@@ -11,6 +11,19 @@ export default {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        ink: "#07121d",
+        navy: "#0d2438",
+        lane: "#16324a",
+        amber: {
+          DEFAULT: "#f0b429",
+          deep: "#d99214",
+        },
+        chalk: "#f4f0e6",
+        mist: "#c9d3de",
+      },
+      fontFamily: {
+        display: ["var(--font-display)", "Impact", "sans-serif"],
+        body: ["var(--font-body)", "Segoe UI", "sans-serif"],
       },
     },
   },

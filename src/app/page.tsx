@@ -1,101 +1,139 @@
 import Image from "next/image";
+import Link from "next/link";
+import { HeroSlider } from "@/components/HeroSlider";
+import { listDeals, listProducts } from "@/lib/store";
+import { ProductCard } from "@/components/ProductCard";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const [products, deals] = await Promise.all([listProducts(), listDeals()]);
+  const featured = products.filter((p) => p.featured).slice(0, 4);
+  const deal = deals.find((d) => d.featured && d.active) || deals.find((d) => d.active);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <>
+      <HeroSlider />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      <section className="site-shell section-pad">
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm tracking-[0.2em] text-amber uppercase">Training</p>
+            <h2 className="display text-4xl md:text-5xl">Bowling Lessons</h2>
+          </div>
+          <Link href="/coaching" className="text-sm text-mist underline decoration-amber/40">
+            View all
+          </Link>
+        </div>
+        <div className="grid gap-5 md:grid-cols-2">
+          <Link
+            href="/coaching"
+            className="group relative min-h-[280px] overflow-hidden rounded-3xl"
           >
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+              src="/images/collections/bowling-lessons.png"
+              alt="Bowling Lessons"
+              fill
+              className="object-cover transition duration-700 group-hover:scale-105"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
+            <div className="absolute bottom-0 p-6">
+              <h3 className="display text-3xl">Bowling Lessons</h3>
+              <p className="mt-1 text-sm text-mist">Private coaching to perfect your game</p>
+            </div>
+          </Link>
+          <Link
+            href="/coaching"
+            className="group relative min-h-[280px] overflow-hidden rounded-3xl"
           >
-            Read our docs
-          </a>
+            <Image
+              src="/images/collections/clinics.jpg"
+              alt="Coaching Clinics"
+              fill
+              className="object-cover transition duration-700 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
+            <div className="absolute bottom-0 p-6">
+              <h3 className="display text-3xl">Coaching Clinics / Group Lessons</h3>
+              <p className="mt-1 text-sm text-mist">Bring Ballard&apos;s Academy to your center</p>
+            </div>
+          </Link>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+      </section>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0">
           <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+            src="/images/hero/slide-2.jpg"
+            alt=""
+            fill
+            className="object-cover opacity-30"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <div className="absolute inset-0 bg-ink/80" />
+        </div>
+        <div className="site-shell section-pad relative">
+          <p className="text-sm tracking-[0.22em] text-amber uppercase">Our Story</p>
+          <h2 className="display mt-2 max-w-3xl text-4xl md:text-6xl">
+            Elite Coaching. Family. Passion.
+          </h2>
+          <div className="mt-8 grid gap-8 lg:grid-cols-2">
+            <div className="space-y-4 text-mist leading-relaxed">
+              <p>
+                <strong className="text-chalk">Mission</strong> – To provide world-class coaching
+                that will enhance the bowling experience to all bowlers and coaches while growing
+                the sport of bowling at all levels on and off the lanes.
+              </p>
+              <p>
+                <strong className="text-chalk">Vision</strong> – To strengthen the bowling community
+                through Education and Coaching.
+              </p>
+            </div>
+            <p className="text-mist leading-relaxed">
+              Ballard&apos;s Bowling Academy was created from the love and passion for the sport of
+              bowling. We believe there is a true inner Champion in all of us whether on the lanes
+              or behind the scenes. There are many facets that lead to success and we look to help
+              you develop a plan to achieve your personal goals. At Ballard&apos;s Bowling Academy
+              we look to inspire you to reach your bowling goals as well as use the tools learned
+              to achieve off-lane success as well.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {deal && (
+        <section className="site-shell section-pad">
+          <div className="grid items-center gap-8 overflow-hidden rounded-[2rem] border border-amber/30 bg-gradient-to-br from-lane/80 to-ink lg:grid-cols-2">
+            <div className="relative min-h-[320px]">
+              <Image src={deal.image} alt={deal.title} fill className="object-cover" />
+            </div>
+            <div className="p-8 md:p-10">
+              <p className="text-sm tracking-[0.2em] text-amber uppercase">Deal of the Month</p>
+              <h2 className="display mt-2 text-4xl md:text-5xl">{deal.title}</h2>
+              <p className="mt-4 text-mist">{deal.description}</p>
+              <Link href="/deals" className="btn btn-primary mt-6">
+                See deals & specials
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="site-shell section-pad pt-0">
+        <div className="mb-8 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm tracking-[0.2em] text-amber uppercase">Pro Shop</p>
+            <h2 className="display text-4xl md:text-5xl">Featured Gear</h2>
+          </div>
+          <Link href="/shop" className="text-sm text-mist underline decoration-amber/40">
+            Shop all
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {featured.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
