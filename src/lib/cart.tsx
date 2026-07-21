@@ -3,8 +3,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
-  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -49,16 +47,11 @@ function subscribe(cb: () => void) {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [hydrated, setHydrated] = useState(false);
   const items = useSyncExternalStore(subscribe, readCart, () => []);
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
   const value: CartContextValue = {
-    items: hydrated ? items : [],
-    count: hydrated ? items.reduce((n, i) => n + i.quantity, 0) : 0,
+    items,
+    count: items.reduce((n, i) => n + i.quantity, 0),
     add(productId, quantity = 1) {
       const next = [...readCart()];
       const existing = next.find((i) => i.productId === productId);

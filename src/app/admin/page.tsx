@@ -60,8 +60,30 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    (async () => {
+      const me = await fetch("/api/auth/me").then((r) => r.json());
+      if (cancelled) return;
+      setUser(me.user || null);
+      if (me.user?.role !== "admin") {
+        setLoading(false);
+        return;
+      }
+      const [p, d, s] = await Promise.all([
+        fetch("/api/products?admin=1").then((r) => r.json()),
+        fetch("/api/deals").then((r) => r.json()),
+        fetch("/api/sponsors").then((r) => r.json()),
+      ]);
+      if (cancelled) return;
+      setProducts(p.products || []);
+      setDeals(d.deals || []);
+      setSponsors(s.sponsors || []);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function uploadImage(file: File): Promise<string | null> {
     const body = new FormData();

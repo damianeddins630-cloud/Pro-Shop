@@ -25,14 +25,18 @@ export function SiteHeader() {
   const shopMode = pathname.startsWith("/shop") || pathname.startsWith("/cart");
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/auth/me")
       .then((r) => r.json())
-      .then((d) => setUser(d.user || null))
-      .catch(() => setUser(null));
-  }, [pathname]);
-
-  useEffect(() => {
-    setOpen(false);
+      .then((d) => {
+        if (!cancelled) setUser(d.user || null);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   return (
@@ -121,13 +125,18 @@ export function SiteHeader() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={() => setOpen(false)}
                 className="rounded-lg px-3 py-2 text-mist hover:bg-white/5 hover:text-chalk"
               >
                 {link.label}
               </Link>
             ))}
             {user?.role === "admin" && (
-              <Link href="/admin" className="rounded-lg px-3 py-2 text-amber">
+              <Link
+                href="/admin"
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-2 text-amber"
+              >
                 Admin
               </Link>
             )}
