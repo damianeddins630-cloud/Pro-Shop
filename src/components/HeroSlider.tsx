@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { EditablePageTitle } from "@/components/EditablePageTitle";
 
-export function HeroSlider() {
+export function HeroSlider({ heroTitle = "Perfect Your Game" }: { heroTitle?: string }) {
   return (
     <section className="relative min-h-[100svh] overflow-hidden">
       <div className="absolute inset-0">
@@ -26,14 +27,18 @@ export function HeroSlider() {
             alt="Ballard's Bowling Academy"
             width={220}
             height={150}
-            className="h-auto w-[160px] md:w-[220px] object-contain"
+            className="h-auto w-[160px] object-contain md:w-[220px]"
             priority
           />
         </div>
 
-        <h1 className="display fade-up max-w-3xl text-5xl text-white md:text-7xl lg:text-8xl">
-          Perfect Your Game
-        </h1>
+        <EditablePageTitle
+          page="home"
+          slot="hero"
+          initial={heroTitle}
+          as="h1"
+          className="display fade-up max-w-3xl text-5xl text-white md:text-7xl lg:text-8xl"
+        />
         <p className="fade-up-delay mt-5 max-w-xl text-base text-mist md:text-lg">
           Hall of Fame coaching and a state-of-the-art pro shop.
         </p>

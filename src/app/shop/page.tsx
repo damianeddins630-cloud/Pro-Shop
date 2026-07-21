@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
-import { ProductCard } from "@/components/ProductCard";
-import { listProducts } from "@/lib/store";
+import { EditablePageTitle } from "@/components/EditablePageTitle";
+import { EditableProductGrid } from "@/components/EditableProductGrid";
+import { getText, listProducts } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,10 @@ export default async function ShopPage({
   searchParams: Promise<{ brand?: string; q?: string; category?: string }>;
 }) {
   const params = await searchParams;
-  const products = await listProducts();
+  const [products, title] = await Promise.all([
+    listProducts(),
+    getText("shop", "title", "Inventory & Gear"),
+  ]);
   const filtered = products.filter((p) => {
     if (params.brand && p.brand !== params.brand) return false;
     if (params.category && p.category !== params.category) return false;
@@ -46,13 +50,19 @@ export default async function ShopPage({
           className="object-cover opacity-40"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 to-ink" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-black" />
         <div className="site-shell relative z-10 py-16 pt-24">
           <div className="flex items-center gap-4">
             <BrandMark mode="cart" size={72} />
             <div>
               <p className="text-sm tracking-[0.22em] text-red uppercase">Pro Shop</p>
-              <h1 className="display text-5xl md:text-7xl">Inventory & Gear</h1>
+              <EditablePageTitle
+                page="shop"
+                slot="title"
+                initial={title}
+                as="h1"
+                className="display text-5xl md:text-7xl"
+              />
             </div>
           </div>
           <p className="mt-4 max-w-2xl text-mist">
@@ -70,8 +80,13 @@ export default async function ShopPage({
               href={b.href}
               className="group relative min-h-[120px] overflow-hidden rounded-2xl border border-white/10"
             >
-              <Image src={b.image} alt={b.name} fill className="object-cover opacity-70 transition group-hover:scale-105" />
-              <div className="absolute inset-0 bg-ink/55" />
+              <Image
+                src={b.image}
+                alt={b.name}
+                fill
+                className="object-cover opacity-70 transition group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-black/55" />
               <span className="absolute inset-x-0 bottom-0 p-3 text-sm font-semibold">{b.name}</span>
             </Link>
           ))}
@@ -84,7 +99,11 @@ export default async function ShopPage({
             placeholder="Search inventory..."
             className="field max-w-sm"
           />
-          <select name="category" defaultValue={params.category || ""} className="field max-w-[200px]">
+          <select
+            name="category"
+            defaultValue={params.category || ""}
+            className="field max-w-[200px]"
+          >
             <option value="">All categories</option>
             {categories.map((c) => (
               <option key={c} value={c}>
@@ -109,11 +128,7 @@ export default async function ShopPage({
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        <EditableProductGrid initial={filtered} />
         {filtered.length === 0 && (
           <p className="mt-8 text-mist">No products match that filter.</p>
         )}

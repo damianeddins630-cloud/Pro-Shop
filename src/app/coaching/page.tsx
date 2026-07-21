@@ -1,14 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
+import { EditableCoaches } from "@/components/EditableCoaches";
+import { EditablePageTitle } from "@/components/EditablePageTitle";
+import { getText, listCoaches } from "@/lib/store";
 
-const coaches = [
-  { name: "Carolyn Dorin-Ballard", image: "/images/coaches/BBA-Coaches-CDB.png" },
-  { name: "Del Ballard, Jr.", image: "/images/coaches/BBA-Coaches-DB.png" },
-  { name: "Paul Fleming", image: "/images/coaches/BBA-Coaches-PF.png" },
-  { name: "Chris Moore", image: "/images/coaches/BBA-Coaches-CM.png" },
-];
+export const dynamic = "force-dynamic";
 
-export default function CoachingPage() {
+export default async function CoachingPage() {
+  const [coaches, title] = await Promise.all([
+    listCoaches(),
+    getText("coaching", "title", "Coaching Clinics / Group Lessons"),
+  ]);
+
   return (
     <>
       <section className="relative min-h-[55vh] overflow-hidden">
@@ -19,12 +22,16 @@ export default function CoachingPage() {
           className="object-cover kenburns"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/75 to-ink/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-black/30" />
         <div className="site-shell relative z-10 flex min-h-[55vh] flex-col justify-end pb-14 pt-28">
           <p className="text-sm tracking-[0.22em] text-red uppercase">Coaching</p>
-          <h1 className="display mt-2 max-w-3xl text-5xl md:text-7xl">
-            Coaching Clinics / Group Lessons
-          </h1>
+          <EditablePageTitle
+            page="coaching"
+            slot="title"
+            initial={title}
+            as="h1"
+            className="display mt-2 max-w-3xl text-5xl md:text-7xl"
+          />
           <p className="mt-4 max-w-2xl text-mist">
             Bring Ballard&apos;s Bowling Academy to you — quality coaching and seminars for
             bowlers and coaches.
@@ -77,19 +84,7 @@ export default function CoachingPage() {
 
       <section className="site-shell section-pad pt-0">
         <h2 className="display mb-6 text-4xl">Our Coaches</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {coaches.map((coach) => (
-            <article
-              key={coach.image}
-              className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
-            >
-              <div className="relative aspect-[3/4]">
-                <Image src={coach.image} alt={coach.name} fill className="object-cover" />
-              </div>
-              <p className="p-3 text-center text-sm font-semibold">{coach.name}</p>
-            </article>
-          ))}
-        </div>
+        <EditableCoaches initial={coaches} />
       </section>
     </>
   );

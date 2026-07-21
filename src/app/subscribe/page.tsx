@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { EditablePageTitle } from "@/components/EditablePageTitle";
 
 export default function SubscribePage() {
   const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -35,7 +36,13 @@ export default function SubscribePage() {
   return (
     <section className="site-shell section-pad pt-24">
       <p className="text-sm tracking-[0.22em] text-red uppercase">Stay connected</p>
-      <h1 className="display mt-2 text-5xl md:text-7xl">Subscribe for Email Updates</h1>
+      <EditablePageTitle
+        page="subscribe"
+        slot="title"
+        initial="Subscribe for Email Updates"
+        as="h1"
+        className="display mt-2 text-5xl md:text-7xl"
+      />
       <p className="mt-4 max-w-2xl text-mist">
         We will email you periodically with news, updates and offers. We will never sell, rent or
         give away your contact information.

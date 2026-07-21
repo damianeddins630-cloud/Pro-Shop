@@ -3,7 +3,9 @@ import { Bebas_Neue, Manrope } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { AdminEditButton } from "@/components/AdminEditButton";
 import { CartProvider } from "@/lib/cart";
+import { EditModeProvider } from "@/lib/edit-mode";
 
 const display = Bebas_Neue({
   weight: "400",
@@ -34,9 +36,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${display.variable} ${body.variable} body-copy antialiased`}>
         <CartProvider>
-          <SiteHeader />
-          <main>{children}</main>
-          <SiteFooter />
+          <EditModeProvider>
+            <SiteHeader />
+            <main>{children}</main>
+            <SiteFooter />
+            <AdminEditButton />
+          </EditModeProvider>
         </CartProvider>
       </body>
     </html>

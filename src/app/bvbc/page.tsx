@@ -1,12 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
+import { EditablePageTitle } from "@/components/EditablePageTitle";
+import { getText } from "@/lib/store";
 
-export default function BvbcPage() {
+export const dynamic = "force-dynamic";
+
+export default async function BvbcPage() {
+  const title = await getText("bvbc", "title", 'Ballard vs. The Big "C"');
+
   return (
     <>
       <section className="relative min-h-[50vh] overflow-hidden">
         <Image src="/images/hero/slide-3.jpg" alt="" fill className="object-cover" priority />
-        <div className="absolute inset-0 bg-ink/80" />
+        <div className="absolute inset-0 bg-black/80" />
         <div className="site-shell relative z-10 flex min-h-[50vh] flex-col justify-end pb-12 pt-28">
           <div className="mb-4 flex items-center gap-4">
             <Image
@@ -14,11 +20,17 @@ export default function BvbcPage() {
               alt="Ballard vs The Big C"
               width={88}
               height={88}
-              className="rounded-full border-2 border-red/70 bg-ink/50 p-2"
+              className="rounded-full border-2 border-red/70 bg-black/50 p-2"
             />
             <div>
               <p className="text-sm tracking-[0.22em] text-red uppercase">Charity</p>
-              <h1 className="display text-4xl md:text-6xl">Ballard vs. The Big &quot;C&quot;</h1>
+              <EditablePageTitle
+                page="bvbc"
+                slot="title"
+                initial={title}
+                as="h1"
+                className="display text-4xl md:text-6xl"
+              />
             </div>
           </div>
           <p className="max-w-2xl text-mist">

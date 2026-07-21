@@ -60,12 +60,28 @@ export interface Subscriber {
   createdAt: string;
 }
 
+export interface Coach {
+  id: string;
+  name: string;
+  image: string;
+  email?: string;
+}
+
+export interface PageText {
+  id: string;
+  page: string;
+  slot: string;
+  text: string;
+}
+
 export interface StoreData {
   products: Product[];
   sponsors: Sponsor[];
   deals: Deal[];
   subscribers: Subscriber[];
   users: User[];
+  coaches: Coach[];
+  texts: PageText[];
 }
 
 export interface CartItem {

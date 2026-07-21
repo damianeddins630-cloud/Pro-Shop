@@ -569,5 +569,93 @@
     }
   ],
   "subscribers": [],
-  "users": []
+  "users": [],
+  "coaches": [
+    {
+      "id": "c1",
+      "name": "Carolyn Dorin-Ballard",
+      "image": "/images/coaches/BBA-Coaches-CDB.png",
+      "email": "Carolynballard.bba@gmail.com"
+    },
+    {
+      "id": "c2",
+      "name": "Del Ballard, Jr.",
+      "image": "/images/coaches/BBA-Coaches-DB.png",
+      "email": "delballard.bba@gmail.com"
+    },
+    {
+      "id": "c3",
+      "name": "Paul Fleming",
+      "image": "/images/coaches/BBA-Coaches-PF.png",
+      "email": ""
+    },
+    {
+      "id": "c4",
+      "name": "Chris Moore",
+      "image": "/images/coaches/BBA-Coaches-CM.png",
+      "email": ""
+    }
+  ],
+  "texts": [
+    {
+      "id": "t1",
+      "page": "home",
+      "slot": "training",
+      "text": "Bowling Lessons"
+    },
+    {
+      "id": "t2",
+      "page": "home",
+      "slot": "story",
+      "text": "Elite Coaching. Family. Passion."
+    },
+    {
+      "id": "t3",
+      "page": "home",
+      "slot": "featured",
+      "text": "Featured Gear"
+    },
+    {
+      "id": "t4",
+      "page": "shop",
+      "slot": "title",
+      "text": "Inventory & Gear"
+    },
+    {
+      "id": "t5",
+      "page": "coaching",
+      "slot": "title",
+      "text": "Coaching Clinics / Group Lessons"
+    },
+    {
+      "id": "t6",
+      "page": "deals",
+      "slot": "title",
+      "text": "Deals and Specials"
+    },
+    {
+      "id": "t7",
+      "page": "sponsors",
+      "slot": "title",
+      "text": "Thank You To All Of Our Sponsors!"
+    },
+    {
+      "id": "t8",
+      "page": "bvbc",
+      "slot": "title",
+      "text": "Ballard vs. The Big \"C\""
+    },
+    {
+      "id": "t9",
+      "page": "subscribe",
+      "slot": "title",
+      "text": "Subscribe for Email Updates"
+    },
+    {
+      "id": "t10",
+      "page": "home",
+      "slot": "hero",
+      "text": "Perfect Your Game"
+    }
+  ]
 }

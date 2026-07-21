@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { HeroSlider } from "@/components/HeroSlider";
-import { listDeals, listProducts } from "@/lib/store";
-import { ProductCard } from "@/components/ProductCard";
+import { EditablePageTitle } from "@/components/EditablePageTitle";
+import { EditableProductGrid } from "@/components/EditableProductGrid";
+import { getText, listDeals, listProducts } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,8 +11,19 @@ export const runtime = "nodejs";
 export default async function HomePage() {
   let products: Awaited<ReturnType<typeof listProducts>> = [];
   let deals: Awaited<ReturnType<typeof listDeals>> = [];
+  let hero = "Perfect Your Game";
+  let training = "Bowling Lessons";
+  let story = "Elite Coaching. Family. Passion.";
+  let featuredTitle = "Featured Gear";
   try {
-    [products, deals] = await Promise.all([listProducts(), listDeals()]);
+    [products, deals, hero, training, story, featuredTitle] = await Promise.all([
+      listProducts(),
+      listDeals(),
+      getText("home", "hero", "Perfect Your Game"),
+      getText("home", "training", "Bowling Lessons"),
+      getText("home", "story", "Elite Coaching. Family. Passion."),
+      getText("home", "featured", "Featured Gear"),
+    ]);
   } catch {
     products = [];
     deals = [];
@@ -21,13 +33,19 @@ export default async function HomePage() {
 
   return (
     <>
-      <HeroSlider />
+      <HeroSlider heroTitle={hero} />
 
       <section className="site-shell section-pad">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
             <p className="text-sm tracking-[0.2em] text-red uppercase">Training</p>
-            <h2 className="display text-4xl md:text-5xl">Bowling Lessons</h2>
+            <EditablePageTitle
+              page="home"
+              slot="training"
+              initial={training}
+              as="h2"
+              className="display text-4xl md:text-5xl"
+            />
           </div>
           <Link href="/coaching" className="text-sm text-mist underline decoration-red/40">
             View all
@@ -44,7 +62,7 @@ export default async function HomePage() {
               fill
               className="object-cover transition duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
             <div className="absolute bottom-0 p-6">
               <h3 className="display text-3xl">Bowling Lessons</h3>
               <p className="mt-1 text-sm text-mist">Private coaching to perfect your game</p>
@@ -60,7 +78,7 @@ export default async function HomePage() {
               fill
               className="object-cover transition duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
             <div className="absolute bottom-0 p-6">
               <h3 className="display text-3xl">Coaching Clinics / Group Lessons</h3>
               <p className="mt-1 text-sm text-mist">Bring Ballard&apos;s Academy to your center</p>
@@ -81,9 +99,13 @@ export default async function HomePage() {
         </div>
         <div className="site-shell section-pad relative">
           <p className="text-sm tracking-[0.22em] text-red uppercase">Our Story</p>
-          <h2 className="display mt-2 max-w-3xl text-4xl md:text-6xl">
-            Elite Coaching. Family. Passion.
-          </h2>
+          <EditablePageTitle
+            page="home"
+            slot="story"
+            initial={story}
+            as="h2"
+            className="display mt-2 max-w-3xl text-4xl md:text-6xl"
+          />
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
             <div className="space-y-4 text-mist leading-relaxed">
               <p>
@@ -130,17 +152,19 @@ export default async function HomePage() {
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
             <p className="text-sm tracking-[0.2em] text-red uppercase">Pro Shop</p>
-            <h2 className="display text-4xl md:text-5xl">Featured Gear</h2>
+            <EditablePageTitle
+              page="home"
+              slot="featured"
+              initial={featuredTitle}
+              as="h2"
+              className="display text-4xl md:text-5xl"
+            />
           </div>
           <Link href="/shop" className="text-sm text-mist underline decoration-red/40">
             Shop all
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {featured.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        <EditableProductGrid initial={featured} />
       </section>
     </>
   );

@@ -2,10 +2,10 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
-import type { StoreData, User, Product, Sponsor, Deal, Subscriber } from "./types";
+import type { StoreData, User, Product, Sponsor, Deal, Subscriber, Coach, PageText } from "./types";
 import seedJson from "@/data/seed.json";
 
-const GLOBAL_KEY = "__bba_store_v2__";
+const GLOBAL_KEY = "__bba_store_v3__";
 
 type GlobalStore = {
   data: StoreData | null;
@@ -34,6 +34,8 @@ function cloneSeed(): StoreData {
   seed.products = seed.products || [];
   seed.sponsors = seed.sponsors || [];
   seed.deals = seed.deals || [];
+  seed.coaches = seed.coaches || [];
+  seed.texts = seed.texts || [];
   return seed;
 }
 
@@ -71,6 +73,8 @@ async function loadFromDisk(): Promise<StoreData> {
     parsed.products = parsed.products?.length ? parsed.products : cloneSeed().products;
     parsed.sponsors = parsed.sponsors?.length ? parsed.sponsors : cloneSeed().sponsors;
     parsed.deals = parsed.deals?.length ? parsed.deals : cloneSeed().deals;
+    parsed.coaches = parsed.coaches?.length ? parsed.coaches : cloneSeed().coaches;
+    parsed.texts = parsed.texts?.length ? parsed.texts : cloneSeed().texts;
     parsed.subscribers = parsed.subscribers || [];
     return parsed;
   } catch {
@@ -296,4 +300,88 @@ export async function reduceStock(items: { productId: string; quantity: number }
       p.stock -= item.quantity;
     }
   });
+}
+
+export async function listCoaches() {
+  return (await getStore()).coaches || [];
+}
+
+export async function createCoach(input: Omit<Coach, "id">) {
+  let created: Coach | null = null;
+  await mutate((data) => {
+    data.coaches = data.coaches || [];
+    created = { ...input, id: randomUUID() };
+    data.coaches.push(created);
+  });
+  return created!;
+}
+
+export async function updateCoach(id: string, patch: Partial<Coach>) {
+  let updated: Coach | null = null;
+  await mutate((data) => {
+    data.coaches = data.coaches || [];
+    const idx = data.coaches.findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    data.coaches[idx] = { ...data.coaches[idx], ...patch, id };
+    updated = data.coaches[idx];
+  });
+  return updated;
+}
+
+export async function deleteCoach(id: string) {
+  let ok = false;
+  await mutate((data) => {
+    data.coaches = data.coaches || [];
+    const before = data.coaches.length;
+    data.coaches = data.coaches.filter((c) => c.id !== id);
+    ok = data.coaches.length < before;
+  });
+  return ok;
+}
+
+export async function listTexts(page?: string) {
+  const texts = (await getStore()).texts || [];
+  return page ? texts.filter((t) => t.page === page) : texts;
+}
+
+export async function getText(page: string, slot: string, fallback = "") {
+  const texts = await listTexts(page);
+  return texts.find((t) => t.slot === slot)?.text || fallback;
+}
+
+export async function upsertText(page: string, slot: string, text: string) {
+  let saved: PageText | null = null;
+  await mutate((data) => {
+    data.texts = data.texts || [];
+    const idx = data.texts.findIndex((t) => t.page === page && t.slot === slot);
+    if (idx >= 0) {
+      data.texts[idx] = { ...data.texts[idx], text };
+      saved = data.texts[idx];
+    } else {
+      saved = { id: randomUUID(), page, slot, text };
+      data.texts.push(saved);
+    }
+  });
+  return saved!;
+}
+
+export async function createText(input: Omit<PageText, "id">) {
+  let created: PageText | null = null;
+  await mutate((data) => {
+    data.texts = data.texts || [];
+    created = { ...input, id: randomUUID() };
+    data.texts.push(created);
+  });
+  return created!;
+}
+
+export async function deleteText(id: string) {
+  let ok = false;
+  await mutate((data) => {
+    data.texts = data.texts || [];
+    const before = data.texts.length;
+    data.texts = data.texts.filter((t) => t.id !== id);
+    ok = data.texts.length < before;
+  });
+  return ok;
 }
