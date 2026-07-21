@@ -77,6 +77,9 @@ export default function ProfilePage() {
           <Link href="/shop" className="btn btn-ghost">
             Shop
           </Link>
+          <Link href="/subscribe" className="btn btn-ghost">
+            Subscribe
+          </Link>
           <button type="button" onClick={logout} className="btn btn-ghost">
             Log out
           </button>
