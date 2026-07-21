@@ -9,19 +9,17 @@ type BrandMarkProps = {
 };
 
 export function BrandMark({ mode = "logo", size = 52, className = "" }: BrandMarkProps) {
-  return (
-    <div
-      className={`circle-mark pulse-glow ${className}`}
-      style={{ width: size, height: size }}
-      aria-hidden
-    >
-      {mode === "logo" ? (
-        <Image src="/images/logo.png" alt="" width={size} height={size} priority />
-      ) : (
+  if (mode === "cart") {
+    return (
+      <div
+        className={`grid place-items-center ${className}`}
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
         <svg
           viewBox="0 0 24 24"
-          width={size * 0.48}
-          height={size * 0.48}
+          width={size * 0.72}
+          height={size * 0.72}
           fill="none"
           stroke="#e10600"
           strokeWidth="1.8"
@@ -30,7 +28,19 @@ export function BrandMark({ mode = "logo", size = 52, className = "" }: BrandMar
           <circle cx="10" cy="20" r="1.4" fill="#e10600" stroke="none" />
           <circle cx="17" cy="20" r="1.4" fill="#e10600" stroke="none" />
         </svg>
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src="/images/logo.png"
+      alt="Ballard's Bowling Academy"
+      width={size}
+      height={size}
+      className={`object-contain ${className}`}
+      style={{ width: size, height: "auto" }}
+      priority
+    />
   );
 }
