@@ -34,7 +34,7 @@ export default function SubscribePage() {
 
   return (
     <section className="site-shell section-pad pt-24">
-      <p className="text-sm tracking-[0.22em] text-amber uppercase">Stay connected</p>
+      <p className="text-sm tracking-[0.22em] text-red uppercase">Stay connected</p>
       <h1 className="display mt-2 text-5xl md:text-7xl">Subscribe for Email Updates</h1>
       <p className="mt-4 max-w-2xl text-mist">
         We will email you periodically with news, updates and offers. We will never sell, rent or

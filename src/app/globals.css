@@ -3,18 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --ink: #07121d;
-  --navy: #0d2438;
-  --lane: #16324a;
-  --amber: #f0b429;
-  --amber-deep: #d99214;
-  --chalk: #f4f0e6;
-  --mist: #c9d3de;
-  --wood: #8b5a2b;
-  --success: #2f9e6b;
-  --danger: #c23b3b;
+  --ink: #000000;
+  --black: #0a0a0a;
+  --panel: #121212;
+  --red: #e10600;
+  --red-deep: #b00000;
+  --white: #ffffff;
+  --fog: #d7d7d7;
+  --steel: #8a8a8a;
   --background: var(--ink);
-  --foreground: var(--chalk);
+  --foreground: var(--white);
 }
 
 * {
@@ -27,10 +25,14 @@ html {
 
 body {
   color: var(--foreground);
-  background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(240, 180, 41, 0.16), transparent 55%),
-    radial-gradient(900px 500px at -10% 20%, rgba(22, 70, 110, 0.45), transparent 50%),
-    linear-gradient(180deg, #07121d 0%, #0d2438 45%, #0a1a29 100%);
+  background-color: #000;
+  background-image:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.72) 55%, rgba(0, 0, 0, 0.92) 100%),
+    url("/images/site-bg.jpg");
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   min-height: 100vh;
 }
 
@@ -40,7 +42,7 @@ a {
 }
 
 ::selection {
-  background: rgba(240, 180, 41, 0.35);
+  background: rgba(225, 6, 0, 0.45);
   color: #fff;
 }
 
@@ -73,7 +75,7 @@ a {
   padding: 0.85rem 1.35rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .btn:hover {
@@ -81,46 +83,46 @@ a {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--amber), var(--amber-deep));
-  color: #1a1205;
-  box-shadow: 0 10px 30px rgba(240, 180, 41, 0.22);
+  background: linear-gradient(135deg, var(--red), var(--red-deep));
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(225, 6, 0, 0.28);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 14px 34px rgba(240, 180, 41, 0.32);
+  box-shadow: 0 14px 34px rgba(225, 6, 0, 0.4);
 }
 
 .btn-ghost {
-  border: 1px solid rgba(244, 240, 230, 0.28);
-  background: rgba(7, 18, 29, 0.35);
-  color: var(--chalk);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--white);
   backdrop-filter: blur(8px);
 }
 
 .btn-ghost:hover {
-  border-color: rgba(240, 180, 41, 0.55);
+  border-color: rgba(225, 6, 0, 0.8);
 }
 
 .field {
   width: 100%;
-  border: 1px solid rgba(244, 240, 230, 0.18);
-  background: rgba(7, 18, 29, 0.55);
-  color: var(--chalk);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.65);
+  color: var(--white);
   border-radius: 0.85rem;
   padding: 0.8rem 0.95rem;
   outline: none;
 }
 
 .field:focus {
-  border-color: rgba(240, 180, 41, 0.7);
-  box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.15);
+  border-color: rgba(225, 6, 0, 0.85);
+  box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.18);
 }
 
 .label {
   display: block;
   margin-bottom: 0.4rem;
   font-size: 0.85rem;
-  color: var(--mist);
+  color: var(--fog);
 }
 
 .circle-mark {
@@ -130,15 +132,21 @@ a {
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 2px solid rgba(240, 180, 41, 0.7);
-  background: radial-gradient(circle at 30% 30%, #234866, #0b1c2c 70%);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--red);
+  background: #000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(225, 6, 0, 0.25);
 }
 
 .circle-mark img {
   width: 78%;
   height: 78%;
   object-fit: contain;
+}
+
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
 }
 
 .fade-up {
@@ -151,6 +159,10 @@ a {
 
 .kenburns {
   animation: kenburns 14s ease-in-out infinite alternate;
+}
+
+.pulse-glow {
+  animation: pulseGlow 2.4s ease-in-out infinite;
 }
 
 @keyframes fadeUp {
@@ -166,23 +178,25 @@ a {
 
 @keyframes kenburns {
   from {
-    transform: scale(1.05) translate3d(0, 0, 0);
+    transform: scale(1.02) translate3d(0, 0, 0);
   }
   to {
-    transform: scale(1.14) translate3d(-1.5%, -1%, 0);
+    transform: scale(1.08) translate3d(-1%, -0.5%, 0);
   }
 }
 
 @keyframes pulseGlow {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.25);
+    box-shadow: 0 0 0 0 rgba(225, 6, 0, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 10px rgba(240, 180, 41, 0);
+    box-shadow: 0 0 0 10px rgba(225, 6, 0, 0);
   }
 }
 
-.pulse-glow {
-  animation: pulseGlow 2.4s ease-in-out infinite;
+@media (max-width: 768px) {
+  body {
+    background-attachment: scroll;
+  }
 }

@@ -213,10 +213,10 @@ export default function AdminPage() {
     <section className="site-shell section-pad pt-24">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm tracking-[0.2em] text-amber uppercase">Owner dashboard</p>
+          <p className="text-sm tracking-[0.2em] text-red uppercase">Owner dashboard</p>
           <h1 className="display text-5xl md:text-6xl">Inventory & Site Admin</h1>
           <p className="mt-2 text-mist">
-            Signed in as <span className="text-amber">{user.username}</span> — full permissions
+            Signed in as <span className="text-red">{user.username}</span> — full permissions
           </p>
         </div>
         <div className="flex gap-2">
@@ -226,7 +226,7 @@ export default function AdminPage() {
               type="button"
               onClick={() => setTab(t)}
               className={`rounded-full px-4 py-2 text-sm capitalize ${
-                tab === t ? "bg-amber text-ink font-bold" : "border border-white/15 text-mist"
+                tab === t ? "bg-red text-white font-bold" : "border border-white/15 text-mist"
               }`}
             >
               {t}
@@ -371,7 +371,7 @@ export default function AdminPage() {
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
-                        className="text-xs text-amber underline"
+                        className="text-xs text-red underline"
                         onClick={() => {
                           setEditingId(p.id);
                           setForm({
@@ -476,7 +476,7 @@ export default function AdminPage() {
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
-                        className="text-xs text-amber underline"
+                        className="text-xs text-red underline"
                         onClick={() => {
                           setEditingDealId(d.id);
                           setDealForm({
@@ -557,7 +557,7 @@ export default function AdminPage() {
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
-                    className="text-xs text-amber underline"
+                    className="text-xs text-red underline"
                     onClick={() => {
                       setEditingSponsorId(s.id);
                       setSponsorForm({ name: s.name, image: s.image, url: s.url });

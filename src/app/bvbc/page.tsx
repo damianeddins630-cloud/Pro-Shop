@@ -14,10 +14,10 @@ export default function BvbcPage() {
               alt="Ballard vs The Big C"
               width={88}
               height={88}
-              className="rounded-full border-2 border-amber/70 bg-ink/50 p-2"
+              className="rounded-full border-2 border-red/70 bg-ink/50 p-2"
             />
             <div>
-              <p className="text-sm tracking-[0.22em] text-amber uppercase">Charity</p>
+              <p className="text-sm tracking-[0.22em] text-red uppercase">Charity</p>
               <h1 className="display text-4xl md:text-6xl">Ballard vs. The Big &quot;C&quot;</h1>
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function BvbcPage() {
               className="h-auto w-full"
             />
           </div>
-          <div className="rounded-3xl border border-amber/25 bg-lane/40 p-6">
+          <div className="rounded-3xl border border-red/25 bg-lane/40 p-6">
             <h3 className="display text-3xl">Where the $ Goes</h3>
             <p className="mt-3 text-sm leading-relaxed text-mist">
               With generous donations from our sponsors and supporters like you, we provide support

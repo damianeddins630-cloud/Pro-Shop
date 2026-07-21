@@ -9,7 +9,7 @@ export default async function DealsPage() {
   return (
     <>
       <section className="site-shell section-pad pt-24">
-        <p className="text-sm tracking-[0.22em] text-amber uppercase">Specials</p>
+        <p className="text-sm tracking-[0.22em] text-red uppercase">Specials</p>
         <h1 className="display mt-2 text-5xl md:text-7xl">Deals and Specials</h1>
         <p className="mt-4 max-w-2xl text-mist">
           Deal of the month and seasonal offers from Ballard&apos;s Bowling Academy Pro Shop.
@@ -27,7 +27,7 @@ export default async function DealsPage() {
             </div>
             <div className="flex flex-col justify-center p-8 md:p-10">
               {deal.featured && (
-                <span className="mb-3 w-fit rounded-full bg-amber/15 px-3 py-1 text-xs tracking-[0.16em] text-amber uppercase">
+                <span className="mb-3 w-fit rounded-full bg-red/15 px-3 py-1 text-xs tracking-[0.16em] text-red uppercase">
                   Deal of the Month
                 </span>
               )}

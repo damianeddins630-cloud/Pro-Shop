@@ -15,8 +15,8 @@ export default function GlobalError({
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
-          background: "#07121d",
-          color: "#f4f0e6",
+          background: "#000000",
+          color: "#ffffff",
           fontFamily: "system-ui, sans-serif",
           padding: "2rem",
         }}
@@ -32,8 +32,8 @@ export default function GlobalError({
             type="button"
             onClick={reset}
             style={{
-              background: "#f0b429",
-              color: "#1a1205",
+              background: "#e10600",
+              color: "#ffffff",
               border: 0,
               borderRadius: 999,
               padding: "0.85rem 1.4rem",

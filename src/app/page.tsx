@@ -26,10 +26,10 @@ export default async function HomePage() {
       <section className="site-shell section-pad">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm tracking-[0.2em] text-amber uppercase">Training</p>
+            <p className="text-sm tracking-[0.2em] text-red uppercase">Training</p>
             <h2 className="display text-4xl md:text-5xl">Bowling Lessons</h2>
           </div>
-          <Link href="/coaching" className="text-sm text-mist underline decoration-amber/40">
+          <Link href="/coaching" className="text-sm text-mist underline decoration-red/40">
             View all
           </Link>
         </div>
@@ -77,10 +77,10 @@ export default async function HomePage() {
             fill
             className="object-cover opacity-30"
           />
-          <div className="absolute inset-0 bg-ink/80" />
+          <div className="absolute inset-0 bg-black/85" />
         </div>
         <div className="site-shell section-pad relative">
-          <p className="text-sm tracking-[0.22em] text-amber uppercase">Our Story</p>
+          <p className="text-sm tracking-[0.22em] text-red uppercase">Our Story</p>
           <h2 className="display mt-2 max-w-3xl text-4xl md:text-6xl">
             Elite Coaching. Family. Passion.
           </h2>
@@ -110,12 +110,12 @@ export default async function HomePage() {
 
       {deal && (
         <section className="site-shell section-pad">
-          <div className="grid items-center gap-8 overflow-hidden rounded-[2rem] border border-amber/30 bg-gradient-to-br from-lane/80 to-ink lg:grid-cols-2">
+          <div className="grid items-center gap-8 overflow-hidden rounded-[2rem] border border-red/30 bg-gradient-to-br from-lane/80 to-ink lg:grid-cols-2">
             <div className="relative min-h-[320px]">
               <Image src={deal.image} alt={deal.title} fill className="object-cover" />
             </div>
             <div className="p-8 md:p-10">
-              <p className="text-sm tracking-[0.2em] text-amber uppercase">Deal of the Month</p>
+              <p className="text-sm tracking-[0.2em] text-red uppercase">Deal of the Month</p>
               <h2 className="display mt-2 text-4xl md:text-5xl">{deal.title}</h2>
               <p className="mt-4 text-mist">{deal.description}</p>
               <Link href="/deals" className="btn btn-primary mt-6">
@@ -129,10 +129,10 @@ export default async function HomePage() {
       <section className="site-shell section-pad pt-0">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm tracking-[0.2em] text-amber uppercase">Pro Shop</p>
+            <p className="text-sm tracking-[0.2em] text-red uppercase">Pro Shop</p>
             <h2 className="display text-4xl md:text-5xl">Featured Gear</h2>
           </div>
-          <Link href="/shop" className="text-sm text-mist underline decoration-amber/40">
+          <Link href="/shop" className="text-sm text-mist underline decoration-red/40">
             Shop all
           </Link>
         </div>

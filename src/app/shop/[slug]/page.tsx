@@ -17,7 +17,7 @@ export default async function ProductPage({
 
   return (
     <section className="site-shell section-pad pt-24">
-      <Link href="/shop" className="text-sm text-mist underline decoration-amber/40">
+      <Link href="/shop" className="text-sm text-mist underline decoration-red/40">
         ← Back to shop
       </Link>
       <div className="mt-6 grid gap-8 lg:grid-cols-2">
@@ -31,7 +31,7 @@ export default async function ProductPage({
           />
         </div>
         <div>
-          <p className="text-sm tracking-[0.18em] text-amber uppercase">{product.brand}</p>
+          <p className="text-sm tracking-[0.18em] text-red uppercase">{product.brand}</p>
           <h1 className="display mt-2 text-5xl md:text-6xl">{product.name}</h1>
           <p className="mt-4 text-2xl text-chalk">${product.price.toFixed(2)}</p>
           <p className="mt-2 text-sm text-mist">

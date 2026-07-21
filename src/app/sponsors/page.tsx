@@ -8,7 +8,7 @@ export default async function SponsorsPage() {
 
   return (
     <section className="site-shell section-pad pt-24">
-      <p className="text-sm tracking-[0.22em] text-amber uppercase">Partners</p>
+      <p className="text-sm tracking-[0.22em] text-red uppercase">Partners</p>
       <h1 className="display mt-2 text-5xl md:text-7xl">
         Thank You To All Of Our Sponsors!
       </h1>
@@ -23,7 +23,7 @@ export default async function SponsorsPage() {
             href={sponsor.url || "#"}
             target={sponsor.url?.startsWith("http") ? "_blank" : undefined}
             rel="noreferrer"
-            className="group flex flex-col items-center rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-amber/40"
+            className="group flex flex-col items-center rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-red/40"
           >
             <div className="relative mb-4 h-28 w-full">
               <Image
@@ -33,7 +33,7 @@ export default async function SponsorsPage() {
                 className="object-contain"
               />
             </div>
-            <span className="text-center text-sm font-semibold text-chalk group-hover:text-amber">
+            <span className="text-center text-sm font-semibold text-chalk group-hover:text-red">
               {sponsor.name}
             </span>
           </a>

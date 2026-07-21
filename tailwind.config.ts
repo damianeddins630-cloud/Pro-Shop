@@ -11,15 +11,23 @@ export default {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
-        ink: "#07121d",
-        navy: "#0d2438",
-        lane: "#16324a",
-        amber: {
-          DEFAULT: "#f0b429",
-          deep: "#d99214",
+        ink: "#000000",
+        black: "#0a0a0a",
+        panel: "#121212",
+        red: {
+          DEFAULT: "#e10600",
+          deep: "#b00000",
         },
-        chalk: "#f4f0e6",
-        mist: "#c9d3de",
+        chalk: "#ffffff",
+        mist: "#d7d7d7",
+        steel: "#8a8a8a",
+        // keep old tokens mapped so existing classnames still work
+        amber: {
+          DEFAULT: "#e10600",
+          deep: "#b00000",
+        },
+        navy: "#0a0a0a",
+        lane: "#161616",
       },
       fontFamily: {
         display: ["var(--font-display)", "Impact", "sans-serif"],

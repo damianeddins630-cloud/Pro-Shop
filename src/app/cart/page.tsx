@@ -51,7 +51,7 @@ export default function CartPage() {
       <div className="mb-8 flex items-center gap-4">
         <BrandMark mode="cart" size={64} />
         <div>
-          <p className="text-sm tracking-[0.2em] text-amber uppercase">Checkout</p>
+          <p className="text-sm tracking-[0.2em] text-red uppercase">Checkout</p>
           <h1 className="display text-5xl">Your Cart</h1>
         </div>
       </div>
@@ -102,7 +102,7 @@ export default function CartPage() {
             ))}
           </div>
 
-          <aside className="h-fit rounded-3xl border border-amber/25 bg-lane/40 p-6">
+          <aside className="h-fit rounded-3xl border border-red/25 bg-lane/40 p-6">
             <h2 className="display text-3xl">Order summary</h2>
             <p className="mt-4 text-2xl">${total(products).toFixed(2)}</p>
             <p className="mt-2 text-sm text-mist">

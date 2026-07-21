@@ -48,7 +48,7 @@ export default function ProfilePage() {
   return (
     <section className="site-shell section-pad pt-24">
       <div className="max-w-xl rounded-3xl border border-white/10 bg-white/[0.03] p-8">
-        <p className="text-sm tracking-[0.2em] text-amber uppercase">Your account</p>
+        <p className="text-sm tracking-[0.2em] text-red uppercase">Your account</p>
         <h1 className="display mt-2 text-5xl">{user.username}</h1>
         <dl className="mt-8 space-y-3 text-sm">
           <div className="flex justify-between gap-4 border-b border-white/10 py-2">
@@ -65,7 +65,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex justify-between gap-4 border-b border-white/10 py-2">
             <dt className="text-mist">Role</dt>
-            <dd className="capitalize text-amber">{user.role}</dd>
+            <dd className="capitalize text-red">{user.role}</dd>
           </div>
         </dl>
         <div className="mt-8 flex flex-wrap gap-3">

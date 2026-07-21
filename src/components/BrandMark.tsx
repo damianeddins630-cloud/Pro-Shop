@@ -1,4 +1,5 @@
 "use client";
+
 import Image from "next/image";
 
 type BrandMarkProps = {
@@ -22,12 +23,12 @@ export function BrandMark({ mode = "logo", size = 52, className = "" }: BrandMar
           width={size * 0.48}
           height={size * 0.48}
           fill="none"
-          stroke="#f0b429"
+          stroke="#e10600"
           strokeWidth="1.8"
         >
           <path d="M3 4h2l2.2 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 8H7" />
-          <circle cx="10" cy="20" r="1.4" fill="#f0b429" stroke="none" />
-          <circle cx="17" cy="20" r="1.4" fill="#f0b429" stroke="none" />
+          <circle cx="10" cy="20" r="1.4" fill="#e10600" stroke="none" />
+          <circle cx="17" cy="20" r="1.4" fill="#e10600" stroke="none" />
         </svg>
       )}
     </div>

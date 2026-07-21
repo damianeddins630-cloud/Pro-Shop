@@ -3,7 +3,7 @@ import { BrandMark } from "./BrandMark";
 
 export function SiteFooter() {
   return (
-    <footer className="mt-10 border-t border-white/10 bg-black/25">
+    <footer className="mt-10 border-t border-white/10 bg-black/80">
       <div className="site-shell section-pad grid gap-8 md:grid-cols-[1.3fr_1fr_1fr]">
         <div>
           <div className="mb-4 flex items-center gap-3">
@@ -19,7 +19,7 @@ export function SiteFooter() {
           </p>
         </div>
         <div>
-          <h3 className="mb-3 text-sm font-semibold tracking-[0.16em] text-amber uppercase">
+          <h3 className="mb-3 text-sm font-semibold tracking-[0.16em] text-red uppercase">
             Explore
           </h3>
           <div className="flex flex-col gap-2 text-sm text-mist">
@@ -30,13 +30,13 @@ export function SiteFooter() {
           </div>
         </div>
         <div>
-          <h3 className="mb-3 text-sm font-semibold tracking-[0.16em] text-amber uppercase">
+          <h3 className="mb-3 text-sm font-semibold tracking-[0.16em] text-red uppercase">
             Contact
           </h3>
           <p className="text-sm text-mist">
             Coaching inquiries:{" "}
             <a
-              className="text-chalk underline decoration-amber/50"
+              className="text-chalk underline decoration-red/50"
               href="mailto:Contactus@ballardsbowlingacdemy.com"
             >
               Contactus@ballardsbowlingacdemy.com

@@ -51,7 +51,7 @@ export default async function ShopPage({
           <div className="flex items-center gap-4">
             <BrandMark mode="cart" size={72} />
             <div>
-              <p className="text-sm tracking-[0.22em] text-amber uppercase">Pro Shop</p>
+              <p className="text-sm tracking-[0.22em] text-red uppercase">Pro Shop</p>
               <h1 className="display text-5xl md:text-7xl">Inventory & Gear</h1>
             </div>
           </div>
@@ -105,7 +105,7 @@ export default async function ShopPage({
 
         {params.brand && (
           <p className="mb-4 text-sm text-mist">
-            Showing brand: <span className="text-amber">{params.brand}</span>
+            Showing brand: <span className="text-red">{params.brand}</span>
           </p>
         )}
 

@@ -57,7 +57,7 @@ export default function LoginPage() {
         </form>
         <p className="mt-6 text-sm text-mist">
           Need an account?{" "}
-          <Link href="/register" className="text-amber underline">
+          <Link href="/register" className="text-red underline">
             Register
           </Link>
         </p>

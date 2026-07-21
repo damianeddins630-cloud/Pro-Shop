@@ -21,7 +21,7 @@ export default function CoachingPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/75 to-ink/30" />
         <div className="site-shell relative z-10 flex min-h-[55vh] flex-col justify-end pb-14 pt-28">
-          <p className="text-sm tracking-[0.22em] text-amber uppercase">Coaching</p>
+          <p className="text-sm tracking-[0.22em] text-red uppercase">Coaching</p>
           <h1 className="display mt-2 max-w-3xl text-5xl md:text-7xl">
             Coaching Clinics / Group Lessons
           </h1>
@@ -42,7 +42,7 @@ export default function CoachingPage() {
           <p className="mt-4 leading-relaxed text-mist">
             Please reach out to us via email —{" "}
             <a
-              className="text-amber underline"
+              className="text-red underline"
               href="mailto:Contactus@ballardsbowlingacdemy.com"
             >
               Contactus@ballardsbowlingacdemy.com

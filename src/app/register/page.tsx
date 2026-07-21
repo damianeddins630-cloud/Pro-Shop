@@ -80,7 +80,7 @@ export default function RegisterPage() {
         </form>
         <p className="mt-6 text-sm text-mist">
           Already have an account?{" "}
-          <Link href="/login" className="text-amber underline">
+          <Link href="/login" className="text-red underline">
             Login
           </Link>
         </p>

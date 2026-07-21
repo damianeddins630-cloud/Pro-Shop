@@ -40,7 +40,7 @@ export function SiteHeader() {
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#07121d]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/85 backdrop-blur-xl">
       <div className="site-shell flex items-center justify-between gap-4 py-3">
         <Link href="/" className="flex items-center gap-3">
           <BrandMark mode={shopMode ? "cart" : "logo"} size={54} />
@@ -48,7 +48,7 @@ export function SiteHeader() {
             <div className="display text-xl text-chalk md:text-2xl">
               Ballard&apos;s
             </div>
-            <div className="text-xs tracking-[0.18em] text-amber uppercase">
+            <div className="text-xs tracking-[0.18em] text-red uppercase">
               Bowling Academy
             </div>
           </div>
@@ -63,7 +63,7 @@ export function SiteHeader() {
                 href={link.href}
                 className={`rounded-full px-3 py-2 text-sm transition ${
                   active
-                    ? "bg-amber/15 text-amber"
+                    ? "bg-red/15 text-red"
                     : "text-mist hover:bg-white/5 hover:text-chalk"
                 }`}
               >
@@ -76,11 +76,11 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <Link
             href="/cart"
-            className="relative rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-amber/50"
+            className="relative rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-red/60"
           >
             Cart
             {count > 0 && (
-              <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-amber px-1 text-[11px] font-bold text-ink">
+              <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red px-1 text-[11px] font-bold text-white">
                 {count}
               </span>
             )}
@@ -90,14 +90,14 @@ export function SiteHeader() {
               {user.role === "admin" && (
                 <Link
                   href="/admin"
-                  className="hidden rounded-full bg-amber px-3 py-2 text-sm font-bold text-ink sm:inline-flex"
+                  className="hidden rounded-full bg-red px-3 py-2 text-sm font-bold text-white sm:inline-flex"
                 >
                   Admin
                 </Link>
               )}
               <Link
                 href="/profile"
-                className="rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-amber/50"
+                className="rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-red/60"
               >
                 Profile
               </Link>
@@ -135,7 +135,7 @@ export function SiteHeader() {
               <Link
                 href="/admin"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2 text-amber"
+                className="rounded-lg px-3 py-2 text-red"
               >
                 Admin
               </Link>
