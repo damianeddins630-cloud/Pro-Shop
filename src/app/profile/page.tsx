@@ -4,41 +4,61 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useEditMode } from "@/lib/edit-mode";
 import type { Order, PublicUser } from "@/lib/types";
 
 type Tab = "account" | "orders";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user: ctxUser, refreshUser } = useEditMode();
   const [user, setUser] = useState<PublicUser | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tab, setTab] = useState<Tab>("account");
   const [loading, setLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const me = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json());
-      if (cancelled) return;
-      setUser(me.user || null);
-      if (me.user) {
-        const o = await fetch("/api/orders", { cache: "no-store" }).then((r) => r.json());
-        if (!cancelled) setOrders(o.orders || []);
+      try {
+        const meRes = await fetch("/api/auth/me", { cache: "no-store" });
+        const me = await meRes.json();
+        if (cancelled) return;
+        const nextUser = (me.user as PublicUser | null) || ctxUser || null;
+        setUser(nextUser);
+
+        if (nextUser) {
+          try {
+            const oRes = await fetch("/api/orders", { cache: "no-store" });
+            const o = await oRes.json();
+            if (!cancelled) {
+              if (oRes.ok) setOrders(o.orders || []);
+              else setOrdersError(o.error || "Could not load orders");
+            }
+          } catch {
+            if (!cancelled) setOrdersError("Could not load orders");
+          }
+        }
+      } catch {
+        if (!cancelled) setUser(ctxUser || null);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      if (!cancelled) setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ctxUser]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
+    await refreshUser();
     router.push("/");
     router.refresh();
   }
 
-  if (loading) {
+  if (loading && !user && !ctxUser) {
     return (
       <section className="site-shell section-pad pt-24">
         <p className="text-mist">Loading profile...</p>
@@ -46,7 +66,9 @@ export default function ProfilePage() {
     );
   }
 
-  if (!user) {
+  const view = user || ctxUser;
+
+  if (!view) {
     return (
       <section className="site-shell section-pad pt-24">
         <h1 className="display text-5xl">Profile</h1>
@@ -59,7 +81,7 @@ export default function ProfilePage() {
   }
 
   const canAdmin =
-    user.permissions?.some((p) =>
+    view.permissions?.some((p) =>
       [
         "manage_inventory",
         "manage_roles",
@@ -76,7 +98,7 @@ export default function ProfilePage() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm tracking-[0.2em] text-red uppercase">Your account</p>
-          <h1 className="display text-5xl">{user.username}</h1>
+          <h1 className="display text-5xl">{view.username}</h1>
         </div>
         <div className="flex gap-2">
           {(["account", "orders"] as Tab[]).map((t) => (
@@ -99,19 +121,19 @@ export default function ProfilePage() {
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between gap-4 border-b border-white/10 py-2">
               <dt className="text-mist">Email</dt>
-              <dd>{user.email}</dd>
+              <dd>{view.email}</dd>
             </div>
             <div className="flex justify-between gap-4 border-b border-white/10 py-2">
               <dt className="text-mist">Phone</dt>
-              <dd>{user.phoneNumber || "—"}</dd>
+              <dd>{view.phoneNumber || "—"}</dd>
             </div>
             <div className="flex justify-between gap-4 border-b border-white/10 py-2">
               <dt className="text-mist">Date of birth</dt>
-              <dd>{user.dateOfBirth}</dd>
+              <dd>{view.dateOfBirth || "—"}</dd>
             </div>
             <div className="flex justify-between gap-4 border-b border-white/10 py-2">
               <dt className="text-mist">Role</dt>
-              <dd className="text-red">{user.roleName}</dd>
+              <dd className="text-red">{view.roleName || "Member"}</dd>
             </div>
           </dl>
           <div className="mt-8 flex flex-wrap gap-3">
@@ -132,6 +154,7 @@ export default function ProfilePage() {
 
       {tab === "orders" && (
         <div className="space-y-4">
+          {ordersError && <p className="text-sm text-red-300">{ordersError}</p>}
           {orders.length === 0 ? (
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
               <p className="text-mist">No previous orders yet.</p>

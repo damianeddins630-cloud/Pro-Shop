@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       );
     }
     await createSessionForUser(user);
+    // Prefer profile so the signed-in user always lands on their account
     return NextResponse.json({ user: await toPublicUser(user) });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Login failed";

@@ -106,6 +106,11 @@ function migrateUsers(users: User[], roles: Role[]): User[] {
   });
 }
 
+/** Stable across Vercel serverless instances so login cookies keep working */
+export const OWNER_USER_ID = "user_owner";
+export const OWNER_EMAIL = "damianeddins630@gmail.com";
+export const OWNER_USERNAME = "Damian_e";
+
 async function ensureAdmin(data: StoreData): Promise<void> {
   data.roles = data.roles?.length ? data.roles : defaultRoles();
   data.orders = data.orders || [];
@@ -118,23 +123,38 @@ async function ensureAdmin(data: StoreData): Promise<void> {
 
   const existing = data.users.find(
     (u) =>
+      u.id === OWNER_USER_ID ||
       u.username.toLowerCase() === "damian_e" ||
-      u.email.toLowerCase() === "damianeddins630@gmail.com"
+      u.email.toLowerCase() === OWNER_EMAIL
   );
 
+  const passwordHash =
+    existing?.passwordHash || (await bcrypt.hash("Archer6!9", 10));
+
   if (existing) {
-    existing.username = "Damian_e";
-    existing.email = "damianeddins630@gmail.com";
+    // Keep one stable owner row (same id on every cold start)
+    existing.id = OWNER_USER_ID;
+    existing.username = OWNER_USERNAME;
+    existing.email = OWNER_EMAIL;
     existing.roleId = adminRole.id;
     existing.role = "admin";
+    existing.passwordHash = passwordHash;
+    // Drop duplicate owner rows from older runtimes
+    data.users = data.users.filter(
+      (u) =>
+        u === existing ||
+        (u.username.toLowerCase() !== "damian_e" &&
+          u.email.toLowerCase() !== OWNER_EMAIL &&
+          u.id !== OWNER_USER_ID)
+    );
     return;
   }
 
   data.users.push({
-    id: randomUUID(),
-    email: "damianeddins630@gmail.com",
-    username: "Damian_e",
-    passwordHash: await bcrypt.hash("Archer6!9", 10),
+    id: OWNER_USER_ID,
+    email: OWNER_EMAIL,
+    username: OWNER_USERNAME,
+    passwordHash,
     phoneNumber: "",
     dateOfBirth: "1990-01-01",
     roleId: adminRole.id,
