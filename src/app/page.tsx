@@ -5,9 +5,17 @@ import { listDeals, listProducts } from "@/lib/store";
 import { ProductCard } from "@/components/ProductCard";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export default async function HomePage() {
-  const [products, deals] = await Promise.all([listProducts(), listDeals()]);
+  let products: Awaited<ReturnType<typeof listProducts>> = [];
+  let deals: Awaited<ReturnType<typeof listDeals>> = [];
+  try {
+    [products, deals] = await Promise.all([listProducts(), listDeals()]);
+  } catch {
+    products = [];
+    deals = [];
+  }
   const featured = products.filter((p) => p.featured).slice(0, 4);
   const deal = deals.find((d) => d.featured && d.active) || deals.find((d) => d.active);
 

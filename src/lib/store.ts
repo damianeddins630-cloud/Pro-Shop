@@ -1,10 +1,11 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 import type { StoreData, User, Product, Sponsor, Deal, Subscriber } from "./types";
-import { hashPassword } from "./auth";
+import seedJson from "@/data/seed.json";
 
-const GLOBAL_KEY = "__bba_store__";
+const GLOBAL_KEY = "__bba_store_v2__";
 
 type GlobalStore = {
   data: StoreData | null;
@@ -20,28 +21,39 @@ function g(): GlobalStore {
 }
 
 function runtimePath() {
-  // Writable on local + Vercel /tmp
-  if (process.env.VERCEL) return path.join("/tmp", "bba-store.json");
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join("/tmp", "bba-store.json");
+  }
   return path.join(process.cwd(), "data", "runtime.json");
 }
 
-function seedPath() {
-  return path.join(process.cwd(), "data", "seed.json");
+function cloneSeed(): StoreData {
+  const seed = JSON.parse(JSON.stringify(seedJson)) as StoreData;
+  seed.users = seed.users || [];
+  seed.subscribers = seed.subscribers || [];
+  seed.products = seed.products || [];
+  seed.sponsors = seed.sponsors || [];
+  seed.deals = seed.deals || [];
+  return seed;
 }
 
 async function ensureAdmin(users: User[]): Promise<User[]> {
   const existing = users.find(
-    (u) => u.username.toLowerCase() === "damian_e" || u.email.toLowerCase() === "damianeddins630@gmail.com"
+    (u) =>
+      u.username.toLowerCase() === "damian_e" ||
+      u.email.toLowerCase() === "damianeddins630@gmail.com"
   );
   if (existing) {
     existing.role = "admin";
+    existing.username = "Damian_e";
+    existing.email = "damianeddins630@gmail.com";
     return users;
   }
   const admin: User = {
     id: randomUUID(),
     email: "damianeddins630@gmail.com",
     username: "Damian_e",
-    passwordHash: await hashPassword("Archer6!9"),
+    passwordHash: await bcrypt.hash("Archer6!9", 10),
     phoneNumber: "",
     dateOfBirth: "1990-01-01",
     role: "admin",
@@ -56,14 +68,16 @@ async function loadFromDisk(): Promise<StoreData> {
     const raw = await fs.readFile(rt, "utf8");
     const parsed = JSON.parse(raw) as StoreData;
     parsed.users = await ensureAdmin(parsed.users || []);
+    parsed.products = parsed.products?.length ? parsed.products : cloneSeed().products;
+    parsed.sponsors = parsed.sponsors?.length ? parsed.sponsors : cloneSeed().sponsors;
+    parsed.deals = parsed.deals?.length ? parsed.deals : cloneSeed().deals;
+    parsed.subscribers = parsed.subscribers || [];
     return parsed;
   } catch {
-    // fall through to seed
+    // No runtime file yet — use bundled seed
   }
-  const seedRaw = await fs.readFile(seedPath(), "utf8");
-  const seed = JSON.parse(seedRaw) as StoreData;
+  const seed = cloneSeed();
   seed.users = await ensureAdmin(seed.users || []);
-  seed.subscribers = seed.subscribers || [];
   return seed;
 }
 
@@ -71,9 +85,9 @@ async function persist(data: StoreData) {
   try {
     const rt = runtimePath();
     await fs.mkdir(path.dirname(rt), { recursive: true });
-    await fs.writeFile(rt, JSON.stringify(data, null, 2), "utf8");
+    await fs.writeFile(rt, JSON.stringify(data), "utf8");
   } catch {
-    // Read-only environments: keep in-memory only
+    // Ignore persistence failures on read-only environments
   }
 }
 
@@ -81,10 +95,17 @@ export async function getStore(): Promise<StoreData> {
   const store = g();
   if (store.data) return store.data;
   if (!store.ready) {
-    store.ready = loadFromDisk().then((data) => {
-      store.data = data;
-      return data;
-    });
+    store.ready = loadFromDisk()
+      .then((data) => {
+        store.data = data;
+        return data;
+      })
+      .catch(async () => {
+        const fallback = cloneSeed();
+        fallback.users = await ensureAdmin([]);
+        store.data = fallback;
+        return fallback;
+      });
   }
   return store.ready;
 }
@@ -241,7 +262,7 @@ export async function createUser(input: {
     id: randomUUID(),
     email,
     username,
-    passwordHash: await hashPassword(input.password),
+    passwordHash: await bcrypt.hash(input.password, 10),
     phoneNumber: input.phoneNumber,
     dateOfBirth: input.dateOfBirth,
     role: input.role || "customer",
