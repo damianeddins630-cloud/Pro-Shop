@@ -2,13 +2,16 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
+  useMemo,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { CartItem, Product } from "./types";
 
 const STORAGE_KEY = "bba_cart_v1";
+const EMPTY: CartItem[] = [];
 
 type CartContextValue = {
   items: CartItem[];
@@ -22,67 +25,104 @@ type CartContextValue = {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-function readCart(): CartItem[] {
-  if (typeof window === "undefined") return [];
+let cachedRaw: string | null = null;
+let cachedItems: CartItem[] = EMPTY;
+
+function getSnapshot(): CartItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+    if (raw === cachedRaw) return cachedItems;
+    cachedRaw = raw;
+    if (!raw) {
+      cachedItems = EMPTY;
+      return cachedItems;
+    }
+    const parsed = JSON.parse(raw) as CartItem[];
+    cachedItems = Array.isArray(parsed) ? parsed : EMPTY;
+    return cachedItems;
   } catch {
-    return [];
+    cachedRaw = null;
+    cachedItems = EMPTY;
+    return EMPTY;
   }
 }
 
+function getServerSnapshot(): CartItem[] {
+  return EMPTY;
+}
+
+function subscribe(onStoreChange: () => void) {
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener("bba-cart", handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener("bba-cart", handler);
+  };
+}
+
 function writeCart(items: CartItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  const next = items.length ? items : EMPTY;
+  const raw = JSON.stringify(next);
+  localStorage.setItem(STORAGE_KEY, raw);
+  cachedRaw = raw;
+  cachedItems = next;
   window.dispatchEvent(new Event("bba-cart"));
 }
 
-function subscribe(cb: () => void) {
-  window.addEventListener("storage", cb);
-  window.addEventListener("bba-cart", cb);
-  return () => {
-    window.removeEventListener("storage", cb);
-    window.removeEventListener("bba-cart", cb);
-  };
-}
-
 export function CartProvider({ children }: { children: ReactNode }) {
-  const items = useSyncExternalStore(subscribe, readCart, () => []);
+  const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const value: CartContextValue = {
-    items,
-    count: items.reduce((n, i) => n + i.quantity, 0),
-    add(productId, quantity = 1) {
-      const next = [...readCart()];
-      const existing = next.find((i) => i.productId === productId);
-      if (existing) existing.quantity += quantity;
-      else next.push({ productId, quantity });
-      writeCart(next);
-    },
-    remove(productId) {
-      writeCart(readCart().filter((i) => i.productId !== productId));
-    },
-    setQty(productId, quantity) {
-      if (quantity <= 0) {
-        writeCart(readCart().filter((i) => i.productId !== productId));
-        return;
-      }
-      writeCart(
-        readCart().map((i) =>
-          i.productId === productId ? { ...i, quantity } : i
-        )
-      );
-    },
-    clear() {
-      writeCart([]);
-    },
-    total(products) {
-      return items.reduce((sum, item) => {
+  const add = useCallback((productId: string, quantity = 1) => {
+    const prev = getSnapshot();
+    const next = prev.map((i) => ({ ...i }));
+    const existing = next.find((i) => i.productId === productId);
+    if (existing) existing.quantity += quantity;
+    else next.push({ productId, quantity });
+    writeCart(next);
+  }, []);
+
+  const remove = useCallback((productId: string) => {
+    writeCart(getSnapshot().filter((i) => i.productId !== productId));
+  }, []);
+
+  const setQty = useCallback((productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      writeCart(getSnapshot().filter((i) => i.productId !== productId));
+      return;
+    }
+    writeCart(
+      getSnapshot().map((i) =>
+        i.productId === productId ? { ...i, quantity } : i
+      )
+    );
+  }, []);
+
+  const clear = useCallback(() => {
+    writeCart(EMPTY);
+  }, []);
+
+  const total = useCallback(
+    (products: Product[]) =>
+      items.reduce((sum, item) => {
         const p = products.find((x) => x.id === item.productId);
         return sum + (p ? p.price * item.quantity : 0);
-      }, 0);
-    },
-  };
+      }, 0),
+    [items]
+  );
+
+  const value = useMemo<CartContextValue>(
+    () => ({
+      items,
+      count: items.reduce((n, i) => n + i.quantity, 0),
+      add,
+      remove,
+      setQty,
+      clear,
+      total,
+    }),
+    [items, add, remove, setQty, clear, total]
+  );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
