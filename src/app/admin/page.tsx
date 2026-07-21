@@ -3,9 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import type { Deal, Product, PublicUser, Sponsor } from "@/lib/types";
+import type {
+  Deal,
+  Order,
+  OrderStatus,
+  Permission,
+  Product,
+  PublicUser,
+  Role,
+  Sponsor,
+} from "@/lib/types";
+import { PERMISSION_LABELS } from "@/lib/types";
 
-type Tab = "inventory" | "deals" | "sponsors";
+type Tab = "inventory" | "deals" | "sponsors" | "roles" | "users" | "orders";
 
 const emptyProduct = {
   name: "",
@@ -19,12 +29,21 @@ const emptyProduct = {
   active: true,
 };
 
+function hasPerm(user: PublicUser | null, ...perms: Permission[]) {
+  if (!user?.permissions) return false;
+  return perms.some((p) => user.permissions.includes(p));
+}
+
 export default function AdminPage() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [tab, setTab] = useState<Tab>("inventory");
   const [products, setProducts] = useState<Product[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [users, setUsers] = useState<PublicUser[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [form, setForm] = useState(emptyProduct);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dealForm, setDealForm] = useState({
@@ -37,53 +56,106 @@ export default function AdminPage() {
   const [editingDealId, setEditingDealId] = useState<string | null>(null);
   const [sponsorForm, setSponsorForm] = useState({ name: "", image: "", url: "#" });
   const [editingSponsorId, setEditingSponsorId] = useState<string | null>(null);
+  const [roleForm, setRoleForm] = useState({
+    name: "",
+    description: "",
+    permissions: [] as Permission[],
+  });
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const canAccess =
+    hasPerm(
+      user,
+      "manage_inventory",
+      "manage_deals",
+      "manage_sponsors",
+      "manage_roles",
+      "manage_users",
+      "view_orders",
+      "manage_orders",
+      "edit_pages"
+    );
+
   const load = useCallback(async () => {
-    const me = await fetch("/api/auth/me").then((r) => r.json());
-    setUser(me.user || null);
-    if (me.user?.role !== "admin") {
+    const me = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json());
+    const u = me.user as PublicUser | null;
+    setUser(u);
+    if (!u) {
       setLoading(false);
       return;
     }
-    const [p, d, s] = await Promise.all([
-      fetch("/api/products?admin=1").then((r) => r.json()),
-      fetch("/api/deals").then((r) => r.json()),
-      fetch("/api/sponsors").then((r) => r.json()),
-    ]);
-    setProducts(p.products || []);
-    setDeals(d.deals || []);
-    setSponsors(s.sponsors || []);
+
+    const tasks: Promise<void>[] = [];
+
+    if (hasPerm(u, "manage_inventory", "edit_pages")) {
+      tasks.push(
+        fetch("/api/products?admin=1")
+          .then((r) => r.json())
+          .then((d) => setProducts(d.products || []))
+      );
+    }
+    if (hasPerm(u, "manage_deals", "edit_pages")) {
+      tasks.push(
+        fetch("/api/deals")
+          .then((r) => r.json())
+          .then((d) => setDeals(d.deals || []))
+      );
+    }
+    if (hasPerm(u, "manage_sponsors", "edit_pages")) {
+      tasks.push(
+        fetch("/api/sponsors")
+          .then((r) => r.json())
+          .then((d) => setSponsors(d.sponsors || []))
+      );
+    }
+    if (hasPerm(u, "manage_roles", "manage_users")) {
+      tasks.push(
+        fetch("/api/roles")
+          .then((r) => r.json())
+          .then((d) => {
+            setRoles(d.roles || []);
+            setPermissions(d.permissions || []);
+          })
+      );
+    }
+    if (hasPerm(u, "manage_users")) {
+      tasks.push(
+        fetch("/api/users")
+          .then((r) => r.json())
+          .then((d) => setUsers(d.users || []))
+      );
+    }
+    if (hasPerm(u, "view_orders", "manage_orders")) {
+      tasks.push(
+        fetch("/api/orders?all=1")
+          .then((r) => r.json())
+          .then((d) => setOrders(d.orders || []))
+      );
+    }
+
+    await Promise.all(tasks);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const me = await fetch("/api/auth/me").then((r) => r.json());
-      if (cancelled) return;
-      setUser(me.user || null);
-      if (me.user?.role !== "admin") {
-        setLoading(false);
-        return;
-      }
-      const [p, d, s] = await Promise.all([
-        fetch("/api/products?admin=1").then((r) => r.json()),
-        fetch("/api/deals").then((r) => r.json()),
-        fetch("/api/sponsors").then((r) => r.json()),
-      ]);
-      if (cancelled) return;
-      setProducts(p.products || []);
-      setDeals(d.deals || []);
-      setSponsors(s.sponsors || []);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!user) return;
+    const preferred: Tab[] = [];
+    if (hasPerm(user, "manage_inventory", "edit_pages")) preferred.push("inventory");
+    if (hasPerm(user, "manage_deals", "edit_pages")) preferred.push("deals");
+    if (hasPerm(user, "manage_sponsors", "edit_pages")) preferred.push("sponsors");
+    if (hasPerm(user, "manage_roles")) preferred.push("roles");
+    if (hasPerm(user, "manage_users")) preferred.push("users");
+    if (hasPerm(user, "view_orders", "manage_orders")) preferred.push("orders");
+    if (preferred.length && !preferred.includes(tab)) setTab(preferred[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function uploadImage(file: File): Promise<string | null> {
     const body = new FormData();
@@ -189,6 +261,99 @@ export default function AdminPage() {
     load();
   }
 
+  async function saveRole(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    const res = await fetch(editingRoleId ? `/api/roles/${editingRoleId}` : "/api/roles", {
+      method: editingRoleId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(roleForm),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Role save failed");
+      return;
+    }
+    setMessage(editingRoleId ? "Role updated" : "Role created");
+    setRoleForm({ name: "", description: "", permissions: [] });
+    setEditingRoleId(null);
+    load();
+  }
+
+  async function removeRole(id: string) {
+    if (!confirm("Delete this role? Users on it become Customers.")) return;
+    const res = await fetch(`/api/roles/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Delete failed");
+      return;
+    }
+    setMessage("Role deleted");
+    load();
+  }
+
+  async function assignUserRole(userId: string, roleId: string) {
+    setError("");
+    const res = await fetch("/api/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, roleId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Could not update user role");
+      return;
+    }
+    setMessage("User role updated");
+    load();
+  }
+
+  async function setOrderStatus(id: string, status: OrderStatus) {
+    const res = await fetch(`/api/orders/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Could not update order");
+      return;
+    }
+    setMessage("Order updated");
+    load();
+  }
+
+  function toggleRolePerm(p: Permission) {
+    setRoleForm((f) => ({
+      ...f,
+      permissions: f.permissions.includes(p)
+        ? f.permissions.filter((x) => x !== p)
+        : [...f.permissions, p],
+    }));
+  }
+
+  const tabs: { id: Tab; label: string; show: boolean }[] = [
+    {
+      id: "inventory",
+      label: "Inventory",
+      show: hasPerm(user, "manage_inventory", "edit_pages"),
+    },
+    { id: "deals", label: "Deals", show: hasPerm(user, "manage_deals", "edit_pages") },
+    {
+      id: "sponsors",
+      label: "Sponsors",
+      show: hasPerm(user, "manage_sponsors", "edit_pages"),
+    },
+    { id: "roles", label: "Roles", show: hasPerm(user, "manage_roles") },
+    { id: "users", label: "Users", show: hasPerm(user, "manage_users") },
+    {
+      id: "orders",
+      label: "Orders",
+      show: hasPerm(user, "view_orders", "manage_orders"),
+    },
+  ];
+
   if (loading) {
     return (
       <section className="site-shell section-pad pt-24">
@@ -197,13 +362,13 @@ export default function AdminPage() {
     );
   }
 
-  if (!user || user.role !== "admin") {
+  if (!user || !canAccess) {
     return (
       <section className="site-shell section-pad pt-24">
         <h1 className="display text-5xl">Admin</h1>
-        <p className="mt-4 text-mist">Owner login required for inventory and site management.</p>
+        <p className="mt-4 text-mist">Login required with admin permissions.</p>
         <Link href="/login" className="btn btn-primary mt-6">
-          Login as owner
+          Login
         </Link>
       </section>
     );
@@ -216,22 +381,27 @@ export default function AdminPage() {
           <p className="text-sm tracking-[0.2em] text-red uppercase">Owner dashboard</p>
           <h1 className="display text-5xl md:text-6xl">Inventory & Site Admin</h1>
           <p className="mt-2 text-mist">
-            Signed in as <span className="text-red">{user.username}</span> — full permissions
+            Signed in as <span className="text-red">{user.username}</span> (
+            {user.roleName})
           </p>
         </div>
-        <div className="flex gap-2">
-          {(["inventory", "deals", "sponsors"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`rounded-full px-4 py-2 text-sm capitalize ${
-                tab === t ? "bg-red text-white font-bold" : "border border-white/15 text-mist"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-2">
+          {tabs
+            .filter((t) => t.show)
+            .map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`rounded-full px-4 py-2 text-sm ${
+                  tab === t.id
+                    ? "bg-red text-white font-bold"
+                    : "border border-white/15 text-mist"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
         </div>
       </div>
 
@@ -243,7 +413,10 @@ export default function AdminPage() {
 
       {tab === "inventory" && (
         <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-          <form onSubmit={saveProduct} className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+          <form
+            onSubmit={saveProduct}
+            className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6"
+          >
             <h2 className="display text-3xl">
               {editingId ? "Update product" : "Add inventory"}
             </h2>
@@ -360,7 +533,13 @@ export default function AdminPage() {
                   className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-black/30">
-                    <Image src={p.image} alt={p.name} fill className="object-contain p-1" unoptimized />
+                    <Image
+                      src={p.image}
+                      alt={p.name}
+                      fill
+                      className="object-contain p-1"
+                      unoptimized
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate font-semibold">{p.name}</h3>
@@ -407,8 +586,13 @@ export default function AdminPage() {
 
       {tab === "deals" && (
         <div className="grid gap-8 lg:grid-cols-2">
-          <form onSubmit={saveDeal} className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="display text-3xl">{editingDealId ? "Update deal" : "Add deal"}</h2>
+          <form
+            onSubmit={saveDeal}
+            className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6"
+          >
+            <h2 className="display text-3xl">
+              {editingDealId ? "Update deal" : "Add deal"}
+            </h2>
             <input
               className="field"
               placeholder="Title"
@@ -462,10 +646,19 @@ export default function AdminPage() {
           </form>
           <div className="space-y-3">
             {deals.map((d) => (
-              <article key={d.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <article
+                key={d.id}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+              >
                 <div className="flex gap-3">
                   <div className="relative h-20 w-28 overflow-hidden rounded-lg">
-                    <Image src={d.image} alt={d.title} fill className="object-cover" unoptimized />
+                    <Image
+                      src={d.image}
+                      alt={d.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
                   </div>
                   <div>
                     <h3 className="font-semibold">{d.title}</h3>
@@ -508,7 +701,10 @@ export default function AdminPage() {
 
       {tab === "sponsors" && (
         <div className="grid gap-8 lg:grid-cols-2">
-          <form onSubmit={saveSponsor} className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+          <form
+            onSubmit={saveSponsor}
+            className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6"
+          >
             <h2 className="display text-3xl">
               {editingSponsorId ? "Update sponsor" : "Add sponsor (name + photo)"}
             </h2>
@@ -549,9 +745,18 @@ export default function AdminPage() {
           </form>
           <div className="grid grid-cols-2 gap-3">
             {sponsors.map((s) => (
-              <article key={s.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <article
+                key={s.id}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+              >
                 <div className="relative mb-3 h-20 w-full">
-                  <Image src={s.image} alt={s.name} fill className="object-contain" unoptimized />
+                  <Image
+                    src={s.image}
+                    alt={s.name}
+                    fill
+                    className="object-contain"
+                    unoptimized
+                  />
                 </div>
                 <h3 className="text-sm font-semibold">{s.name}</h3>
                 <div className="mt-2 flex gap-2">
@@ -576,6 +781,215 @@ export default function AdminPage() {
               </article>
             ))}
           </div>
+        </div>
+      )}
+
+      {tab === "roles" && (
+        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+          <form
+            onSubmit={saveRole}
+            className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-6"
+          >
+            <h2 className="display text-3xl">
+              {editingRoleId ? "Update role" : "Create role"}
+            </h2>
+            <input
+              className="field"
+              placeholder="Role name"
+              value={roleForm.name}
+              onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
+              required
+            />
+            <textarea
+              className="field min-h-20"
+              placeholder="Description"
+              value={roleForm.description}
+              onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
+            />
+            <div>
+              <p className="mb-2 text-sm text-mist">Permissions</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {permissions.map((p) => (
+                  <label
+                    key={p}
+                    className="flex items-start gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={roleForm.permissions.includes(p)}
+                      onChange={() => toggleRolePerm(p)}
+                    />
+                    <span>
+                      <span className="block text-chalk">{PERMISSION_LABELS[p] || p}</span>
+                      <span className="text-xs text-mist">{p}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button className="btn btn-primary" type="submit">
+                {editingRoleId ? "Update role" : "Add role"}
+              </button>
+              {editingRoleId && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setEditingRoleId(null);
+                    setRoleForm({ name: "", description: "", permissions: [] });
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+
+          <div className="space-y-3">
+            <h2 className="display text-3xl">Roles ({roles.length})</h2>
+            {roles.map((role) => (
+              <article
+                key={role.id}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-semibold text-chalk">
+                      {role.name}
+                      {role.system ? (
+                        <span className="ml-2 text-xs text-mist">(system)</span>
+                      ) : null}
+                    </h3>
+                    <p className="text-sm text-mist">{role.description || "—"}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="text-xs text-red underline"
+                      onClick={() => {
+                        setEditingRoleId(role.id);
+                        setRoleForm({
+                          name: role.name,
+                          description: role.description,
+                          permissions: [...role.permissions],
+                        });
+                      }}
+                    >
+                      Edit
+                    </button>
+                    {!role.system && (
+                      <button
+                        type="button"
+                        className="text-xs text-red-300 underline"
+                        onClick={() => removeRole(role.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-mist">
+                  {role.permissions.length
+                    ? role.permissions.map((p) => PERMISSION_LABELS[p] || p).join(" · ")
+                    : "No permissions"}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "users" && (
+        <div className="space-y-3">
+          <h2 className="display text-3xl">Users ({users.length})</h2>
+          <div className="overflow-x-auto rounded-3xl border border-white/10">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-white/10 bg-white/[0.04] text-mist">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Username</th>
+                  <th className="px-4 py-3 font-medium">Email</th>
+                  <th className="px-4 py-3 font-medium">Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-white/5">
+                    <td className="px-4 py-3">{u.username}</td>
+                    <td className="px-4 py-3 text-mist">{u.email}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        className="field !py-2"
+                        value={u.roleId}
+                        onChange={(e) => assignUserRole(u.id, e.target.value)}
+                      >
+                        {roles.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === "orders" && (
+        <div className="space-y-4">
+          <h2 className="display text-3xl">All orders ({orders.length})</h2>
+          {orders.length === 0 ? (
+            <p className="text-mist">No orders yet.</p>
+          ) : (
+            orders.map((order) => (
+              <article
+                key={order.id}
+                className="rounded-3xl border border-white/10 bg-white/[0.03] p-5"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-mist">
+                      {new Date(order.createdAt).toLocaleString()} · {order.username} (
+                      {order.email})
+                    </p>
+                    <h3 className="display mt-1 text-3xl">${order.total.toFixed(2)}</h3>
+                  </div>
+                  {hasPerm(user, "manage_orders") ? (
+                    <select
+                      className="field !w-auto !py-2 capitalize"
+                      value={order.status}
+                      onChange={(e) =>
+                        setOrderStatus(order.id, e.target.value as OrderStatus)
+                      }
+                    >
+                      {(["placed", "processing", "completed", "cancelled"] as OrderStatus[]).map(
+                        (s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        )
+                      )}
+                    </select>
+                  ) : (
+                    <span className="rounded-full border border-red/40 px-3 py-1 text-xs capitalize text-red">
+                      {order.status}
+                    </span>
+                  )}
+                </div>
+                <ul className="mt-4 space-y-2 text-sm text-mist">
+                  {order.items.map((item) => (
+                    <li key={`${order.id}-${item.productId}`}>
+                      {item.name} × {item.quantity} — ${item.price.toFixed(2)}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))
+          )}
         </div>
       )}
     </section>

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BrandMark } from "./BrandMark";
 import { useCart } from "@/lib/cart";
-import type { PublicUser } from "@/lib/types";
+import { useEditMode } from "@/lib/edit-mode";
 
 const links = [
   { href: "/", label: "Home" },
@@ -20,24 +20,16 @@ const links = [
 export function SiteHeader() {
   const pathname = usePathname();
   const { count } = useCart();
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const { user, canEdit, can, editMode, setEditMode } = useEditMode();
   const [open, setOpen] = useState(false);
   const shopMode = pathname.startsWith("/shop") || pathname.startsWith("/cart");
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled) setUser(d.user || null);
-      })
-      .catch(() => {
-        if (!cancelled) setUser(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
+  const showAdmin =
+    can("manage_inventory") ||
+    can("manage_roles") ||
+    can("manage_users") ||
+    can("manage_deals") ||
+    can("manage_sponsors") ||
+    can("view_orders");
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/85 backdrop-blur-xl">
@@ -74,6 +66,19 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setEditMode(!editMode)}
+              className={`rounded-full px-3 py-2 text-sm font-bold ${
+                editMode
+                  ? "bg-white text-black"
+                  : "bg-red text-white hover:bg-red-deep"
+              }`}
+            >
+              {editMode ? "Done" : "Edit"}
+            </button>
+          )}
           <Link
             href="/cart"
             className="relative rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-red/60"
@@ -87,7 +92,7 @@ export function SiteHeader() {
           </Link>
           {user ? (
             <>
-              {user.role === "admin" && (
+              {showAdmin && (
                 <Link
                   href="/admin"
                   className="hidden rounded-full bg-red px-3 py-2 text-sm font-bold text-white sm:inline-flex"
@@ -131,7 +136,19 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
-            {user?.role === "admin" && (
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditMode(!editMode);
+                  setOpen(false);
+                }}
+                className="rounded-lg px-3 py-2 text-left text-red"
+              >
+                {editMode ? "Done editing" : "Edit pages"}
+              </button>
+            )}
+            {showAdmin && (
               <Link
                 href="/admin"
                 onClick={() => setOpen(false)}

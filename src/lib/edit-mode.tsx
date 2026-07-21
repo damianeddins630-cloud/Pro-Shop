@@ -9,70 +9,68 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { PublicUser } from "@/lib/types";
+import { usePathname } from "next/navigation";
+import type { Permission, PublicUser } from "@/lib/types";
 
 type EditModeContextValue = {
   user: PublicUser | null;
-  isAdmin: boolean;
-  editing: boolean;
-  setEditing: (value: boolean) => void;
-  toggleEditing: () => void;
+  loading: boolean;
+  editMode: boolean;
+  setEditMode: (value: boolean) => void;
+  canEdit: boolean;
+  can: (permission: Permission) => boolean;
   refreshUser: () => Promise<void>;
 };
 
 const EditModeContext = createContext<EditModeContextValue | null>(null);
 
-async function fetchMe(): Promise<PublicUser | null> {
-  try {
-    const res = await fetch("/api/auth/me");
-    const data = await res.json();
-    return (data.user as PublicUser) || null;
-  } catch {
-    return null;
-  }
-}
-
 export function EditModeProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [user, setUser] = useState<PublicUser | null>(null);
-  const [editing, setEditingState] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
 
   const refreshUser = useCallback(async () => {
-    const next = await fetchMe();
-    setUser(next);
-    if (!next || next.role !== "admin") setEditingState(false);
+    try {
+      const res = await fetch("/api/auth/me", { cache: "no-store" });
+      const data = await res.json();
+      setUser(data.user ?? null);
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    fetchMe().then((next) => {
-      if (cancelled) return;
-      setUser(next);
-      if (!next || next.role !== "admin") setEditingState(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void refreshUser();
+  }, [refreshUser, pathname]);
+
+  const can = useCallback(
+    (permission: Permission) => Boolean(user?.permissions?.includes(permission)),
+    [user],
+  );
+
+  const canEdit = can("edit_pages");
+
+  useEffect(() => {
+    if (!canEdit) setEditMode(false);
+  }, [canEdit]);
 
   const value = useMemo(
     () => ({
       user,
-      isAdmin: user?.role === "admin",
-      editing: Boolean(user?.role === "admin" && editing),
-      setEditing: (v: boolean) => {
-        if (user?.role === "admin") setEditingState(v);
-      },
-      toggleEditing: () => {
-        if (user?.role === "admin") setEditingState((e) => !e);
-      },
+      loading,
+      editMode: canEdit && editMode,
+      setEditMode,
+      canEdit,
+      can,
       refreshUser,
     }),
-    [user, editing, refreshUser]
+    [user, loading, editMode, canEdit, can, refreshUser],
   );
 
-  return (
-    <EditModeContext.Provider value={value}>{children}</EditModeContext.Provider>
-  );
+  return <EditModeContext.Provider value={value}>{children}</EditModeContext.Provider>;
 }
 
 export function useEditMode() {

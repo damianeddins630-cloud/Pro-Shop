@@ -16,7 +16,7 @@ export function EditableText({
   as = "span",
   className = "",
 }: EditableTextProps) {
-  const { editing } = useEditMode();
+  const { editMode: editing } = useEditMode();
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
   const [activeValue, setActiveValue] = useState(value);
@@ -68,7 +68,7 @@ type ItemControlsProps = {
 };
 
 export function ItemControls({ onAdd, onRemove, addLabel = "Add" }: ItemControlsProps) {
-  const { editing } = useEditMode();
+  const { editMode: editing } = useEditMode();
   if (!editing) return null;
 
   return (
@@ -106,7 +106,7 @@ export function AddItemButton({
   onAdd: () => void | Promise<void>;
   label?: string;
 }) {
-  const { editing } = useEditMode();
+  const { editMode: editing } = useEditMode();
   if (!editing) return null;
   return (
     <button type="button" onClick={() => onAdd()} className="btn btn-primary mt-4 gap-2">

@@ -11,7 +11,7 @@ import type { Product } from "@/lib/types";
 
 export function EditableProductGrid({ initial }: { initial: Product[] }) {
   const [products, setProducts] = useState(initial);
-  const { editing } = useEditMode();
+  const { editMode: editing } = useEditMode();
   const { add } = useCart();
   const router = useRouter();
 

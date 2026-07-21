@@ -657,5 +657,46 @@
       "slot": "hero",
       "text": "Perfect Your Game"
     }
-  ]
+  ],
+  "roles": [
+    {
+      "id": "role_admin",
+      "name": "Admin",
+      "description": "Full website owner access",
+      "permissions": [
+        "edit_pages",
+        "manage_inventory",
+        "manage_sponsors",
+        "manage_deals",
+        "manage_coaches",
+        "manage_users",
+        "manage_roles",
+        "view_orders",
+        "manage_orders"
+      ],
+      "system": true
+    },
+    {
+      "id": "role_customer",
+      "name": "Customer",
+      "description": "Shop and place orders",
+      "permissions": [],
+      "system": true
+    },
+    {
+      "id": "role_staff",
+      "name": "Staff",
+      "description": "Edit pages and manage shop content",
+      "permissions": [
+        "edit_pages",
+        "manage_inventory",
+        "manage_sponsors",
+        "manage_deals",
+        "manage_coaches",
+        "view_orders"
+      ],
+      "system": false
+    }
+  ],
+  "orders": []
 }

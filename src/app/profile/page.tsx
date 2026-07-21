@@ -1,22 +1,35 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { PublicUser } from "@/lib/types";
+import type { Order, PublicUser } from "@/lib/types";
+
+type Tab = "account" | "orders";
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<PublicUser | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [tab, setTab] = useState<Tab>("account");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => {
-        setUser(d.user || null);
-        setLoading(false);
-      });
+    let cancelled = false;
+    (async () => {
+      const me = await fetch("/api/auth/me", { cache: "no-store" }).then((r) => r.json());
+      if (cancelled) return;
+      setUser(me.user || null);
+      if (me.user) {
+        const o = await fetch("/api/orders", { cache: "no-store" }).then((r) => r.json());
+        if (!cancelled) setOrders(o.orders || []);
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function logout() {
@@ -45,46 +58,132 @@ export default function ProfilePage() {
     );
   }
 
+  const canAdmin =
+    user.permissions?.some((p) =>
+      [
+        "manage_inventory",
+        "manage_roles",
+        "manage_users",
+        "manage_deals",
+        "manage_sponsors",
+        "view_orders",
+        "edit_pages",
+      ].includes(p)
+    ) ?? false;
+
   return (
     <section className="site-shell section-pad pt-24">
-      <div className="max-w-xl rounded-3xl border border-white/10 bg-white/[0.03] p-8">
-        <p className="text-sm tracking-[0.2em] text-red uppercase">Your account</p>
-        <h1 className="display mt-2 text-5xl">{user.username}</h1>
-        <dl className="mt-8 space-y-3 text-sm">
-          <div className="flex justify-between gap-4 border-b border-white/10 py-2">
-            <dt className="text-mist">Email</dt>
-            <dd>{user.email}</dd>
-          </div>
-          <div className="flex justify-between gap-4 border-b border-white/10 py-2">
-            <dt className="text-mist">Phone</dt>
-            <dd>{user.phoneNumber || "—"}</dd>
-          </div>
-          <div className="flex justify-between gap-4 border-b border-white/10 py-2">
-            <dt className="text-mist">Date of birth</dt>
-            <dd>{user.dateOfBirth}</dd>
-          </div>
-          <div className="flex justify-between gap-4 border-b border-white/10 py-2">
-            <dt className="text-mist">Role</dt>
-            <dd className="capitalize text-red">{user.role}</dd>
-          </div>
-        </dl>
-        <div className="mt-8 flex flex-wrap gap-3">
-          {user.role === "admin" && (
-            <Link href="/admin" className="btn btn-primary">
-              Open admin
-            </Link>
-          )}
-          <Link href="/shop" className="btn btn-ghost">
-            Shop
-          </Link>
-          <Link href="/subscribe" className="btn btn-ghost">
-            Subscribe
-          </Link>
-          <button type="button" onClick={logout} className="btn btn-ghost">
-            Log out
-          </button>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm tracking-[0.2em] text-red uppercase">Your account</p>
+          <h1 className="display text-5xl">{user.username}</h1>
+        </div>
+        <div className="flex gap-2">
+          {(["account", "orders"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`rounded-full px-4 py-2 text-sm capitalize ${
+                tab === t ? "bg-red text-white font-bold" : "border border-white/15 text-mist"
+              }`}
+            >
+              {t === "orders" ? "Previous orders" : "Account"}
+            </button>
+          ))}
         </div>
       </div>
+
+      {tab === "account" && (
+        <div className="max-w-xl rounded-3xl border border-white/10 bg-white/[0.03] p-8">
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between gap-4 border-b border-white/10 py-2">
+              <dt className="text-mist">Email</dt>
+              <dd>{user.email}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-b border-white/10 py-2">
+              <dt className="text-mist">Phone</dt>
+              <dd>{user.phoneNumber || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-b border-white/10 py-2">
+              <dt className="text-mist">Date of birth</dt>
+              <dd>{user.dateOfBirth}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-b border-white/10 py-2">
+              <dt className="text-mist">Role</dt>
+              <dd className="text-red">{user.roleName}</dd>
+            </div>
+          </dl>
+          <div className="mt-8 flex flex-wrap gap-3">
+            {canAdmin && (
+              <Link href="/admin" className="btn btn-primary">
+                Open admin
+              </Link>
+            )}
+            <Link href="/shop" className="btn btn-ghost">
+              Shop
+            </Link>
+            <button type="button" onClick={logout} className="btn btn-ghost">
+              Log out
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === "orders" && (
+        <div className="space-y-4">
+          {orders.length === 0 ? (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
+              <p className="text-mist">No previous orders yet.</p>
+              <Link href="/shop" className="btn btn-primary mt-6">
+                Browse the shop
+              </Link>
+            </div>
+          ) : (
+            orders.map((order) => (
+              <article
+                key={order.id}
+                className="rounded-3xl border border-white/10 bg-white/[0.03] p-6"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs tracking-[0.16em] text-mist uppercase">
+                      {new Date(order.createdAt).toLocaleString()}
+                    </p>
+                    <h2 className="display mt-1 text-3xl">
+                      ${order.total.toFixed(2)}
+                    </h2>
+                  </div>
+                  <span className="rounded-full border border-red/40 px-3 py-1 text-xs capitalize text-red">
+                    {order.status}
+                  </span>
+                </div>
+                <ul className="mt-5 space-y-3">
+                  {order.items.map((item) => (
+                    <li key={`${order.id}-${item.productId}`} className="flex gap-3">
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-black/40">
+                        <Image
+                          src={item.image}
+                          alt={item.name}
+                          fill
+                          className="object-contain p-1"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{item.name}</p>
+                        <p className="text-sm text-mist">
+                          Qty {item.quantity} · ${item.price.toFixed(2)} each
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))
+          )}
+        </div>
+      )}
     </section>
   );
 }

@@ -2,10 +2,25 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
-import type { StoreData, User, Product, Sponsor, Deal, Subscriber, Coach, PageText } from "./types";
+import type {
+  StoreData,
+  User,
+  Product,
+  Sponsor,
+  Deal,
+  Subscriber,
+  Coach,
+  PageText,
+  Role,
+  Order,
+  OrderItem,
+  OrderStatus,
+  Permission,
+} from "./types";
+import { ALL_PERMISSIONS } from "./types";
 import seedJson from "@/data/seed.json";
 
-const GLOBAL_KEY = "__bba_store_v3__";
+const GLOBAL_KEY = "__bba_store_v4__";
 
 type GlobalStore = {
   data: StoreData | null;
@@ -27,6 +42,39 @@ function runtimePath() {
   return path.join(process.cwd(), "data", "runtime.json");
 }
 
+function defaultRoles(): Role[] {
+  return [
+    {
+      id: "role_admin",
+      name: "Admin",
+      description: "Full website owner access",
+      permissions: [...ALL_PERMISSIONS],
+      system: true,
+    },
+    {
+      id: "role_customer",
+      name: "Customer",
+      description: "Shop and place orders",
+      permissions: [],
+      system: true,
+    },
+    {
+      id: "role_staff",
+      name: "Staff",
+      description: "Edit pages and manage shop content",
+      permissions: [
+        "edit_pages",
+        "manage_inventory",
+        "manage_sponsors",
+        "manage_deals",
+        "manage_coaches",
+        "view_orders",
+      ],
+      system: false,
+    },
+  ];
+}
+
 function cloneSeed(): StoreData {
   const seed = JSON.parse(JSON.stringify(seedJson)) as StoreData;
   seed.users = seed.users || [];
@@ -36,32 +84,63 @@ function cloneSeed(): StoreData {
   seed.deals = seed.deals || [];
   seed.coaches = seed.coaches || [];
   seed.texts = seed.texts || [];
+  seed.roles = seed.roles?.length ? seed.roles : defaultRoles();
+  seed.orders = seed.orders || [];
   return seed;
 }
 
-async function ensureAdmin(users: User[]): Promise<User[]> {
-  const existing = users.find(
+function migrateUsers(users: User[], roles: Role[]): User[] {
+  const adminId = roles.find((r) => r.name.toLowerCase() === "admin")?.id || "role_admin";
+  const customerId =
+    roles.find((r) => r.name.toLowerCase() === "customer")?.id || "role_customer";
+
+  return users.map((u) => {
+    const next = { ...u };
+    if (!next.roleId) {
+      next.roleId =
+        next.role === "admin" || next.username?.toLowerCase() === "damian_e"
+          ? adminId
+          : customerId;
+    }
+    return next;
+  });
+}
+
+async function ensureAdmin(data: StoreData): Promise<void> {
+  data.roles = data.roles?.length ? data.roles : defaultRoles();
+  data.orders = data.orders || [];
+  data.users = migrateUsers(data.users || [], data.roles);
+
+  const adminRole =
+    data.roles.find((r) => r.id === "role_admin") ||
+    data.roles.find((r) => r.name.toLowerCase() === "admin") ||
+    data.roles[0];
+
+  const existing = data.users.find(
     (u) =>
       u.username.toLowerCase() === "damian_e" ||
       u.email.toLowerCase() === "damianeddins630@gmail.com"
   );
+
   if (existing) {
-    existing.role = "admin";
     existing.username = "Damian_e";
     existing.email = "damianeddins630@gmail.com";
-    return users;
+    existing.roleId = adminRole.id;
+    existing.role = "admin";
+    return;
   }
-  const admin: User = {
+
+  data.users.push({
     id: randomUUID(),
     email: "damianeddins630@gmail.com",
     username: "Damian_e",
     passwordHash: await bcrypt.hash("Archer6!9", 10),
     phoneNumber: "",
     dateOfBirth: "1990-01-01",
+    roleId: adminRole.id,
     role: "admin",
     createdAt: new Date().toISOString(),
-  };
-  return [...users, admin];
+  });
 }
 
 async function loadFromDisk(): Promise<StoreData> {
@@ -69,19 +148,23 @@ async function loadFromDisk(): Promise<StoreData> {
   try {
     const raw = await fs.readFile(rt, "utf8");
     const parsed = JSON.parse(raw) as StoreData;
-    parsed.users = await ensureAdmin(parsed.users || []);
-    parsed.products = parsed.products?.length ? parsed.products : cloneSeed().products;
-    parsed.sponsors = parsed.sponsors?.length ? parsed.sponsors : cloneSeed().sponsors;
-    parsed.deals = parsed.deals?.length ? parsed.deals : cloneSeed().deals;
-    parsed.coaches = parsed.coaches?.length ? parsed.coaches : cloneSeed().coaches;
-    parsed.texts = parsed.texts?.length ? parsed.texts : cloneSeed().texts;
+    const seed = cloneSeed();
+    parsed.products = parsed.products?.length ? parsed.products : seed.products;
+    parsed.sponsors = parsed.sponsors?.length ? parsed.sponsors : seed.sponsors;
+    parsed.deals = parsed.deals?.length ? parsed.deals : seed.deals;
+    parsed.coaches = parsed.coaches?.length ? parsed.coaches : seed.coaches;
+    parsed.texts = parsed.texts?.length ? parsed.texts : seed.texts;
+    parsed.roles = parsed.roles?.length ? parsed.roles : seed.roles;
+    parsed.orders = parsed.orders || [];
     parsed.subscribers = parsed.subscribers || [];
+    parsed.users = parsed.users || [];
+    await ensureAdmin(parsed);
     return parsed;
   } catch {
-    // No runtime file yet — use bundled seed
+    // fall through
   }
   const seed = cloneSeed();
-  seed.users = await ensureAdmin(seed.users || []);
+  await ensureAdmin(seed);
   return seed;
 }
 
@@ -91,7 +174,7 @@ async function persist(data: StoreData) {
     await fs.mkdir(path.dirname(rt), { recursive: true });
     await fs.writeFile(rt, JSON.stringify(data), "utf8");
   } catch {
-    // Ignore persistence failures on read-only environments
+    // ignore
   }
 }
 
@@ -106,7 +189,7 @@ export async function getStore(): Promise<StoreData> {
       })
       .catch(async () => {
         const fallback = cloneSeed();
-        fallback.users = await ensureAdmin([]);
+        await ensureAdmin(fallback);
         store.data = fallback;
         return fallback;
       });
@@ -120,6 +203,96 @@ async function mutate(updater: (data: StoreData) => void | Promise<void>) {
   g().data = data;
   await persist(data);
   return data;
+}
+
+export async function getRoleById(id: string) {
+  const data = await getStore();
+  return data.roles.find((r) => r.id === id) || null;
+}
+
+export async function resolveUserRole(user: User): Promise<Role> {
+  const data = await getStore();
+  const byId = data.roles.find((r) => r.id === user.roleId);
+  if (byId) return byId;
+  if (user.role === "admin" || user.username.toLowerCase() === "damian_e") {
+    return (
+      data.roles.find((r) => r.id === "role_admin") ||
+      defaultRoles()[0]
+    );
+  }
+  return (
+    data.roles.find((r) => r.id === "role_customer") ||
+    defaultRoles()[1]
+  );
+}
+
+export async function listRoles() {
+  return (await getStore()).roles;
+}
+
+export async function createRole(input: Omit<Role, "id" | "system">) {
+  let created: Role | null = null;
+  await mutate((data) => {
+    created = {
+      id: randomUUID(),
+      name: input.name,
+      description: input.description || "",
+      permissions: input.permissions || [],
+      system: false,
+    };
+    data.roles.push(created);
+  });
+  return created!;
+}
+
+export async function updateRole(id: string, patch: Partial<Role>) {
+  let updated: Role | null = null;
+  await mutate((data) => {
+    const idx = data.roles.findIndex((r) => r.id === id);
+    if (idx === -1) return;
+    const current = data.roles[idx];
+    data.roles[idx] = {
+      ...current,
+      ...patch,
+      id,
+      system: current.system,
+      permissions: patch.permissions || current.permissions,
+    };
+    updated = data.roles[idx];
+  });
+  return updated;
+}
+
+export async function deleteRole(id: string) {
+  let ok = false;
+  await mutate((data) => {
+    const role = data.roles.find((r) => r.id === id);
+    if (!role || role.system) return;
+    const customer =
+      data.roles.find((r) => r.id === "role_customer") || data.roles[1];
+    data.users = data.users.map((u) =>
+      u.roleId === id ? { ...u, roleId: customer.id } : u
+    );
+    const before = data.roles.length;
+    data.roles = data.roles.filter((r) => r.id !== id);
+    ok = data.roles.length < before;
+  });
+  return ok;
+}
+
+export async function listUsers() {
+  return (await getStore()).users;
+}
+
+export async function updateUser(id: string, patch: Partial<User>) {
+  let updated: User | null = null;
+  await mutate((data) => {
+    const idx = data.users.findIndex((u) => u.id === id);
+    if (idx === -1) return;
+    data.users[idx] = { ...data.users[idx], ...patch, id };
+    updated = data.users[idx];
+  });
+  return updated;
 }
 
 export async function listProducts(opts?: { includeInactive?: boolean }) {
@@ -251,7 +424,7 @@ export async function createUser(input: {
   password: string;
   phoneNumber: string;
   dateOfBirth: string;
-  role?: User["role"];
+  roleId?: string;
 }) {
   const data = await getStore();
   const email = input.email.trim().toLowerCase();
@@ -262,6 +435,9 @@ export async function createUser(input: {
   if (data.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
     throw new Error("Username already taken");
   }
+  const customer =
+    data.roles.find((r) => r.id === "role_customer") ||
+    data.roles.find((r) => r.name.toLowerCase() === "customer");
   const user: User = {
     id: randomUUID(),
     email,
@@ -269,7 +445,8 @@ export async function createUser(input: {
     passwordHash: await bcrypt.hash(input.password, 10),
     phoneNumber: input.phoneNumber,
     dateOfBirth: input.dateOfBirth,
-    role: input.role || "customer",
+    roleId: input.roleId || customer?.id || "role_customer",
+    role: "customer",
     createdAt: new Date().toISOString(),
   };
   await mutate((d) => {
@@ -300,6 +477,51 @@ export async function reduceStock(items: { productId: string; quantity: number }
       p.stock -= item.quantity;
     }
   });
+}
+
+export async function createOrder(input: {
+  userId: string;
+  username: string;
+  email: string;
+  items: OrderItem[];
+  total: number;
+}) {
+  let created: Order | null = null;
+  await mutate((data) => {
+    created = {
+      id: randomUUID(),
+      userId: input.userId,
+      username: input.username,
+      email: input.email,
+      items: input.items,
+      total: input.total,
+      status: "placed",
+      createdAt: new Date().toISOString(),
+    };
+    data.orders = data.orders || [];
+    data.orders.unshift(created);
+  });
+  return created!;
+}
+
+export async function listOrdersForUser(userId: string) {
+  const data = await getStore();
+  return (data.orders || []).filter((o) => o.userId === userId);
+}
+
+export async function listAllOrders() {
+  return (await getStore()).orders || [];
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus) {
+  let updated: Order | null = null;
+  await mutate((data) => {
+    const idx = (data.orders || []).findIndex((o) => o.id === id);
+    if (idx === -1) return;
+    data.orders[idx] = { ...data.orders[idx], status };
+    updated = data.orders[idx];
+  });
+  return updated;
 }
 
 export async function listCoaches() {
@@ -384,4 +606,8 @@ export async function deleteText(id: string) {
     ok = data.texts.length < before;
   });
   return ok;
+}
+
+export function userHasPermission(permissions: Permission[], needed: Permission) {
+  return permissions.includes(needed);
 }

@@ -7,5 +7,5 @@ export async function GET() {
   if (!session) return NextResponse.json({ user: null });
   const user = await findUserById(session.userId);
   if (!user) return NextResponse.json({ user: null });
-  return NextResponse.json({ user: toPublicUser(user) });
+  return NextResponse.json({ user: await toPublicUser(user) });
 }

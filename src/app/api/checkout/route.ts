@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
-import { getProduct, reduceStock } from "@/lib/store";
+import { createOrder, getProduct, reduceStock } from "@/lib/store";
 
 const schema = z.object({
   items: z
@@ -21,6 +21,9 @@ export async function POST(req: Request) {
   }
   try {
     const body = schema.parse(await req.json());
+    const lineItems = [];
+    let total = 0;
+
     for (const item of body.items) {
       const product = await getProduct(item.productId);
       if (!product || !product.active) {
@@ -32,9 +35,30 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      lineItems.push({
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: item.quantity,
+        image: product.image,
+      });
+      total += product.price * item.quantity;
     }
+
     await reduceStock(body.items);
-    return NextResponse.json({ ok: true, message: "Order placed — inventory updated." });
+    const order = await createOrder({
+      userId: session.userId,
+      username: session.username,
+      email: session.email,
+      items: lineItems,
+      total,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      order,
+      message: "Order placed — saved to your previous orders.",
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Checkout failed";
     return NextResponse.json({ error: message }, { status: 400 });

@@ -28,7 +28,11 @@ export default function LoginPage() {
       setError(data.error || "Login failed");
       return;
     }
-    router.push(data.user?.role === "admin" ? "/admin" : "/profile");
+    const perms: string[] = data.user?.permissions || [];
+    const goAdmin = perms.some((p) =>
+      ["manage_inventory", "manage_roles", "manage_users", "edit_pages"].includes(p)
+    );
+    router.push(goAdmin ? "/admin" : "/profile");
     router.refresh();
   }
 

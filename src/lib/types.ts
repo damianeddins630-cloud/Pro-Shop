@@ -1,4 +1,48 @@
-export type UserRole = "customer" | "admin";
+export type Permission =
+  | "edit_pages"
+  | "manage_inventory"
+  | "manage_sponsors"
+  | "manage_deals"
+  | "manage_coaches"
+  | "manage_users"
+  | "manage_roles"
+  | "view_orders"
+  | "manage_orders";
+
+export const ALL_PERMISSIONS: Permission[] = [
+  "edit_pages",
+  "manage_inventory",
+  "manage_sponsors",
+  "manage_deals",
+  "manage_coaches",
+  "manage_users",
+  "manage_roles",
+  "view_orders",
+  "manage_orders",
+];
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+  edit_pages: "Edit pages (rename / + / −)",
+  manage_inventory: "Manage inventory",
+  manage_sponsors: "Manage sponsors",
+  manage_deals: "Manage deals",
+  manage_coaches: "Manage coaches",
+  manage_users: "Manage users",
+  manage_roles: "Manage roles & permissions",
+  view_orders: "View all orders",
+  manage_orders: "Manage order status",
+};
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  permissions: Permission[];
+  system?: boolean;
+}
+
+/** @deprecated use roleId — kept for migration */
+export type UserRole = "customer" | "admin" | string;
 
 export interface User {
   id: string;
@@ -7,7 +51,9 @@ export interface User {
   passwordHash: string;
   phoneNumber: string;
   dateOfBirth: string;
-  role: UserRole;
+  roleId: string;
+  /** legacy field */
+  role?: string;
   createdAt: string;
 }
 
@@ -17,7 +63,9 @@ export interface PublicUser {
   username: string;
   phoneNumber: string;
   dateOfBirth: string;
-  role: UserRole;
+  roleId: string;
+  roleName: string;
+  permissions: Permission[];
 }
 
 export interface Product {
@@ -74,6 +122,27 @@ export interface PageText {
   text: string;
 }
 
+export interface OrderItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
+}
+
+export type OrderStatus = "placed" | "processing" | "completed" | "cancelled";
+
+export interface Order {
+  id: string;
+  userId: string;
+  username: string;
+  email: string;
+  items: OrderItem[];
+  total: number;
+  status: OrderStatus;
+  createdAt: string;
+}
+
 export interface StoreData {
   products: Product[];
   sponsors: Sponsor[];
@@ -82,6 +151,8 @@ export interface StoreData {
   users: User[];
   coaches: Coach[];
   texts: PageText[];
+  roles: Role[];
+  orders: Order[];
 }
 
 export interface CartItem {
@@ -91,7 +162,8 @@ export interface CartItem {
 
 export interface SessionPayload {
   userId: string;
-  role: UserRole;
+  roleId: string;
   username: string;
   email: string;
+  permissions: Permission[];
 }
