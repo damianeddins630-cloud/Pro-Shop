@@ -21,6 +21,7 @@ const emptyProduct = {
   name: "",
   description: "",
   price: 0,
+  discountPercent: 0,
   stock: 0,
   category: "Accessories",
   brand: "Ballard's Bowling",
@@ -179,8 +180,9 @@ export default function AdminPage() {
     setMessage("");
     const payload = {
       ...form,
-      price: Number(form.price),
-      stock: Number(form.stock),
+      price: Number(form.price) || 0,
+      discountPercent: Math.min(100, Math.max(0, Number(form.discountPercent) || 0)),
+      stock: Number(form.stock) || 0,
     };
     const res = await fetch(editingId ? `/api/products/${editingId}` : "/api/products", {
       method: editingId ? "PUT" : "POST",
@@ -199,6 +201,9 @@ export default function AdminPage() {
     setForm(emptyProduct);
     setEditingId(null);
     if (data.persist) setDurableConfigured(Boolean(data.persist.durableConfigured));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("bba-inventory"));
+    }
     load();
   }
 
@@ -211,6 +216,9 @@ export default function AdminPage() {
       return;
     }
     setMessage("Product deleted");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("bba-inventory"));
+    }
     load();
   }
 
@@ -451,23 +459,76 @@ export default function AdminPage() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
             <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label" htmlFor="price">
+                  Regular price ($0 allowed)
+                </label>
+                <input
+                  id="price"
+                  className="field"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  placeholder="0.00"
+                  value={form.price}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      price: e.target.value === "" ? 0 : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="stock">
+                  Stock
+                </label>
+                <input
+                  id="stock"
+                  className="field"
+                  type="number"
+                  min={0}
+                  placeholder="Stock"
+                  value={form.stock}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      stock: e.target.value === "" ? 0 : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <label className="label" htmlFor="discountPercent">
+                Discount % (keeps regular price, shows sale price)
+              </label>
               <input
+                id="discountPercent"
                 className="field"
                 type="number"
-                step="0.01"
-                placeholder="Price"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-                required
+                min={0}
+                max={100}
+                step={1}
+                placeholder="0"
+                value={form.discountPercent}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    discountPercent:
+                      e.target.value === "" ? 0 : Number(e.target.value),
+                  })
+                }
               />
-              <input
-                className="field"
-                type="number"
-                placeholder="Stock"
-                value={form.stock}
-                onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
-                required
-              />
+              <p className="mt-1 text-xs text-mist">
+                Example: $100 + 20% off → shop shows $80 (was $100)
+                {form.price > 0 && form.discountPercent > 0
+                  ? ` · now $${(
+                      form.price *
+                      (1 - Math.min(100, Math.max(0, form.discountPercent)) / 100)
+                    ).toFixed(2)}`
+                  : ""}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <input
@@ -561,7 +622,14 @@ export default function AdminPage() {
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate font-semibold">{p.name}</h3>
                     <p className="text-sm text-mist">
-                      ${p.price.toFixed(2)} · stock {p.stock} · {p.brand}
+                      ${p.price.toFixed(2)}
+                      {(p.discountPercent || 0) > 0
+                        ? ` · ${p.discountPercent}% off → $${(
+                            p.price *
+                            (1 - (p.discountPercent || 0) / 100)
+                          ).toFixed(2)}`
+                        : ""}{" "}
+                      · stock {p.stock} · {p.brand}
                       {!p.active && " · hidden"}
                     </p>
                     <div className="mt-2 flex gap-2">
@@ -574,6 +642,7 @@ export default function AdminPage() {
                             name: p.name,
                             description: p.description,
                             price: p.price,
+                            discountPercent: p.discountPercent || 0,
                             stock: p.stock,
                             category: p.category,
                             brand: p.brand,

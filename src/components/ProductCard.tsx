@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
+import { ProductPrice } from "@/components/ProductPrice";
 
 export function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
@@ -32,12 +33,13 @@ export function ProductCard({ product }: { product: Product }) {
             fill
             className="object-contain p-4 transition duration-500 group-hover:scale-105"
             sizes="(max-width:768px) 50vw, 25vw"
+            unoptimized
           />
         </div>
         <div className="space-y-1 p-4">
           <p className="text-xs tracking-[0.14em] text-red uppercase">{product.brand}</p>
           <h3 className="text-lg font-semibold text-chalk">{product.name}</h3>
-          <p className="text-mist">${product.price.toFixed(2)}</p>
+          <ProductPrice product={product} />
           <p className="text-xs text-mist/80">
             {out ? "Out of stock" : `${product.stock} in stock`}
           </p>

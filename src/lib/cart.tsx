@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { CartItem, Product } from "./types";
+import { effectivePrice } from "./pricing";
 
 const STORAGE_KEY = "bba_cart_v1";
 const EMPTY: CartItem[] = [];
@@ -106,7 +107,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (products: Product[]) =>
       items.reduce((sum, item) => {
         const p = products.find((x) => x.id === item.productId);
-        return sum + (p ? p.price * item.quantity : 0);
+        return sum + (p ? effectivePrice(p) * item.quantity : 0);
       }, 0),
     [items]
   );

@@ -12,6 +12,7 @@ import {
   isShopifyConfigured,
   shopifyStatus,
 } from "@/lib/shopify";
+import { effectivePrice } from "@/lib/pricing";
 
 const schema = z.object({
   items: z
@@ -50,14 +51,18 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      const unitPrice = effectivePrice(product);
       lineItems.push({
         productId: product.id,
-        name: product.name,
-        price: product.price,
+        name:
+          (product.discountPercent || 0) > 0
+            ? `${product.name} (${product.discountPercent}% off)`
+            : product.name,
+        price: unitPrice,
         quantity: item.quantity,
         image: product.image,
       });
-      total += product.price * item.quantity;
+      total += unitPrice * item.quantity;
     }
 
     const origin =

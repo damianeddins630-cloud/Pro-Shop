@@ -32,6 +32,7 @@ const patchSchema = z.object({
   image: z.string().min(1).optional(),
   featured: z.boolean().optional(),
   active: z.boolean().optional(),
+  discountPercent: z.coerce.number().min(0).max(100).optional(),
   shopifyVariantId: z.string().optional(),
 });
 
@@ -47,7 +48,10 @@ export async function PUT(req: Request, { params }: Params) {
     if (!product) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json({ product, persist: storePersistStatus() });
+    return NextResponse.json(
+      { product, persist: storePersistStatus() },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Update failed";
     return NextResponse.json({ error: message }, { status: 400 });
@@ -64,5 +68,8 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!ok) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ ok: true, persist: storePersistStatus() });
+  return NextResponse.json(
+    { ok: true, persist: storePersistStatus() },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }

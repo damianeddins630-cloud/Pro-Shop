@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProduct } from "@/lib/store";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { ProductPrice } from "@/components/ProductPrice";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +29,18 @@ export default async function ProductPage({
             fill
             className="object-contain p-8"
             priority
+            unoptimized
           />
         </div>
         <div>
           <p className="text-sm tracking-[0.18em] text-red uppercase">{product.brand}</p>
           <h1 className="display mt-2 text-5xl md:text-6xl">{product.name}</h1>
-          <p className="mt-4 text-2xl text-chalk">${product.price.toFixed(2)}</p>
+          <div className="mt-4">
+            <ProductPrice product={product} size="lg" />
+          </div>
           <p className="mt-2 text-sm text-mist">
-            {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"} · {product.category}
+            {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"} ·{" "}
+            {product.category}
           </p>
           <p className="mt-6 leading-relaxed text-mist">{product.description}</p>
           <div className="mt-8">

@@ -73,7 +73,10 @@ export interface Product {
   name: string;
   slug: string;
   description: string;
+  /** Regular / list price — may be $0 */
   price: number;
+  /** 0–100 percent off the regular price (keeps original price visible) */
+  discountPercent?: number;
   stock: number;
   category: string;
   brand: string;

@@ -3,17 +3,84 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AddItemButton, EditableText, ItemControls } from "@/components/Editable";
+import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
 import type { Product } from "@/lib/types";
 
-export function EditableProductGrid({ initial }: { initial: Product[] }) {
-  const [products, setProducts] = useState(initial);
+type Filters = {
+  brand?: string;
+  q?: string;
+  category?: string;
+  featuredOnly?: boolean;
+  limit?: number;
+};
+
+function applyFilters(list: Product[], filters?: Filters) {
+  let next = list;
+  if (filters?.featuredOnly) next = next.filter((p) => p.featured);
+  if (filters?.brand) next = next.filter((p) => p.brand === filters.brand);
+  if (filters?.category) next = next.filter((p) => p.category === filters.category);
+  if (filters?.q) {
+    const q = filters.q.toLowerCase();
+    next = next.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.brand.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+    );
+  }
+  if (filters?.limit) next = next.slice(0, filters.limit);
+  return next;
+}
+
+export function EditableProductGrid({
+  initial = [],
+  filters,
+}: {
+  initial?: Product[];
+  filters?: Filters;
+}) {
+  const [products, setProducts] = useState<Product[]>(() =>
+    applyFilters(initial, filters)
+  );
+  const [loading, setLoading] = useState(!initial.length);
   const { editMode: editing, user, loading: authLoading } = useEditMode();
   const { add } = useCart();
   const router = useRouter();
+
+  const filterKey = JSON.stringify(filters || {});
+
+  const load = useCallback(async () => {
+    const activeFilters = JSON.parse(filterKey) as Filters;
+    try {
+      const res = await fetch("/api/products", { cache: "no-store" });
+      const data = await res.json();
+      setProducts(applyFilters(data.products || [], activeFilters));
+    } catch {
+      // keep current
+    } finally {
+      setLoading(false);
+    }
+  }, [filterKey]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("bba-inventory", refresh);
+    const id = window.setInterval(refresh, 12000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("bba-inventory", refresh);
+      window.clearInterval(id);
+    };
+  }, [load]);
 
   function onBuy(productId: string, slug: string) {
     if (authLoading) return;
@@ -32,7 +99,8 @@ export function EditableProductGrid({ initial }: { initial: Product[] }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Rename failed");
-    setProducts((prev) => prev.map((p) => (p.id === id ? data.product : p)));
+    window.dispatchEvent(new Event("bba-inventory"));
+    await load();
     router.refresh();
   }
 
@@ -44,7 +112,8 @@ export function EditableProductGrid({ initial }: { initial: Product[] }) {
       alert(data.error || "Delete failed");
       return;
     }
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+    window.dispatchEvent(new Event("bba-inventory"));
+    await load();
     router.refresh();
   }
 
@@ -58,6 +127,7 @@ export function EditableProductGrid({ initial }: { initial: Product[] }) {
         name: name.trim(),
         description: "New inventory item",
         price: 0,
+        discountPercent: 0,
         stock: 1,
         category: "Accessories",
         brand: "Ballard's Bowling",
@@ -71,8 +141,13 @@ export function EditableProductGrid({ initial }: { initial: Product[] }) {
       alert(data.error || "Add failed");
       return;
     }
-    setProducts((prev) => [data.product, ...prev]);
+    window.dispatchEvent(new Event("bba-inventory"));
+    await load();
     router.refresh();
+  }
+
+  if (loading && products.length === 0) {
+    return <p className="text-mist">Loading inventory...</p>;
   }
 
   return (
@@ -93,18 +168,21 @@ export function EditableProductGrid({ initial }: { initial: Product[] }) {
                     fill
                     className="object-contain p-4 transition duration-500 group-hover:scale-105"
                     sizes="(max-width:768px) 50vw, 25vw"
+                    unoptimized
                   />
                 </div>
               </Link>
               <div className="space-y-1 p-4">
-                <p className="text-xs tracking-[0.14em] text-red uppercase">{product.brand}</p>
+                <p className="text-xs tracking-[0.14em] text-red uppercase">
+                  {product.brand}
+                </p>
                 <EditableText
                   as="h3"
                   className="text-lg font-semibold text-chalk"
                   value={product.name}
                   onSave={(name) => rename(product.id, name)}
                 />
-                <p className="text-mist">${product.price.toFixed(2)}</p>
+                <ProductPrice product={product} />
                 <p className="text-xs text-mist/80">
                   {out ? "Out of stock" : `${product.stock} in stock`}
                 </p>

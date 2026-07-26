@@ -17,12 +17,18 @@ export async function GET(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({
-      products: await listProducts({ includeInactive: true }),
-      persist: storePersistStatus(),
-    });
+    return NextResponse.json(
+      {
+        products: await listProducts({ includeInactive: true }),
+        persist: storePersistStatus(),
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   }
-  return NextResponse.json({ products: await listProducts() });
+  return NextResponse.json(
+    { products: await listProducts() },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 const createSchema = z.object({
@@ -36,6 +42,7 @@ const createSchema = z.object({
   image: z.string().min(1),
   featured: z.boolean().optional(),
   active: z.boolean().optional(),
+  discountPercent: z.coerce.number().min(0).max(100).optional(),
   shopifyVariantId: z.string().optional(),
 });
 
@@ -57,6 +64,7 @@ export async function POST(req: Request) {
       slug,
       description: body.description,
       price: body.price,
+      discountPercent: body.discountPercent ?? 0,
       stock: body.stock,
       category: body.category,
       brand: body.brand,
@@ -74,7 +82,10 @@ export async function POST(req: Request) {
           ? undefined
           : "Saved on this server only. Add Upstash Redis on Vercel so inventory sticks.",
       },
-      { status: 201 }
+      {
+        status: 201,
+        headers: { "Cache-Control": "no-store" },
+      }
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Create failed";

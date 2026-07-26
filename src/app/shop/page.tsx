@@ -24,20 +24,11 @@ export default async function ShopPage({
     listProducts(),
     getText("shop", "title", "Inventory & Gear"),
   ]);
-  const filtered = products.filter((p) => {
-    if (params.brand && p.brand !== params.brand) return false;
-    if (params.category && p.category !== params.category) return false;
-    if (params.q) {
-      const q = params.q.toLowerCase();
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
+  const filters = {
+    brand: params.brand,
+    category: params.category,
+    q: params.q,
+  };
   const categories = Array.from(new Set(products.map((p) => p.category))).sort();
 
   return (
@@ -128,10 +119,10 @@ export default async function ShopPage({
           </p>
         )}
 
-        <EditableProductGrid initial={filtered} />
-        {filtered.length === 0 && (
-          <p className="mt-8 text-mist">No products match that filter.</p>
-        )}
+        <EditableProductGrid
+          initial={products}
+          filters={filters}
+        />
       </section>
     </>
   );

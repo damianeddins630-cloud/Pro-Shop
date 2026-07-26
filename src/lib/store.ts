@@ -360,20 +360,32 @@ export async function updateUser(id: string, patch: Partial<User>) {
   return updated;
 }
 
+function normalizeProduct(p: Product): Product {
+  return {
+    ...p,
+    price: Math.max(0, Number(p.price) || 0),
+    discountPercent: Math.min(100, Math.max(0, Number(p.discountPercent) || 0)),
+    stock: Math.max(0, Math.floor(Number(p.stock) || 0)),
+  };
+}
+
 export async function listProducts(opts?: { includeInactive?: boolean }) {
   const data = await getStore();
-  return data.products.filter((p) => opts?.includeInactive || p.active);
+  return data.products
+    .map(normalizeProduct)
+    .filter((p) => opts?.includeInactive || p.active);
 }
 
 export async function getProduct(id: string) {
   const data = await getStore();
-  return data.products.find((p) => p.id === id || p.slug === id) || null;
+  const product = data.products.find((p) => p.id === id || p.slug === id);
+  return product ? normalizeProduct(product) : null;
 }
 
 export async function createProduct(input: Omit<Product, "id">) {
   let created: Product | null = null;
   await mutate((data) => {
-    created = { ...input, id: randomUUID() };
+    created = normalizeProduct({ ...input, id: randomUUID() });
     data.products.unshift(created);
   });
   return created!;
@@ -384,7 +396,11 @@ export async function updateProduct(id: string, patch: Partial<Product>) {
   await mutate((data) => {
     const idx = data.products.findIndex((p) => p.id === id);
     if (idx === -1) return;
-    data.products[idx] = { ...data.products[idx], ...patch, id };
+    data.products[idx] = normalizeProduct({
+      ...data.products[idx],
+      ...patch,
+      id,
+    });
     updated = data.products[idx];
   });
   return updated;

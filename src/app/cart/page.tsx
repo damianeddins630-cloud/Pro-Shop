@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
+import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
+import { effectivePrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
 export default function CartPage() {
@@ -20,13 +22,21 @@ export default function CartPage() {
   const [shopifyReady, setShopifyReady] = useState(false);
 
   useEffect(() => {
-    fetch("/api/products")
-      .then((r) => r.json())
-      .then((d) => setProducts(d.products || []));
+    const loadProducts = () =>
+      fetch("/api/products", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => setProducts(d.products || []));
+    void loadProducts();
+    window.addEventListener("bba-inventory", loadProducts);
+    window.addEventListener("focus", loadProducts);
     fetch("/api/checkout")
       .then((r) => r.json())
       .then((d) => setShopifyReady(Boolean(d.shopify?.configured)))
       .catch(() => setShopifyReady(false));
+    return () => {
+      window.removeEventListener("bba-inventory", loadProducts);
+      window.removeEventListener("focus", loadProducts);
+    };
   }, []);
 
   const lines = items
@@ -111,7 +121,7 @@ export default function CartPage() {
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold">{product.name}</h3>
-                  <p className="text-sm text-mist">${product.price.toFixed(2)}</p>
+                  <ProductPrice product={product} size="sm" />
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <input
                       type="number"
@@ -131,7 +141,7 @@ export default function CartPage() {
                   </div>
                 </div>
                 <div className="font-semibold">
-                  ${(product.price * item.quantity).toFixed(2)}
+                  ${(effectivePrice(product) * item.quantity).toFixed(2)}
                 </div>
               </div>
             ))}
