@@ -65,6 +65,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [durableConfigured, setDurableConfigured] = useState(true);
 
   const canAccess =
     hasPerm(
@@ -94,7 +95,10 @@ export default function AdminPage() {
       tasks.push(
         fetch("/api/products?admin=1")
           .then((r) => r.json())
-          .then((d) => setProducts(d.products || []))
+          .then((d) => {
+            setProducts(d.products || []);
+            if (d.persist) setDurableConfigured(Boolean(d.persist.durableConfigured));
+          })
       );
     }
     if (hasPerm(u, "manage_deals", "edit_pages")) {
@@ -188,9 +192,13 @@ export default function AdminPage() {
       setError(data.error || "Save failed");
       return;
     }
-    setMessage(editingId ? "Product updated" : "Product added");
+    setMessage(
+      (editingId ? "Product updated" : "Product added") +
+        (data.warning ? ` — ${data.warning}` : "")
+    );
     setForm(emptyProduct);
     setEditingId(null);
+    if (data.persist) setDurableConfigured(Boolean(data.persist.durableConfigured));
     load();
   }
 
@@ -404,6 +412,15 @@ export default function AdminPage() {
             ))}
         </div>
       </div>
+
+      {!durableConfigured && (
+        <p className="mb-6 rounded-2xl border border-red/40 bg-red/10 px-4 py-3 text-sm text-red-100">
+          Inventory saves can reset on Vercel until durable storage is connected. Add free{" "}
+          <strong>Upstash Redis</strong> env vars in Vercel:{" "}
+          <code className="text-xs">UPSTASH_REDIS_REST_URL</code> and{" "}
+          <code className="text-xs">UPSTASH_REDIS_REST_TOKEN</code>, then redeploy.
+        </p>
+      )}
 
       {(message || error) && (
         <p className={`mb-6 text-sm ${error ? "text-red-300" : "text-emerald-300"}`}>

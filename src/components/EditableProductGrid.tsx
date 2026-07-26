@@ -11,9 +11,18 @@ import type { Product } from "@/lib/types";
 
 export function EditableProductGrid({ initial }: { initial: Product[] }) {
   const [products, setProducts] = useState(initial);
-  const { editMode: editing } = useEditMode();
+  const { editMode: editing, user, loading: authLoading } = useEditMode();
   const { add } = useCart();
   const router = useRouter();
+
+  function onBuy(productId: string, slug: string) {
+    if (authLoading) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/shop/${slug}`)}`);
+      return;
+    }
+    add(productId);
+  }
 
   async function rename(id: string, name: string) {
     const res = await fetch(`/api/products/${id}`, {
@@ -105,11 +114,11 @@ export function EditableProductGrid({ initial }: { initial: Product[] }) {
                 <div className="px-4 pb-4">
                   <button
                     type="button"
-                    disabled={out}
-                    onClick={() => add(product.id)}
+                    disabled={out || authLoading}
+                    onClick={() => onBuy(product.id, product.slug)}
                     className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {out ? "Sold out" : "Add to cart"}
+                    {out ? "Sold out" : user ? "Add to cart" : "Login to buy"}
                   </button>
                 </div>
               )}

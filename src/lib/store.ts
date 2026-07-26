@@ -19,18 +19,24 @@ import type {
 } from "./types";
 import { ALL_PERMISSIONS } from "./types";
 import seedJson from "@/data/seed.json";
+import {
+  durableStoreConfigured,
+  loadDurableStore,
+  saveDurableStore,
+} from "./durable-store";
 
-const GLOBAL_KEY = "__bba_store_v4__";
+const GLOBAL_KEY = "__bba_store_v5__";
 
 type GlobalStore = {
   data: StoreData | null;
   ready: Promise<StoreData> | null;
+  lastPersistOk: boolean;
 };
 
 function g(): GlobalStore {
   const root = globalThis as typeof globalThis & { [GLOBAL_KEY]?: GlobalStore };
   if (!root[GLOBAL_KEY]) {
-    root[GLOBAL_KEY] = { data: null, ready: null };
+    root[GLOBAL_KEY] = { data: null, ready: null, lastPersistOk: true };
   }
   return root[GLOBAL_KEY]!;
 }
@@ -163,21 +169,32 @@ async function ensureAdmin(data: StoreData): Promise<void> {
   });
 }
 
+function mergeWithSeed(parsed: StoreData): StoreData {
+  const seed = cloneSeed();
+  parsed.products = parsed.products?.length ? parsed.products : seed.products;
+  parsed.sponsors = parsed.sponsors?.length ? parsed.sponsors : seed.sponsors;
+  parsed.deals = parsed.deals?.length ? parsed.deals : seed.deals;
+  parsed.coaches = parsed.coaches?.length ? parsed.coaches : seed.coaches;
+  parsed.texts = parsed.texts?.length ? parsed.texts : seed.texts;
+  parsed.roles = parsed.roles?.length ? parsed.roles : seed.roles;
+  parsed.orders = parsed.orders || [];
+  parsed.subscribers = parsed.subscribers || [];
+  parsed.users = parsed.users || [];
+  return parsed;
+}
+
 async function loadFromDisk(): Promise<StoreData> {
+  const remote = await loadDurableStore();
+  if (remote) {
+    const merged = mergeWithSeed(remote);
+    await ensureAdmin(merged);
+    return merged;
+  }
+
   const rt = runtimePath();
   try {
     const raw = await fs.readFile(rt, "utf8");
-    const parsed = JSON.parse(raw) as StoreData;
-    const seed = cloneSeed();
-    parsed.products = parsed.products?.length ? parsed.products : seed.products;
-    parsed.sponsors = parsed.sponsors?.length ? parsed.sponsors : seed.sponsors;
-    parsed.deals = parsed.deals?.length ? parsed.deals : seed.deals;
-    parsed.coaches = parsed.coaches?.length ? parsed.coaches : seed.coaches;
-    parsed.texts = parsed.texts?.length ? parsed.texts : seed.texts;
-    parsed.roles = parsed.roles?.length ? parsed.roles : seed.roles;
-    parsed.orders = parsed.orders || [];
-    parsed.subscribers = parsed.subscribers || [];
-    parsed.users = parsed.users || [];
+    const parsed = mergeWithSeed(JSON.parse(raw) as StoreData);
     await ensureAdmin(parsed);
     return parsed;
   } catch {
@@ -189,17 +206,45 @@ async function loadFromDisk(): Promise<StoreData> {
 }
 
 async function persist(data: StoreData) {
+  const store = g();
+  let ok = true;
   try {
     const rt = runtimePath();
     await fs.mkdir(path.dirname(rt), { recursive: true });
     await fs.writeFile(rt, JSON.stringify(data), "utf8");
   } catch {
-    // ignore
+    ok = false;
   }
+
+  if (durableStoreConfigured()) {
+    const durableOk = await saveDurableStore(data);
+    ok = durableOk || ok;
+  }
+
+  store.lastPersistOk = ok;
+}
+
+export function storePersistStatus() {
+  return {
+    durableConfigured: durableStoreConfigured(),
+    lastPersistOk: g().lastPersistOk,
+  };
 }
 
 export async function getStore(): Promise<StoreData> {
   const store = g();
+
+  // On Vercel with durable store, always refresh so inventory changes sync across instances
+  if (durableStoreConfigured()) {
+    const remote = await loadDurableStore();
+    if (remote) {
+      const merged = mergeWithSeed(remote);
+      await ensureAdmin(merged);
+      store.data = merged;
+      return merged;
+    }
+  }
+
   if (store.data) return store.data;
   if (!store.ready) {
     store.ready = loadFromDisk()

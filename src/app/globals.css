@@ -27,8 +27,8 @@ body {
   color: var(--foreground);
   background-color: #000;
   background-image:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.72) 55%, rgba(0, 0, 0, 0.92) 100%),
-    url("/images/site-bg.jpg");
+    linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.72) 55%, rgba(0, 0, 0, 0.92) 100%),
+    url("/images/site-bg.gif");
   background-size: cover;
   background-position: center top;
   background-attachment: fixed;

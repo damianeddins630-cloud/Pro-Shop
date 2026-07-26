@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listProducts } from "@/lib/store";
+import { listProducts, storePersistStatus } from "@/lib/store";
 import { shopifyStatus } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ export async function GET() {
       vercel: Boolean(process.env.VERCEL),
       productCount: products.length,
       shopify: shopifyStatus(),
+      persist: storePersistStatus(),
       time: new Date().toISOString(),
     });
   } catch (e) {

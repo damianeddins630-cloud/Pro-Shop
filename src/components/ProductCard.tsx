@@ -2,12 +2,25 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { useCart } from "@/lib/cart";
+import { useEditMode } from "@/lib/edit-mode";
 
 export function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
+  const { user, loading } = useEditMode();
+  const router = useRouter();
   const out = product.stock <= 0;
+
+  function onBuy() {
+    if (loading) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/shop/${product.slug}`)}`);
+      return;
+    }
+    add(product.id);
+  }
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-red/40 hover:bg-white/[0.05]">
@@ -33,11 +46,11 @@ export function ProductCard({ product }: { product: Product }) {
       <div className="px-4 pb-4">
         <button
           type="button"
-          disabled={out}
-          onClick={() => add(product.id)}
+          disabled={out || loading}
+          onClick={onBuy}
           className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {out ? "Sold out" : "Add to cart"}
+          {out ? "Sold out" : user ? "Add to cart" : "Login to buy"}
         </button>
       </div>
     </article>

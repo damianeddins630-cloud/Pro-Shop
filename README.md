@@ -33,6 +33,11 @@ In Vercel → Project → Settings → Environment Variables, add:
 ```
 AUTH_SECRET=...
 NEXT_PUBLIC_SITE_URL=https://YOUR-DOMAIN
+
+# Required so inventory add/edit/delete sticks on Vercel (free Upstash Redis)
+UPSTASH_REDIS_REST_URL=https://xxxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxxxxxxx
+
 SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_...
 SHOPIFY_API_VERSION=2025-01
@@ -40,6 +45,8 @@ SHOPIFY_WEBHOOK_SECRET=...   # optional but recommended
 ```
 
 Redeploy after saving env vars. Cart button becomes **Pay with Shopify** when configured.
+
+Buying requires login or create account (`Login to buy` on products).
 
 ## Local
 

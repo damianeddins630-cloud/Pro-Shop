@@ -3,11 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { useCart } from "@/lib/cart";
+import { useEditMode } from "@/lib/edit-mode";
 import type { Product } from "@/lib/types";
 
 export default function CartPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useEditMode();
   const { items, setQty, remove, clear, total, count } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [message, setMessage] = useState("");
@@ -36,6 +40,10 @@ export default function CartPage() {
   }[];
 
   async function checkout() {
+    if (!user) {
+      router.push("/login?next=/cart");
+      return;
+    }
     setLoading(true);
     setError("");
     setMessage("");
@@ -133,7 +141,7 @@ export default function CartPage() {
             <h2 className="display text-3xl">Order summary</h2>
             <p className="mt-4 text-2xl">${total(products).toFixed(2)}</p>
             <p className="mt-2 text-sm text-mist">
-              Shop and cart stay on this website.{" "}
+              Login required to buy. Shop and cart stay on this website.{" "}
               {shopifyReady
                 ? "Payment is collected securely by Shopify, then you return here."
                 : "Shopify payments are not connected yet — orders save on the site only."}
@@ -142,19 +150,28 @@ export default function CartPage() {
             {message && <p className="mt-3 text-sm text-emerald-300">{message}</p>}
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || authLoading}
               onClick={checkout}
               className="btn btn-primary mt-6 w-full"
             >
-              {loading
-                ? "Starting checkout..."
-                : shopifyReady
-                  ? "Pay with Shopify"
-                  : "Place order"}
+              {!user
+                ? "Login to checkout"
+                : loading
+                  ? "Starting checkout..."
+                  : shopifyReady
+                    ? "Pay with Shopify"
+                    : "Place order"}
             </button>
-            <Link href="/login" className="mt-3 block text-center text-sm text-mist underline">
-              Login / create account
-            </Link>
+            {!user && (
+              <div className="mt-3 flex justify-center gap-3 text-sm">
+                <Link href="/login?next=/cart" className="text-red underline">
+                  Login
+                </Link>
+                <Link href="/register?next=/cart" className="text-mist underline">
+                  Create account
+                </Link>
+              </div>
+            )}
           </aside>
         </div>
       )}
