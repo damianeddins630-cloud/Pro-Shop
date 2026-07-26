@@ -1,1 +1,1 @@
-{"version":1,"products":[],"updatedAt":"2026-07-26T19:26:03.222Z"}
+{"version":1,"products":[{"id":"test","name":"Test Free","price":0,"discountPercent":25,"stock":5,"active":true,"slug":"test-free","description":"","category":"Test","brand":"Ballard","image":"/images/logo.png","featured":false}],"updatedAt":"2026-07-26T19:26:16.112Z"}
