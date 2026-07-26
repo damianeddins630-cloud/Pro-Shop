@@ -34,19 +34,26 @@ export function loadLocalInventory(): LocalInventory | null {
   }
 }
 
+export function clearLocalInventory() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(KEY);
+    window.dispatchEvent(new Event("bba-inventory"));
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * Prefer local inventory when it exists and is at least as new as the API
- * (admin edits on this browser). Otherwise use API/GitHub data.
+ * Admin edits are stored in localStorage on this browser.
+ * Always prefer that over the API seed, otherwise shop never updates on Vercel.
  */
-export function pickNewestProducts(
-  apiProducts: Product[],
-  apiUpdatedAt?: string
-): Product[] {
+export function pickNewestProducts(apiProducts: Product[]): Product[] {
   const local = loadLocalInventory();
-  if (!local?.products?.length) return apiProducts;
-  if (!apiProducts?.length) return local.products;
-  if (!apiUpdatedAt) return local.products;
-  const localTime = Date.parse(local.updatedAt) || 0;
-  const apiTime = Date.parse(apiUpdatedAt) || 0;
-  return localTime >= apiTime ? local.products : apiProducts;
+  if (local?.products?.length) return local.products;
+  return apiProducts;
+}
+
+export function activeProducts(products: Product[]) {
+  return products.filter((p) => p.active !== false);
 }

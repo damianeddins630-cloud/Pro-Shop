@@ -9,6 +9,8 @@ import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
 import {
+  activeProducts,
+  loadLocalInventory,
   pickNewestProducts,
   saveLocalInventory,
 } from "@/lib/inventory-client";
@@ -23,7 +25,7 @@ type Filters = {
 };
 
 function applyFilters(list: Product[], filters?: Filters) {
-  let next = list;
+  let next = activeProducts(list);
   if (filters?.featuredOnly) next = next.filter((p) => p.featured);
   if (filters?.brand) next = next.filter((p) => p.brand === filters.brand);
   if (filters?.category) next = next.filter((p) => p.category === filters.category);
@@ -40,6 +42,12 @@ function applyFilters(list: Product[], filters?: Filters) {
   return next;
 }
 
+function readInitial(filters?: Filters, serverInitial: Product[] = []) {
+  const local = loadLocalInventory();
+  if (local?.products?.length) return applyFilters(local.products, filters);
+  return applyFilters(serverInitial, filters);
+}
+
 export function EditableProductGrid({
   initial = [],
   filters,
@@ -47,40 +55,67 @@ export function EditableProductGrid({
   initial?: Product[];
   filters?: Filters;
 }) {
-  const [products, setProducts] = useState<Product[]>(() =>
-    applyFilters(initial, filters)
-  );
-  const [loading, setLoading] = useState(!initial.length);
+  const filterKey = JSON.stringify(filters || {});
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState<"local" | "api" | "">("");
   const { editMode: editing, user, loading: authLoading } = useEditMode();
   const { add } = useCart();
   const router = useRouter();
 
-  const filterKey = JSON.stringify(filters || {});
-
   const load = useCallback(async () => {
     const activeFilters = JSON.parse(filterKey) as Filters;
+
+    // 1) Show local admin inventory immediately (this is what makes shop update)
+    const local = loadLocalInventory();
+    if (local?.products?.length) {
+      setProducts(applyFilters(local.products, activeFilters));
+      setSource("local");
+      setLoading(false);
+    }
+
+    // 2) Also try API / GitHub-backed store
     try {
       const res = await fetch(`/api/products?t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
-      const merged = pickNewestProducts(data.products || [], data.updatedAt);
+      const apiProducts = (data.products || []) as Product[];
+
+      // If we already have local admin edits, keep them and ignore stale API seed
+      if (local?.products?.length) {
+        setProducts(applyFilters(local.products, activeFilters));
+        setSource("local");
+        return;
+      }
+
+      const merged = pickNewestProducts(apiProducts);
       setProducts(applyFilters(merged, activeFilters));
+      setSource("api");
     } catch {
-      const local = pickNewestProducts([]);
-      if (local.length) setProducts(applyFilters(local, activeFilters));
+      if (!local?.products?.length) {
+        setProducts(readInitial(activeFilters, initial));
+      }
     } finally {
       setLoading(false);
     }
-  }, [filterKey]);
+  }, [filterKey, initial]);
 
   useEffect(() => {
+    // Hydrate from localStorage on mount (server initial is often stale on Vercel)
+    const activeFilters = JSON.parse(filterKey) as Filters;
+    const hydrated = readInitial(activeFilters, initial);
+    if (hydrated.length) {
+      setProducts(hydrated);
+      setSource(loadLocalInventory()?.products?.length ? "local" : "api");
+      setLoading(false);
+    }
     void load();
-  }, [load]);
+  }, [load, filterKey, initial]);
 
   useEffect(() => {
     const refresh = () => void load();
     window.addEventListener("focus", refresh);
     window.addEventListener("bba-inventory", refresh);
-    const id = window.setInterval(refresh, 12000);
+    const id = window.setInterval(refresh, 8000);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("bba-inventory", refresh);
@@ -107,13 +142,10 @@ export function EditableProductGrid({
     if (!res.ok) throw new Error(data.error || "Rename failed");
     if (Array.isArray(data.products)) saveLocalInventory(data.products);
     else {
-      setProducts((prev) => {
-        const next = prev.map((p) => (p.id === id ? data.product : p));
-        saveLocalInventory(next);
-        return next;
-      });
+      const local = loadLocalInventory()?.products || products;
+      const next = local.map((p) => (p.id === id ? { ...p, name } : p));
+      saveLocalInventory(next);
     }
-    window.dispatchEvent(new Event("bba-inventory"));
     await load();
     router.refresh();
   }
@@ -127,7 +159,10 @@ export function EditableProductGrid({
       return;
     }
     if (Array.isArray(data.products)) saveLocalInventory(data.products);
-    window.dispatchEvent(new Event("bba-inventory"));
+    else {
+      const local = loadLocalInventory()?.products || products;
+      saveLocalInventory(local.filter((p) => p.id !== id));
+    }
     await load();
     router.refresh();
   }
@@ -157,7 +192,10 @@ export function EditableProductGrid({
       return;
     }
     if (Array.isArray(data.products)) saveLocalInventory(data.products);
-    window.dispatchEvent(new Event("bba-inventory"));
+    else if (data.product) {
+      const local = loadLocalInventory()?.products || products;
+      saveLocalInventory([data.product, ...local]);
+    }
     await load();
     router.refresh();
   }
@@ -168,6 +206,11 @@ export function EditableProductGrid({
 
   return (
     <div>
+      {source === "local" && (
+        <p className="mb-4 text-xs text-emerald-300">
+          Showing your latest inventory updates.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {products.map((product) => {
           const out = product.stock <= 0;
@@ -220,6 +263,9 @@ export function EditableProductGrid({
           );
         })}
       </div>
+      {!products.length && (
+        <p className="mt-8 text-mist">No products match that filter.</p>
+      )}
       <AddItemButton onAdd={addProduct} label="Add product" />
     </div>
   );

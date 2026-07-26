@@ -120,7 +120,7 @@ export default async function ShopPage({
         )}
 
         <EditableProductGrid
-          initial={products}
+          initial={[]}
           filters={filters}
         />
       </section>

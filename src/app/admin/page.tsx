@@ -214,14 +214,34 @@ export default function AdminPage() {
       setError(data.error || "Save failed");
       return;
     }
-    if (Array.isArray(data.products)) {
-      setProducts(data.products);
-      saveLocalInventory(data.products);
+
+    // Always write shop inventory cache on this browser (Vercel API memory does not sync alone)
+    let nextProducts: Product[] = Array.isArray(data.products)
+      ? data.products
+      : [...products];
+    if (data.product) {
+      const idx = nextProducts.findIndex((p) => p.id === data.product.id);
+      if (idx >= 0) nextProducts[idx] = data.product;
+      else nextProducts = [data.product, ...nextProducts];
+    } else if (editingId) {
+      nextProducts = nextProducts.map((p) =>
+        p.id === editingId
+          ? {
+              ...p,
+              ...payload,
+              id: p.id,
+              slug: p.slug,
+            }
+          : p
+      );
     }
+    setProducts(nextProducts);
+    saveLocalInventory(nextProducts);
+
     setMessage(
       `${editingId ? "Product updated" : "Product added"} — price $${price.toFixed(2)}` +
         (discountPercent > 0 ? `, ${discountPercent}% off` : "") +
-        (data.warning ? ` — ${data.warning}` : ". Shop will refresh with this change.")
+        ". Open the Shop page to see it."
     );
     setForm(emptyProduct);
     setEditingId(null);
@@ -240,11 +260,12 @@ export default function AdminPage() {
       setError(data.error || "Delete failed");
       return;
     }
-    setMessage("Product deleted");
-    if (Array.isArray(data.products)) {
-      setProducts(data.products);
-      saveLocalInventory(data.products);
-    }
+    setMessage("Product deleted — open Shop to confirm.");
+    const nextProducts = Array.isArray(data.products)
+      ? data.products
+      : products.filter((p) => p.id !== id);
+    setProducts(nextProducts);
+    saveLocalInventory(nextProducts);
     window.dispatchEvent(new Event("bba-inventory"));
     load();
   }
@@ -448,19 +469,17 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {!githubWrite && (
-        <p className="mb-6 rounded-2xl border border-red/40 bg-red/10 px-4 py-3 text-sm text-red-100">
-          To make inventory changes show for every shop visitor on Vercel, add env var{" "}
-          <code className="text-xs">GITHUB_TOKEN</code> (a GitHub personal access token with{" "}
-          <code className="text-xs">repo</code> access), then redeploy. On this browser, shop
-          updates right after you save.
-        </p>
-      )}
-
       {(message || error) && (
-        <p className={`mb-6 text-sm ${error ? "text-red-300" : "text-emerald-300"}`}>
-          {error || message}
-        </p>
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <p className={`text-sm ${error ? "text-red-300" : "text-emerald-300"}`}>
+            {error || message}
+          </p>
+          {message && !error && (
+            <Link href="/shop" className="btn btn-primary !py-2 !px-4 text-sm">
+              Open Shop page
+            </Link>
+          )}
+        </div>
       )}
 
       {tab === "inventory" && (
