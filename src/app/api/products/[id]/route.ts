@@ -4,11 +4,14 @@ import { requireAnyPermission } from "@/lib/auth";
 import {
   deleteProduct,
   getProduct,
+  listProducts,
   storePersistStatus,
   updateProduct,
 } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+const noStore = { "Cache-Control": "no-store, max-age=0" };
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,20 +21,20 @@ export async function GET(_req: Request, { params }: Params) {
   if (!product) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ product });
+  return NextResponse.json({ product }, { headers: noStore });
 }
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   slug: z.string().min(1).optional(),
   description: z.string().optional(),
-  price: z.coerce.number().nonnegative().optional(),
-  stock: z.coerce.number().int().nonnegative().optional(),
+  price: z.coerce.number().min(0).optional(),
+  stock: z.coerce.number().int().min(0).optional(),
   category: z.string().optional(),
   brand: z.string().optional(),
   image: z.string().min(1).optional(),
-  featured: z.boolean().optional(),
-  active: z.boolean().optional(),
+  featured: z.coerce.boolean().optional(),
+  active: z.coerce.boolean().optional(),
   discountPercent: z.coerce.number().min(0).max(100).optional(),
   shopifyVariantId: z.string().optional(),
 });
@@ -48,9 +51,10 @@ export async function PUT(req: Request, { params }: Params) {
     if (!product) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    const products = await listProducts({ includeInactive: true });
     return NextResponse.json(
-      { product, persist: storePersistStatus() },
-      { headers: { "Cache-Control": "no-store" } }
+      { product, products, persist: storePersistStatus() },
+      { headers: noStore }
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Update failed";
@@ -68,8 +72,9 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!ok) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const products = await listProducts({ includeInactive: true });
   return NextResponse.json(
-    { ok: true, persist: storePersistStatus() },
-    { headers: { "Cache-Control": "no-store" } }
+    { ok: true, products, persist: storePersistStatus() },
+    { headers: noStore }
   );
 }

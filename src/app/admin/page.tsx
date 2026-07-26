@@ -14,15 +14,16 @@ import type {
   Sponsor,
 } from "@/lib/types";
 import { PERMISSION_LABELS } from "@/lib/types";
+import { saveLocalInventory } from "@/lib/inventory-client";
 
 type Tab = "inventory" | "deals" | "sponsors" | "roles" | "users" | "orders";
 
 const emptyProduct = {
   name: "",
   description: "",
-  price: 0,
-  discountPercent: 0,
-  stock: 0,
+  price: "0",
+  discountPercent: "0",
+  stock: "0",
   category: "Accessories",
   brand: "Ballard's Bowling",
   image: "",
@@ -66,7 +67,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [durableConfigured, setDurableConfigured] = useState(true);
+  const [githubWrite, setGithubWrite] = useState(false);
 
   const canAccess =
     hasPerm(
@@ -98,7 +99,10 @@ export default function AdminPage() {
           .then((r) => r.json())
           .then((d) => {
             setProducts(d.products || []);
-            if (d.persist) setDurableConfigured(Boolean(d.persist.durableConfigured));
+            if (d.products) saveLocalInventory(d.products);
+            if (d.persist) {
+              setGithubWrite(Boolean(d.persist.githubWriteConfigured));
+            }
           })
       );
     }
@@ -178,11 +182,27 @@ export default function AdminPage() {
     e.preventDefault();
     setError("");
     setMessage("");
+    const price = Math.max(0, Number(form.price));
+    const discountPercent = Math.min(
+      100,
+      Math.max(0, Number(form.discountPercent))
+    );
+    const stock = Math.max(0, Math.floor(Number(form.stock)));
+    if (Number.isNaN(price) || Number.isNaN(discountPercent) || Number.isNaN(stock)) {
+      setError("Price, discount, and stock must be valid numbers. $0 and 0% are allowed.");
+      return;
+    }
     const payload = {
-      ...form,
-      price: Number(form.price) || 0,
-      discountPercent: Math.min(100, Math.max(0, Number(form.discountPercent) || 0)),
-      stock: Number(form.stock) || 0,
+      name: form.name,
+      description: form.description,
+      price,
+      discountPercent,
+      stock,
+      category: form.category,
+      brand: form.brand,
+      image: form.image?.trim() || "/images/logo.png",
+      featured: form.featured,
+      active: form.active,
     };
     const res = await fetch(editingId ? `/api/products/${editingId}` : "/api/products", {
       method: editingId ? "PUT" : "POST",
@@ -194,31 +214,38 @@ export default function AdminPage() {
       setError(data.error || "Save failed");
       return;
     }
+    if (Array.isArray(data.products)) {
+      setProducts(data.products);
+      saveLocalInventory(data.products);
+    }
     setMessage(
-      (editingId ? "Product updated" : "Product added") +
-        (data.warning ? ` — ${data.warning}` : "")
+      `${editingId ? "Product updated" : "Product added"} — price $${price.toFixed(2)}` +
+        (discountPercent > 0 ? `, ${discountPercent}% off` : "") +
+        (data.warning ? ` — ${data.warning}` : ". Shop will refresh with this change.")
     );
     setForm(emptyProduct);
     setEditingId(null);
-    if (data.persist) setDurableConfigured(Boolean(data.persist.durableConfigured));
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("bba-inventory"));
+    if (data.persist) {
+      setGithubWrite(Boolean(data.persist.githubWriteConfigured));
     }
+    window.dispatchEvent(new Event("bba-inventory"));
     load();
   }
 
   async function removeProduct(id: string) {
     if (!confirm("Delete this product from inventory?")) return;
     const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const data = await res.json();
       setError(data.error || "Delete failed");
       return;
     }
     setMessage("Product deleted");
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("bba-inventory"));
+    if (Array.isArray(data.products)) {
+      setProducts(data.products);
+      saveLocalInventory(data.products);
     }
+    window.dispatchEvent(new Event("bba-inventory"));
     load();
   }
 
@@ -421,12 +448,12 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {!durableConfigured && (
+      {!githubWrite && (
         <p className="mb-6 rounded-2xl border border-red/40 bg-red/10 px-4 py-3 text-sm text-red-100">
-          Inventory saves can reset on Vercel until durable storage is connected. Add free{" "}
-          <strong>Upstash Redis</strong> env vars in Vercel:{" "}
-          <code className="text-xs">UPSTASH_REDIS_REST_URL</code> and{" "}
-          <code className="text-xs">UPSTASH_REDIS_REST_TOKEN</code>, then redeploy.
+          To make inventory changes show for every shop visitor on Vercel, add env var{" "}
+          <code className="text-xs">GITHUB_TOKEN</code> (a GitHub personal access token with{" "}
+          <code className="text-xs">repo</code> access), then redeploy. On this browser, shop
+          updates right after you save.
         </p>
       )}
 
@@ -458,23 +485,41 @@ export default function AdminPage() {
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="label" htmlFor="price">
-                  Regular price ($0 allowed)
+                  Price ($0 OK)
                 </label>
                 <input
                   id="price"
                   className="field"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  placeholder="0.00"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
                   value={form.price}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      price: e.target.value === "" ? 0 : Number(e.target.value),
+                      price: e.target.value.replace(/[^0-9.]/g, ""),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="discountPercent">
+                  Discount %
+                </label>
+                <input
+                  id="discountPercent"
+                  className="field"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={form.discountPercent}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      discountPercent: e.target.value.replace(/[^0-9.]/g, ""),
                     })
                   }
                 />
@@ -486,50 +531,31 @@ export default function AdminPage() {
                 <input
                   id="stock"
                   className="field"
-                  type="number"
-                  min={0}
-                  placeholder="Stock"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
                   value={form.stock}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      stock: e.target.value === "" ? 0 : Number(e.target.value),
+                      stock: e.target.value.replace(/[^0-9]/g, ""),
                     })
                   }
                 />
               </div>
             </div>
-            <div>
-              <label className="label" htmlFor="discountPercent">
-                Discount % (keeps regular price, shows sale price)
-              </label>
-              <input
-                id="discountPercent"
-                className="field"
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                placeholder="0"
-                value={form.discountPercent}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    discountPercent:
-                      e.target.value === "" ? 0 : Number(e.target.value),
-                  })
-                }
-              />
-              <p className="mt-1 text-xs text-mist">
-                Example: $100 + 20% off → shop shows $80 (was $100)
-                {form.price > 0 && form.discountPercent > 0
-                  ? ` · now $${(
-                      form.price *
-                      (1 - Math.min(100, Math.max(0, form.discountPercent)) / 100)
-                    ).toFixed(2)}`
+            <p className="text-xs text-mist">
+              Discount keeps the regular price and shows a sale price. Example: price 100 +
+              discount 20 → shop shows $80.
+              {Number(form.price) > 0 && Number(form.discountPercent) > 0
+                ? ` · Preview: $${(
+                    Number(form.price) *
+                    (1 - Math.min(100, Math.max(0, Number(form.discountPercent))) / 100)
+                  ).toFixed(2)}`
+                : Number(form.price) === 0
+                  ? " · Preview: FREE"
                   : ""}
-              </p>
-            </div>
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <input
                 className="field"
@@ -546,10 +572,9 @@ export default function AdminPage() {
             </div>
             <input
               className="field"
-              placeholder="Image URL or upload below"
+              placeholder="Image URL (optional — defaults to logo)"
               value={form.image}
               onChange={(e) => setForm({ ...form, image: e.target.value })}
-              required
             />
             <input
               type="file"
@@ -641,9 +666,9 @@ export default function AdminPage() {
                           setForm({
                             name: p.name,
                             description: p.description,
-                            price: p.price,
-                            discountPercent: p.discountPercent || 0,
-                            stock: p.stock,
+                            price: String(p.price ?? 0),
+                            discountPercent: String(p.discountPercent ?? 0),
+                            stock: String(p.stock ?? 0),
                             category: p.category,
                             brand: p.brand,
                             image: p.image,

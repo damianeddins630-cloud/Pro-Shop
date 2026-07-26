@@ -8,6 +8,10 @@ import { AddItemButton, EditableText, ItemControls } from "@/components/Editable
 import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
+import {
+  pickNewestProducts,
+  saveLocalInventory,
+} from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
 
 type Filters = {
@@ -56,11 +60,13 @@ export function EditableProductGrid({
   const load = useCallback(async () => {
     const activeFilters = JSON.parse(filterKey) as Filters;
     try {
-      const res = await fetch("/api/products", { cache: "no-store" });
+      const res = await fetch(`/api/products?t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
-      setProducts(applyFilters(data.products || [], activeFilters));
+      const merged = pickNewestProducts(data.products || [], data.updatedAt);
+      setProducts(applyFilters(merged, activeFilters));
     } catch {
-      // keep current
+      const local = pickNewestProducts([]);
+      if (local.length) setProducts(applyFilters(local, activeFilters));
     } finally {
       setLoading(false);
     }
@@ -99,6 +105,14 @@ export function EditableProductGrid({
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Rename failed");
+    if (Array.isArray(data.products)) saveLocalInventory(data.products);
+    else {
+      setProducts((prev) => {
+        const next = prev.map((p) => (p.id === id ? data.product : p));
+        saveLocalInventory(next);
+        return next;
+      });
+    }
     window.dispatchEvent(new Event("bba-inventory"));
     await load();
     router.refresh();
@@ -107,11 +121,12 @@ export function EditableProductGrid({
   async function remove(id: string) {
     if (!confirm("Remove this product?")) return;
     const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    const data = await res.json();
     if (!res.ok) {
-      const data = await res.json();
       alert(data.error || "Delete failed");
       return;
     }
+    if (Array.isArray(data.products)) saveLocalInventory(data.products);
     window.dispatchEvent(new Event("bba-inventory"));
     await load();
     router.refresh();
@@ -141,6 +156,7 @@ export function EditableProductGrid({
       alert(data.error || "Add failed");
       return;
     }
+    if (Array.isArray(data.products)) saveLocalInventory(data.products);
     window.dispatchEvent(new Event("bba-inventory"));
     await load();
     router.refresh();
