@@ -13,11 +13,16 @@ export default function CartPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [shopifyReady, setShopifyReady] = useState(false);
 
   useEffect(() => {
     fetch("/api/products")
       .then((r) => r.json())
       .then((d) => setProducts(d.products || []));
+    fetch("/api/checkout")
+      .then((r) => r.json())
+      .then((d) => setShopifyReady(Boolean(d.shopify?.configured)))
+      .catch(() => setShopifyReady(false));
   }, []);
 
   const lines = items
@@ -25,25 +30,42 @@ export default function CartPage() {
       const product = products.find((p) => p.id === item.productId);
       return product ? { item, product } : null;
     })
-    .filter(Boolean) as { item: { productId: string; quantity: number }; product: Product }[];
+    .filter(Boolean) as {
+    item: { productId: string; quantity: number };
+    product: Product;
+  }[];
 
   async function checkout() {
     setLoading(true);
     setError("");
     setMessage("");
-    const res = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error || "Checkout failed");
-      return;
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Checkout failed");
+        setLoading(false);
+        return;
+      }
+
+      if (data.provider === "shopify" && data.checkoutUrl) {
+        // Keep cart until they finish; clear as they leave for Shopify pay
+        clear();
+        window.location.href = data.checkoutUrl as string;
+        return;
+      }
+
+      clear();
+      setMessage(data.message || "Order placed!");
+      setLoading(false);
+    } catch {
+      setError("Checkout failed");
+      setLoading(false);
     }
-    clear();
-    setMessage(data.message || "Order placed!");
   }
 
   return (
@@ -72,7 +94,12 @@ export default function CartPage() {
                 className="flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4"
               >
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-black/30">
-                  <Image src={product.image} alt={product.name} fill className="object-contain p-2" />
+                  <Image
+                    src={product.image}
+                    alt={product.name}
+                    fill
+                    className="object-contain p-2"
+                  />
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold">{product.name}</h3>
@@ -106,7 +133,10 @@ export default function CartPage() {
             <h2 className="display text-3xl">Order summary</h2>
             <p className="mt-4 text-2xl">${total(products).toFixed(2)}</p>
             <p className="mt-2 text-sm text-mist">
-              Checkout updates live inventory stock. Log in required.
+              Shop and cart stay on this website.{" "}
+              {shopifyReady
+                ? "Payment is collected securely by Shopify, then you return here."
+                : "Shopify payments are not connected yet — orders save on the site only."}
             </p>
             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
             {message && <p className="mt-3 text-sm text-emerald-300">{message}</p>}
@@ -116,7 +146,11 @@ export default function CartPage() {
               onClick={checkout}
               className="btn btn-primary mt-6 w-full"
             >
-              {loading ? "Processing..." : "Place order"}
+              {loading
+                ? "Starting checkout..."
+                : shopifyReady
+                  ? "Pay with Shopify"
+                  : "Place order"}
             </button>
             <Link href="/login" className="mt-3 block text-center text-sm text-mist underline">
               Login / create account

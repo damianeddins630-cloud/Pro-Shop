@@ -178,7 +178,8 @@ export default function ProfilePage() {
                     </h2>
                   </div>
                   <span className="rounded-full border border-red/40 px-3 py-1 text-xs capitalize text-red">
-                    {order.status}
+                    {order.status.replace(/_/g, " ")}
+                    {order.paymentProvider === "shopify" ? " · Shopify" : ""}
                   </span>
                 </div>
                 <ul className="mt-5 space-y-3">

@@ -505,6 +505,10 @@ export async function createOrder(input: {
   email: string;
   items: OrderItem[];
   total: number;
+  status?: OrderStatus;
+  shopifyDraftOrderId?: string;
+  shopifyInvoiceUrl?: string;
+  paymentProvider?: "shopify" | "local";
 }) {
   let created: Order | null = null;
   await mutate((data) => {
@@ -515,13 +519,50 @@ export async function createOrder(input: {
       email: input.email,
       items: input.items,
       total: input.total,
-      status: "placed",
+      status: input.status || "placed",
       createdAt: new Date().toISOString(),
+      shopifyDraftOrderId: input.shopifyDraftOrderId,
+      shopifyInvoiceUrl: input.shopifyInvoiceUrl,
+      paymentProvider: input.paymentProvider || "local",
     };
     data.orders = data.orders || [];
     data.orders.unshift(created);
   });
   return created!;
+}
+
+export async function updateOrder(
+  id: string,
+  patch: Partial<
+    Pick<
+      Order,
+      | "status"
+      | "shopifyDraftOrderId"
+      | "shopifyInvoiceUrl"
+      | "paymentProvider"
+    >
+  >
+) {
+  let updated: Order | null = null;
+  await mutate((data) => {
+    const idx = (data.orders || []).findIndex((o) => o.id === id);
+    if (idx === -1) return;
+    data.orders[idx] = { ...data.orders[idx], ...patch, id };
+    updated = data.orders[idx];
+  });
+  return updated;
+}
+
+export async function findOrderById(id: string) {
+  const data = await getStore();
+  return (data.orders || []).find((o) => o.id === id) || null;
+}
+
+export async function findOrderByShopifyDraftId(draftId: string) {
+  const data = await getStore();
+  return (
+    (data.orders || []).find((o) => o.shopifyDraftOrderId === draftId) || null
+  );
 }
 
 export async function listOrdersForUser(userId: string) {

@@ -966,13 +966,19 @@ export default function AdminPage() {
                         setOrderStatus(order.id, e.target.value as OrderStatus)
                       }
                     >
-                      {(["placed", "processing", "completed", "cancelled"] as OrderStatus[]).map(
-                        (s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        )
-                      )}
+                      {(
+                        [
+                          "awaiting_payment",
+                          "placed",
+                          "processing",
+                          "completed",
+                          "cancelled",
+                        ] as OrderStatus[]
+                      ).map((s) => (
+                        <option key={s} value={s}>
+                          {s.replace("_", " ")}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <span className="rounded-full border border-red/40 px-3 py-1 text-xs capitalize text-red">

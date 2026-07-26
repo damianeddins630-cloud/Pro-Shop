@@ -6,7 +6,13 @@ import { updateOrderStatus } from "@/lib/store";
 type Params = { params: Promise<{ id: string }> };
 
 const schema = z.object({
-  status: z.enum(["placed", "processing", "completed", "cancelled"]),
+  status: z.enum([
+    "awaiting_payment",
+    "placed",
+    "processing",
+    "completed",
+    "cancelled",
+  ]),
 });
 
 export async function PUT(req: Request, { params }: Params) {

@@ -80,6 +80,8 @@ export interface Product {
   image: string;
   featured: boolean;
   active: boolean;
+  /** Optional Shopify variant GID/id if product is synced in Shopify */
+  shopifyVariantId?: string;
 }
 
 export interface Sponsor {
@@ -130,7 +132,12 @@ export interface OrderItem {
   image: string;
 }
 
-export type OrderStatus = "placed" | "processing" | "completed" | "cancelled";
+export type OrderStatus =
+  | "awaiting_payment"
+  | "placed"
+  | "processing"
+  | "completed"
+  | "cancelled";
 
 export interface Order {
   id: string;
@@ -141,6 +148,10 @@ export interface Order {
   total: number;
   status: OrderStatus;
   createdAt: string;
+  /** Shopify draft order GID when paid via Shopify */
+  shopifyDraftOrderId?: string;
+  shopifyInvoiceUrl?: string;
+  paymentProvider?: "shopify" | "local";
 }
 
 export interface StoreData {
