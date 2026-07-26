@@ -34,9 +34,10 @@ In Vercel → Project → Settings → Environment Variables, add:
 AUTH_SECRET=...
 NEXT_PUBLIC_SITE_URL=https://YOUR-DOMAIN
 
-# Required so inventory add/edit/delete sticks on Vercel (free Upstash Redis)
-UPSTASH_REDIS_REST_URL=https://xxxx.upstash.io
-UPSTASH_REDIS_REST_TOKEN=xxxxxxxx
+# Required so inventory add/edit/delete shows on the shop for everyone
+GITHUB_TOKEN=ghp_xxx   # GitHub PAT with repo scope
+GITHUB_REPO=damianeddins630-cloud/Pro-Shop
+GITHUB_BRANCH=main
 
 SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_...
