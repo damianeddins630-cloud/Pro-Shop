@@ -9,7 +9,10 @@ const secret = new TextEncoder().encode(
   process.env.AUTH_SECRET || "ballards-bowling-academy-dev-secret-change-me"
 );
 
-export async function toPublicUser(user: User): Promise<PublicUser> {
+export async function toPublicUser(
+  user: User,
+  extras?: Pick<PublicUser, "hasOrdered" | "orderCount" | "lastOrderAt">
+): Promise<PublicUser> {
   const role = await resolveUserRole(user);
   return {
     id: user.id,
@@ -20,6 +23,10 @@ export async function toPublicUser(user: User): Promise<PublicUser> {
     roleId: role.id,
     roleName: role.name,
     permissions: role.permissions,
+    createdAt: user.createdAt,
+    hasOrdered: extras?.hasOrdered ?? false,
+    orderCount: extras?.orderCount ?? 0,
+    lastOrderAt: extras?.lastOrderAt,
   };
 }
 

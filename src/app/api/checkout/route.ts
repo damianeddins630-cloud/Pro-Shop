@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import {
   createOrder,
   getProduct,
+  listProducts,
   reduceStock,
   updateOrder,
 } from "@/lib/store";
@@ -65,12 +66,14 @@ export async function POST(req: Request) {
       total += unitPrice * item.quantity;
     }
 
+    // Always take stock when an order is placed, and always create an order record
+    await reduceStock(body.items);
+
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
       req.headers.get("origin") ||
       "http://localhost:3000";
 
-    // Shopify takes the money; browsing/cart stay on this website.
     if (isShopifyConfigured()) {
       const order = await createOrder({
         userId: session.userId,
@@ -98,14 +101,17 @@ export async function POST(req: Request) {
           shopifyInvoiceUrl: shopify.invoiceUrl,
         });
 
+        const products = await listProducts({ includeInactive: true });
         return NextResponse.json({
           ok: true,
           provider: "shopify",
           orderId: order.id,
+          order,
+          products,
           checkoutUrl: shopify.invoiceUrl,
           returnUrl,
           message:
-            "Continue to Shopify to pay securely. You'll come back to this site after payment.",
+            "Order saved. Continue to Shopify to pay. Stock was reduced from inventory.",
         });
       } catch (e) {
         await updateOrder(order.id, { status: "cancelled" });
@@ -113,8 +119,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Local fallback when Shopify env vars are not set yet
-    await reduceStock(body.items);
     const order = await createOrder({
       userId: session.userId,
       username: session.username,
@@ -125,12 +129,13 @@ export async function POST(req: Request) {
       paymentProvider: "local",
     });
 
+    const products = await listProducts({ includeInactive: true });
     return NextResponse.json({
       ok: true,
       provider: "local",
       order,
-      message:
-        "Order saved on the website. Connect Shopify in Vercel env vars to collect real payments.",
+      products,
+      message: "Order placed. Inventory stock updated and order added to Operations.",
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Checkout failed";

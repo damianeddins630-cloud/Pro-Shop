@@ -8,7 +8,10 @@ import { BrandMark } from "@/components/BrandMark";
 import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
-import { loadLocalInventory } from "@/lib/inventory-client";
+import {
+  loadLocalInventory,
+  saveLocalInventory,
+} from "@/lib/inventory-client";
 import { effectivePrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
@@ -77,8 +80,13 @@ export default function CartPage() {
         return;
       }
 
+      if (Array.isArray(data.products)) {
+        saveLocalInventory(data.products);
+        setProducts(data.products);
+        window.dispatchEvent(new Event("bba-inventory"));
+      }
+
       if (data.provider === "shopify" && data.checkoutUrl) {
-        // Keep cart until they finish; clear as they leave for Shopify pay
         clear();
         window.location.href = data.checkoutUrl as string;
         return;

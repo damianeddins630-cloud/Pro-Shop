@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission, toPublicUser } from "@/lib/auth";
-import { listUsers, updateUser } from "@/lib/store";
+import { listAllOrders, listUsers, updateUser } from "@/lib/store";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const session = await requirePermission("manage_users");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const users = await listUsers();
-  const publicUsers = await Promise.all(users.map((u) => toPublicUser(u)));
-  return NextResponse.json({ users: publicUsers });
+  const [users, orders] = await Promise.all([listUsers(), listAllOrders()]);
+  const publicUsers = await Promise.all(
+    users.map((u) => {
+      const userOrders = orders.filter((o) => o.userId === u.id);
+      const last = userOrders[0];
+      return toPublicUser(u, {
+        hasOrdered: userOrders.length > 0,
+        orderCount: userOrders.length,
+        lastOrderAt: last?.createdAt,
+      });
+    })
+  );
+  return NextResponse.json(
+    { users: publicUsers },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
 
 const schema = z.object({

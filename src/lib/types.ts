@@ -66,6 +66,10 @@ export interface PublicUser {
   roleId: string;
   roleName: string;
   permissions: Permission[];
+  createdAt?: string;
+  hasOrdered?: boolean;
+  orderCount?: number;
+  lastOrderAt?: string;
 }
 
 export interface Product {

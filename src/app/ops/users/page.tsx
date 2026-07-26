@@ -1,0 +1,118 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import type { PublicUser, Role } from "@/lib/types";
+
+export default function OpsUsersPage() {
+  const [users, setUsers] = useState<PublicUser[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const [uRes, rRes] = await Promise.all([
+      fetch("/api/users", { cache: "no-store" }),
+      fetch("/api/roles", { cache: "no-store" }),
+    ]);
+    const uData = await uRes.json();
+    const rData = await rRes.json();
+    if (!uRes.ok) {
+      setError(uData.error || "Could not load users");
+      setLoading(false);
+      return;
+    }
+    setUsers(uData.users || []);
+    setRoles(rData.roles || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function assignRole(userId: string, roleId: string) {
+    setError("");
+    const res = await fetch("/api/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, roleId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Could not update role");
+      return;
+    }
+    setMessage("User role updated");
+    load();
+  }
+
+  if (loading) return <p className="text-mist">Loading users...</p>;
+
+  return (
+    <div>
+      <h2 className="display text-4xl">Users & accounts</h2>
+      <p className="mt-1 text-sm text-mist">
+        Every account: when it was made, name, email, role, and whether they ordered.
+      </p>
+      {(message || error) && (
+        <p className={`mt-4 text-sm ${error ? "text-red-300" : "text-emerald-300"}`}>
+          {error || message}
+        </p>
+      )}
+
+      <div className="mt-6 overflow-x-auto rounded-3xl border border-white/10">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-white/10 bg-white/[0.04] text-mist">
+            <tr>
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Email</th>
+              <th className="px-4 py-3 font-medium">Created</th>
+              <th className="px-4 py-3 font-medium">Orders</th>
+              <th className="px-4 py-3 font-medium">Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id} className="border-b border-white/5">
+                <td className="px-4 py-3 font-medium">{u.username}</td>
+                <td className="px-4 py-3 text-mist">{u.email}</td>
+                <td className="px-4 py-3 text-mist">
+                  {u.createdAt
+                    ? new Date(u.createdAt).toLocaleDateString()
+                    : "—"}
+                </td>
+                <td className="px-4 py-3">
+                  {u.hasOrdered ? (
+                    <span className="text-emerald-300">
+                      Yes ({u.orderCount}
+                      {u.lastOrderAt
+                        ? ` · last ${new Date(u.lastOrderAt).toLocaleDateString()}`
+                        : ""}
+                      )
+                    </span>
+                  ) : (
+                    <span className="text-mist">Never</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <select
+                    className="field !py-2"
+                    value={u.roleId}
+                    onChange={(e) => assignRole(u.id, e.target.value)}
+                  >
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

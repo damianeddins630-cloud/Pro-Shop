@@ -3,7 +3,6 @@ import { createHmac, timingSafeEqual } from "crypto";
 import {
   findOrderById,
   findOrderByShopifyDraftId,
-  reduceStock,
   updateOrder,
 } from "@/lib/store";
 
@@ -64,19 +63,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, matched: false });
     }
 
+    // Stock was already reduced when the website order was created
     if (order.status === "awaiting_payment" || order.status === "placed") {
-      if (order.status === "awaiting_payment") {
-        try {
-          await reduceStock(
-            order.items.map((i) => ({
-              productId: i.productId,
-              quantity: i.quantity,
-            }))
-          );
-        } catch {
-          // stock may already be low; still mark paid
-        }
-      }
       await updateOrder(order.id, { status: "processing" });
     }
 

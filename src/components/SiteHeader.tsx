@@ -94,10 +94,10 @@ export function SiteHeader() {
             <>
               {showAdmin && (
                 <Link
-                  href="/admin"
+                  href="/ops"
                   className="hidden rounded-full bg-red px-3 py-2 text-sm font-bold text-white sm:inline-flex"
                 >
-                  Admin
+                  Operations
                 </Link>
               )}
               <Link
@@ -150,11 +150,11 @@ export function SiteHeader() {
             )}
             {showAdmin && (
               <Link
-                href="/admin"
+                href="/ops"
                 onClick={() => setOpen(false)}
                 className="rounded-lg px-3 py-2 text-red"
               >
-                Admin
+                Operations
               </Link>
             )}
           </div>

@@ -138,8 +138,8 @@ export default function ProfilePage() {
           </dl>
           <div className="mt-8 flex flex-wrap gap-3">
             {canAdmin && (
-              <Link href="/admin" className="btn btn-primary">
-                Open admin
+              <Link href="/ops" className="btn btn-primary">
+                Operations Home Base
               </Link>
             )}
             <Link href="/shop" className="btn btn-ghost">
