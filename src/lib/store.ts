@@ -21,9 +21,11 @@ import { ALL_PERMISSIONS } from "./types";
 import seedJson from "@/data/seed.json";
 import {
   durableStoreConfigured,
+  durableWriteConfigured,
   loadDurableStore,
   saveDurableStore,
 } from "./durable-store";
+import { githubWriteConfigured } from "./github-store";
 
 const GLOBAL_KEY = "__bba_store_v5__";
 
@@ -227,6 +229,8 @@ async function persist(data: StoreData) {
 export function storePersistStatus() {
   return {
     durableConfigured: durableStoreConfigured(),
+    durableWriteConfigured: durableWriteConfigured(),
+    githubWriteConfigured: githubWriteConfigured(),
     lastPersistOk: g().lastPersistOk,
   };
 }
@@ -234,8 +238,8 @@ export function storePersistStatus() {
 export async function getStore(): Promise<StoreData> {
   const store = g();
 
-  // On Vercel with durable store, always refresh so inventory changes sync across instances
-  if (durableStoreConfigured()) {
+  // When durable WRITE works, always reload so every serverless instance sees admin edits
+  if (durableWriteConfigured()) {
     const remote = await loadDurableStore();
     if (remote) {
       const merged = mergeWithSeed(remote);
@@ -245,7 +249,9 @@ export async function getStore(): Promise<StoreData> {
     }
   }
 
+  // Same-instance memory wins (admin just edited on this lambda)
   if (store.data) return store.data;
+
   if (!store.ready) {
     store.ready = loadFromDisk()
       .then((data) => {
@@ -263,7 +269,8 @@ export async function getStore(): Promise<StoreData> {
 }
 
 async function mutate(updater: (data: StoreData) => void | Promise<void>) {
-  const data = await getStore();
+  const store = g();
+  const data = store.data || (await getStore());
   await updater(data);
   g().data = data;
   await persist(data);
