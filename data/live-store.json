@@ -1,1 +1,753 @@
-{"version":1,"products":[{"id":"test","name":"Test Free","price":0,"discountPercent":25,"stock":5,"active":true,"slug":"test-free","description":"","category":"Test","brand":"Ballard","image":"/images/logo.png","featured":false}],"updatedAt":"2026-07-26T19:26:16.112Z"}
+{
+  "version": 2,
+  "updatedAt": "2026-07-26T19:27:15.620Z",
+  "products": [
+    {
+      "id": "8945599381658",
+      "name": "Vengeance",
+      "slug": "vengeance",
+      "description": "The oil didn’t get lighter. Your ball choice just got smarter. The Vengeance was built for medium–heavy to heavy oil conditions, delivering strength without overreaction. This all-new core and cover combination produces one of the most dynamic symmetrical balls in 900 Global history, creating a readable, confident shape that holds up from the first frame to the last. It picks up in the mid-lane, stays smooth as the lanes transition, and still finishes with purpose downlane. Strong enough to star",
+      "price": 2000,
+      "stock": 3,
+      "category": "Bowling Ball",
+      "brand": "900 Global",
+      "image": "/images/products/vengeance.jpg",
+      "featured": true,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "8903923761306",
+      "name": "Ember",
+      "slug": "ember",
+      "description": ";sdkhsdf;lkfd;kh",
+      "price": 130,
+      "stock": 10,
+      "category": "Bowling Ball",
+      "brand": "Storm",
+      "image": "/images/products/ember.jpg",
+      "featured": true,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6706102272154",
+      "name": "Online Video Coaching",
+      "slug": "online-video-coaching",
+      "description": "Online Video Coaching available at Ballard's Bowling Academy Pro Shop.",
+      "price": 60,
+      "stock": 999,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/online-video-coaching.jpg",
+      "featured": true,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687329190042",
+      "name": "Turbo Quad Yellow",
+      "slug": "turbo-quad-yellow",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-yellow.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687328927898",
+      "name": "Turbo Quad Green",
+      "slug": "turbo-quad-green",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-green.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687328370842",
+      "name": "Turbo Quad Purple",
+      "slug": "turbo-quad-purple",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-purple.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687327912090",
+      "name": "Turbo Quad Clear",
+      "slug": "turbo-quad-clear",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-clear.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687327420570",
+      "name": "Turbo Quad Red",
+      "slug": "turbo-quad-red",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-red.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687326994586",
+      "name": "Turbo Quad Orange",
+      "slug": "turbo-quad-orange",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-orange.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687319294106",
+      "name": "Turbo Quad Blue",
+      "slug": "turbo-quad-blue",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-blue.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6687318212762",
+      "name": "Turbo Quad Black",
+      "slug": "turbo-quad-black",
+      "description": "QUAD® (Q) – Available in: 19 sizes, 7 colors, Standard 31/32” diameter for sizes 19/31 – 13/16,1 1/32” diameter for sizes 53/64 – 29/32.\nMs. QUAD® (MQ) – 7/8″ diameter, Available in 15 sizes, *5 colors.\n\nSide 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-black.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655915819162",
+      "name": "Turbo Jack",
+      "slug": "turbo-jack",
+      "description": "Aids in lifting an Inner Sleeve insert up and out of a tight thumb hole. Removable inserts can become difficult to remove when a ball core expands due to hot/cold climate changes or simply over time as the ball absorbs lane oil. Ball core expansion puts pressure on the Switch Grip Outer Sleeve which causes difficulty in removing or turning the Inner Sleeve. The Jack aids in removing Inner Sleeves that tighten up in ball.",
+      "price": 18.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-jack.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655914541210",
+      "name": "Turbo Switch-A-Roo",
+      "slug": "turbo-switch-a-roo",
+      "description": "2 sizes Available:   Large (Thumb-shown at left in red) and Small (Fingers or Small Thumb sizes shown at right in blue)\nSwitch A Roo Locking Tools can be used to remove Inner Sleeves that become tight due to climate changes (expanding ball cores), loose debris that can get down into hole and under locking channel or for other uncontrollable factors. Simply insert the cone-shaped rubber end into insert hole, twist and remove.",
+      "price": 18.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-switch-a-roo.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655912542362",
+      "name": "Turbo Pre-Cut Energy KT Tape",
+      "slug": "turbo-pre-cut-energy-kt-tape",
+      "description": "Turbo Energy Tape NOW Available in convenient 10” pre-measured strips. Each roll includes 20-10” strips. Go Stronger, Longer with RockTape.\n \n",
+      "price": 22.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-pre-cut-energy-kt-tape.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655890489498",
+      "name": "Turbo Rock Sauce Ice",
+      "slug": "turbo-rock-sauce-ice",
+      "description": "So cold you’ll want to put on a parka. You love the feeling of ice on an injury? Get the same strong chill from RockSauce Chill! It relieves muscle and joint pain with strong 6% menthol and other active ingredients that provide a powerfully chill cooling sensation.  Combined with Arnica, Green Tea and Aloe, RockSauce Chill soothes more than your brain with natural ingredients to soothe swelling and keep skin irritation-free. The convenient 3oz roll-on bottle means your hands stay clean and clear",
+      "price": 16.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-rock-sauce-ice.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655887474842",
+      "name": "Turbo Rock Sauce Fire",
+      "slug": "turbo-rock-sauce-fire",
+      "description": "Say hello to Hot! RockSauce is a topical pain relief cream that works by providing incredibly strong heating sensations that last for hours—with powerful ingredients like menthol and capsaicin that work together to soothe sore joints and muscles. Best of all, it can be used with RockTape – it soaks right through, without compromising stickiness— delivering pain relief in combination working with our incredible tape. The convenient 3oz roll-on bottle means your hands stay clean and clear of our p",
+      "price": 16.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-rock-sauce-fire.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655881183386",
+      "name": "Turbo Strike Wipes",
+      "slug": "turbo-strike-wipes",
+      "description": "\nSafely &amp; conveniently removes lane oil, surface grime and belt marks\nFast drying, non-abrasive\nApproved for PBA and USBC competition. Unlike other spray or liquid cleaners, Strike Wipes are permitted for use Before and After competition.\n",
+      "price": 9.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-strike-wipes.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655789039770",
+      "name": "Turbo Wrist Restrictor",
+      "slug": "turbo-wrist-restrictor",
+      "description": "The Wrist Restrictor is an easy-to-use training aid that can be worn to restrict or enhance wrist rotation during the bowling release. Topping the ball, or over-rotating, at the point of release drastically affects the movement of the ball down lane. The Wrist Restrictor will help sync wrist and elbow through the release to correct over rotation. A backup ball release is a clockwise (RH) or counter clockwise (LH) rotation of the wrist which is opposite of a traditional hook. The Wrist Restrictor",
+      "price": 34.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-wrist-restrictor.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655783207066",
+      "name": "Turbo Deluxxx Large Tour Accessory Case",
+      "slug": "turbo-deluxxx-large-tour-accessory-case",
+      "description": "\n600D/840D nylon construction\n1 Zipper Compartment\n1 Center Panel with Zipper pockets\n1 Switch Grip Insert compartment with foam insert\nApprox Size: 12” x 8” x 3”\n\nColor: Black/Red",
+      "price": 39.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-deluxxx-large-tour-accessory-case.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655774425242",
+      "name": "Turbo Tour 2-Ball Tote",
+      "slug": "turbo-tour-2-ball-tote",
+      "description": "Our popular 2-ball tote has a clear, see-thru top and is as durable as it is stylish. Features side shoe and accessory pocket and adjustable strap.\n\n600D/840D nylon construction\n",
+      "price": 44.99,
+      "stock": 25,
+      "category": "Bags",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-tour-2-ball-tote.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655753814170",
+      "name": "Turbo Shuttle Backpack",
+      "slug": "turbo-shuttle-backpack",
+      "description": "Our Shuttle Backpack matches great with our Pursuit Slim Triple Tote and our Mini Accessory Case.\n\n1680D nylon construction\nIntegrated grab handle\nCurved padded shoulder straps\nFront zippered pockets with organization panel\nSide mesh pockets\nDimensions: 19.5”h x 13.5”w x 9”d\n",
+      "price": 55.99,
+      "stock": 10,
+      "category": "Bags",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-shuttle-backpack.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655741624474",
+      "name": "Turbo Pursuit Slim 3-Ball Tote",
+      "slug": "turbo-pursuit-slim-3-ball-tote",
+      "description": "Our Pursuit Slim Triple Tote matches great with our Shuttle Backpack and our Mini Accessory Case.\n\n1680D nylon construction\nThree ball capacity\nClear “see thru” top\nAdjustable tow strap\nCarry Handles with Velcro Closure\nDimensions 11”W x 10”D x 26”H\nInline style wheels are 1 ½” high x 1 ½” wide.\nBag weight 4 lbs\n\nColors: Black/Orange, Black/Pink, Red/Black\n \n ",
+      "price": 79.99,
+      "stock": 10,
+      "category": "Bags",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-pursuit-slim-3-ball-tote.jpg",
+      "featured": true,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655728189594",
+      "name": "Turbo Dry Towel",
+      "slug": "turbo-dry-towel",
+      "description": "Soft leather shammy that removes oil from any ball surface to help maintain a natural surface texture during competition. Removing lane oil using a dry towel during competition and regularly cleaning after competition (see Strike Wipes) is the 1-2 punch in keeping your bowling ball in striking condition.\nColor: Red/Black, Pink/Black, Orange/Black, Lime/Black, Blue/Black",
+      "price": 22.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-dry-towel.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655665078426",
+      "name": "Turbo Mini Accessory Case",
+      "slug": "turbo-mini-accessory-case",
+      "description": "Perfect for storing small accessory products like skin protection tapes, scissors, finger inserts, logo patches etc. Our Mini Accessory Case has a single zipper opening, features embroidered Driven to Bowl logo on front, clear panel on back and carry strap.\nOur Mini Accessory Case is a great compliment to our Pursuit Slim Triple Tote and our Shuttle Backpack.\n\nApprox. size: 8” L x 4.5” H x 2” D\nCombination 1680D/600D nylon (Switch Grip Case is 600D nylon construction)\n\nColors: Black (w/Red zippe",
+      "price": 16.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-mini-accessory-case.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655657705626",
+      "name": "Turbo REV Wrap",
+      "slug": "turbo-rev-wrap",
+      "description": "\nHigh quality neoprene material\nStretch design for added comfort\nEasy Velcro™ strap adjustment\nHelps prevent carpal tunnel syndrome\n\nAvailable Colors: Orange, Neon Green, Hot Pink and Electric Blue\n\nAvailable Sizes: S (6”), M (6-7”), L (7-8”), XL (8”+); Size determined by taking measurement of the diameter of bowler’s wrist.\n\n",
+      "price": 14.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-rev-wrap.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655651774618",
+      "name": "Turbo Grip Smart Dry Ball",
+      "slug": "turbo-grip-smart-dry-ball",
+      "description": "\nKeeps hands dry\nAbsorbent microfiber fabric\nImprove performance\nAvailable Colors: Orange, Hot Pink, Electric Blue and Neon Green\n",
+      "price": 10.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-grip-smart-dry-ball.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655646695578",
+      "name": "Turbo Super Shine Ball Caddy",
+      "slug": "turbo-super-shine-ball-caddy",
+      "description": "\nMachine washable Deluxe See Saw\nSoft cleaning surface\nEasy transport from locker to lane\nAvailable Colors: Electric Blue, Hot Pink, Neon Green and Orange\n",
+      "price": 12.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-super-shine-ball-caddy.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655636603034",
+      "name": "Turbo Handy Blade",
+      "slug": "turbo-handy-blade",
+      "description": "Convenient all-purpose utility knife best used to remove and insert traditional bowling tape in thumb holes.",
+      "price": 5.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-handy-blade.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655631753370",
+      "name": "Turbo Fitting Tape",
+      "slug": "turbo-fitting-tape",
+      "description": "Tape Roll Dimensions: 13’ L x 1” W\n\nStretchable Cotton fabric\nApply to fingers and thumb to adjust fit of hole, ease grip tension and modify release\nApply before bowling to prevent blisters, callouses, cuts\n\n(4) Beige F225 – Smooth texture, tight weave.\n(5) Purple F125 – Semi-Smooth texture, loose weave. Same texture also available in our Driven to Bowl Logo Tape.\n(6) Mint F325 – Course Texture, thickest of all varieties, open weave. If you use multiple pieces of bowling tape, Mint F325 is\n \n\nSt",
+      "price": 13.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-fitting-tape.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655600263322",
+      "name": "Turbo Gamer Grip",
+      "slug": "turbo-gamer-grip",
+      "description": "Use by itself or prior to applying Turbo Skin Protection Tape to absorb moisture and ensuring better application.\n1 oz. Bottle\n\nBlocks sweat for up to 4 hours\nNon-Sticky\nFeels Natural\nNo residue\nEquipment stays clean.\n",
+      "price": 12.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-gamer-grip.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655596658842",
+      "name": "Turbo Scissors",
+      "slug": "turbo-scissors",
+      "description": "Anyone using rolls of our SPF Tapes should consider a pair of our Precision Blade Scissors. These are not your typical, disposable craft scissors but precision blade, stainless steel to make precise cuts on various textures with adhesive backing.5 1/2” blade.",
+      "price": 9.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-scissors.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655593316506",
+      "name": "Turbo Fitting Tape \"Logo\"",
+      "slug": "turbo-fitting-tape-logo",
+      "description": "Put some Drive in Your Performance with our signature Driven to Bowl logo tapes.\n\nCotton fitting tape – Comparable to Purple (5) fitting tape\nAvailable in 3 colors: Black, Red and Blue\n",
+      "price": 13.99,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-fitting-tape-logo.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655578898586",
+      "name": "Turbo Switch Grip Inner Sleeve",
+      "slug": "turbo-switch-grip-inner-sleeve",
+      "description": "Switch Grip® Interchangeable Inserts consist of ONLY TWO components, an Outer Sleeve that is permanently glued into your thumb hole, and an Inner Sleeve, which can be removed and used amongst all of your equipment. The Outer Sleeve will receive any of the following removable Inner Sleeve components:\n\nOuters: Black, Orange, Yellow, Green, Blue, Red\nInner Blank: Black, Orange, Yellow, Green, Blue, Red\nInner 1 1/4 .” Urethane: Black/Blk, Blk/Pink, Blk/Green, Blk/Red, Blk/Blue, Blk/White, Blk/Purple",
+      "price": 25,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-switch-grip-inner-sleeve.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655572672666",
+      "name": "Turbo Switch Grip Outer Sleeve",
+      "slug": "turbo-switch-grip-outer-sleeve",
+      "description": "Switch Grip® Interchangeable Inserts consist of ONLY TWO components, an Outer Sleeve that is permanently glued into your thumb hole, and an Inner Sleeve, which can be removed and used amongst all of your equipment. The Outer Sleeve will receive any of the following removable Inner Sleeve components:\n\nOuters: Black, Orange, Yellow, Green, Blue, Red\nInner Blank: Black, Orange, Yellow, Green, Blue, Red\nInner 1 1/4 .” Urethane: Black/Blk, Blk/Pink, Blk/Green, Blk/Red, Blk/Blue, Blk/White, Blk/Purple",
+      "price": 20,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-switch-grip-outer-sleeve.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655531942042",
+      "name": "Turbo Ms. Quad",
+      "slug": "turbo-ms-quad",
+      "description": "Side 1:Perfect Oval – Milled Oval with Smooth or Mesh Surface – designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit. Use mesh textured surface for a tackier feel.\nSide 2:Power Oval – has 1/8″ forward pitch for more subtle increase in loft. The finger pad has a contoured shape and smooth surface. Ideal for most bowlers.\n \n ",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-ms-quad.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655518671002",
+      "name": "Turbo Quad Classic",
+      "slug": "turbo-quad-classic",
+      "description": "Side 1:Perfect Oval – is designed as a true, milled oval shape. This oval shape is flat through the center and is the most like the shape of your fingertip giving you a very natural and relaxed fit.\nSide 2:Power Lift 1/4” – helps increase loft and length of release to the target.   The finger pad has a flat edge and smooth surface for a sharp, clean feel.",
+      "price": 5,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-quad-classic.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    },
+    {
+      "id": "6655493505178",
+      "name": "Turbo Thumb Slug",
+      "slug": "turbo-thumb-slug",
+      "description": "\n100% urethane, quick release, consistent feel\nPre-sanded outside surface\n\nStandard 1 /8”, 1 /4” and 1 /8” solids have 2 /8” drill depth with center indicator mark.\n-Multiple Color Options Available\n31/32”, 1 1/8” Hardness 72 (+/- 2) Shore D",
+      "price": 15,
+      "stock": 25,
+      "category": "Accessories",
+      "brand": "Ballard's Bowling",
+      "image": "/images/products/turbo-thumb-slug.jpg",
+      "featured": false,
+      "active": true,
+      "discountPercent": 0
+    }
+  ],
+  "sponsors": [
+    {
+      "id": "s1",
+      "name": "Storm",
+      "image": "/images/sponsors/storm.png",
+      "url": "https://www.stormbowling.com"
+    },
+    {
+      "id": "s2",
+      "name": "Roto Grip",
+      "image": "/images/sponsors/roto-grip.jpg",
+      "url": "https://www.rotogrip.com"
+    },
+    {
+      "id": "s3",
+      "name": "900 Global",
+      "image": "/images/sponsors/images-1.png",
+      "url": "https://www.900global.com"
+    },
+    {
+      "id": "s4",
+      "name": "Platinum Ford",
+      "image": "/images/sponsors/platinum_ford_480x480.png",
+      "url": "#"
+    },
+    {
+      "id": "s5",
+      "name": "Turbo Grips",
+      "image": "/images/sponsors/TurboLogoRet360px_480x480.png",
+      "url": "https://www.turbogrips.com"
+    },
+    {
+      "id": "s6",
+      "name": "Dexter",
+      "image": "/images/sponsors/dexter_480x480.jpg",
+      "url": "#"
+    },
+    {
+      "id": "s7",
+      "name": "Infusion",
+      "image": "/images/sponsors/logo_infusion_480x480.png",
+      "url": "#"
+    },
+    {
+      "id": "s8",
+      "name": "I Am Bowling",
+      "image": "/images/sponsors/i_am_bowling_2_480x480.png",
+      "url": "#"
+    },
+    {
+      "id": "s9",
+      "name": "InLinq",
+      "image": "/images/sponsors/inlinq2_480x480.jpg",
+      "url": "#"
+    },
+    {
+      "id": "s10",
+      "name": "BVL",
+      "image": "/images/sponsors/bba.bvl.logo.png",
+      "url": "#"
+    },
+    {
+      "id": "s11",
+      "name": "Ballard vs The Big C",
+      "image": "/images/bvbc-mark.png",
+      "url": "/bvbc"
+    }
+  ],
+  "deals": [
+    {
+      "id": "d1",
+      "title": "Combo Special",
+      "description": "Deal of the month combo special from Ballard's Bowling Academy.",
+      "image": "/images/deals/combo-special.png",
+      "active": true,
+      "featured": true
+    },
+    {
+      "id": "d2",
+      "title": "End of Season Sale 2026",
+      "description": "End of season specials — shop selected gear while supplies last.",
+      "image": "/images/deals/end-of-season.png",
+      "active": true,
+      "featured": false
+    }
+  ],
+  "coaches": [
+    {
+      "id": "c1",
+      "name": "Carolyn Dorin-Ballard",
+      "image": "/images/coaches/BBA-Coaches-CDB.png",
+      "email": "Carolynballard.bba@gmail.com"
+    },
+    {
+      "id": "c2",
+      "name": "Del Ballard, Jr.",
+      "image": "/images/coaches/BBA-Coaches-DB.png",
+      "email": "delballard.bba@gmail.com"
+    },
+    {
+      "id": "c3",
+      "name": "Paul Fleming",
+      "image": "/images/coaches/BBA-Coaches-PF.png",
+      "email": ""
+    },
+    {
+      "id": "c4",
+      "name": "Chris Moore",
+      "image": "/images/coaches/BBA-Coaches-CM.png",
+      "email": ""
+    }
+  ],
+  "texts": [
+    {
+      "id": "t1",
+      "page": "home",
+      "slot": "training",
+      "text": "Bowling Lessons"
+    },
+    {
+      "id": "t2",
+      "page": "home",
+      "slot": "story",
+      "text": "Elite Coaching. Family. Passion."
+    },
+    {
+      "id": "t3",
+      "page": "home",
+      "slot": "featured",
+      "text": "Featured Gear"
+    },
+    {
+      "id": "t4",
+      "page": "shop",
+      "slot": "title",
+      "text": "Inventory & Gear"
+    },
+    {
+      "id": "t5",
+      "page": "coaching",
+      "slot": "title",
+      "text": "Coaching Clinics / Group Lessons"
+    },
+    {
+      "id": "t6",
+      "page": "deals",
+      "slot": "title",
+      "text": "Deals and Specials"
+    },
+    {
+      "id": "t7",
+      "page": "sponsors",
+      "slot": "title",
+      "text": "Thank You To All Of Our Sponsors!"
+    },
+    {
+      "id": "t8",
+      "page": "bvbc",
+      "slot": "title",
+      "text": "Ballard vs. The Big \"C\""
+    },
+    {
+      "id": "t9",
+      "page": "subscribe",
+      "slot": "title",
+      "text": "Subscribe for Email Updates"
+    },
+    {
+      "id": "t10",
+      "page": "home",
+      "slot": "hero",
+      "text": "Perfect Your Game"
+    }
+  ],
+  "roles": [
+    {
+      "id": "role_admin",
+      "name": "Admin",
+      "description": "Full website owner access",
+      "permissions": [
+        "edit_pages",
+        "manage_inventory",
+        "manage_sponsors",
+        "manage_deals",
+        "manage_coaches",
+        "manage_users",
+        "manage_roles",
+        "view_orders",
+        "manage_orders"
+      ],
+      "system": true
+    },
+    {
+      "id": "role_customer",
+      "name": "Customer",
+      "description": "Shop and place orders",
+      "permissions": [],
+      "system": true
+    },
+    {
+      "id": "role_staff",
+      "name": "Staff",
+      "description": "Edit pages and manage shop content",
+      "permissions": [
+        "edit_pages",
+        "manage_inventory",
+        "manage_sponsors",
+        "manage_deals",
+        "manage_coaches",
+        "view_orders"
+      ],
+      "system": false
+    }
+  ],
+  "orders": [],
+  "users": [
+    {
+      "id": "user_owner",
+      "email": "damianeddins630@gmail.com",
+      "username": "Damian_e",
+      "passwordHash": "$2b$10$nf62.7yvsWOyNm40r6ZtoubhBeKVw7hefg2W8IWm1cEHx8we4BI/O",
+      "phoneNumber": "",
+      "dateOfBirth": "1990-01-01",
+      "roleId": "role_admin",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "subscribers": []
+}
