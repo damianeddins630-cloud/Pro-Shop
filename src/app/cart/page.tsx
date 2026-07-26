@@ -8,6 +8,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
+import { loadLocalInventory } from "@/lib/inventory-client";
 import { effectivePrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
@@ -22,10 +23,16 @@ export default function CartPage() {
   const [shopifyReady, setShopifyReady] = useState(false);
 
   useEffect(() => {
-    const loadProducts = () =>
+    const loadProducts = () => {
+      const local = loadLocalInventory();
+      if (local?.products?.length) {
+        setProducts(local.products);
+        return;
+      }
       fetch("/api/products", { cache: "no-store" })
         .then((r) => r.json())
         .then((d) => setProducts(d.products || []));
+    };
     void loadProducts();
     window.addEventListener("bba-inventory", loadProducts);
     window.addEventListener("focus", loadProducts);

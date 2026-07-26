@@ -165,7 +165,7 @@ export default async function HomePage() {
           </Link>
         </div>
         <EditableProductGrid
-          initial={featured}
+          initial={[]}
           filters={{ featuredOnly: true, limit: 4 }}
         />
       </section>
