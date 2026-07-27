@@ -80,7 +80,7 @@ export default function OpsCouponsPage() {
     <div>
       <h2 className="display text-4xl">Coupons</h2>
       <p className="mt-1 text-sm text-mist">
-        Add or remove redeemable codes. Owner free code:{" "}
+        Add, edit, or remove redeemable codes for the cart. Owner free code stays locked:{" "}
         <span className="text-red">cityviewlanes.com</span>
       </p>
       {(message || error) && (
