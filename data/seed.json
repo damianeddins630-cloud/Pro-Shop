@@ -573,8 +573,8 @@
     {
       "id": "user_owner",
       "email": "damianeddins630@gmail.com",
-      "username": "Damian_e",
-      "passwordHash": "$2b$10$nf62.7yvsWOyNm40r6ZtoubhBeKVw7hefg2W8IWm1cEHx8we4BI/O",
+      "username": "CV_damian",
+      "passwordHash": "$2b$10$7aHB08kNpgY72y/mHpDsp.hv2TtzWd8lX4gTzEsZYKHNmmiiyfujC",
       "phoneNumber": "",
       "dateOfBirth": "1990-01-01",
       "roleId": "role_admin",

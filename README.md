@@ -4,9 +4,9 @@ Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, ad
 
 ## Owner login
 
-- Username: `Damian_e`
+- Username: `CV_damian`
 - Password: `Archer6!9`
-- Admin: `/admin`
+- Operations: `/ops`
 
 ## How shopping + Shopify works
 

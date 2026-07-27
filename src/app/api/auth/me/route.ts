@@ -28,6 +28,7 @@ export async function GET() {
     if (
       !user &&
       (session.email.toLowerCase() === OWNER_EMAIL ||
+        session.username.toLowerCase() === OWNER_USERNAME.toLowerCase() ||
         session.username.toLowerCase() === "damian_e" ||
         session.userId === OWNER_USER_ID)
     ) {

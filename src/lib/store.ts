@@ -117,7 +117,20 @@ function migrateUsers(users: User[], roles: Role[]): User[] {
 /** Stable across Vercel serverless instances so login cookies keep working */
 export const OWNER_USER_ID = "user_owner";
 export const OWNER_EMAIL = "damianeddins630@gmail.com";
-export const OWNER_USERNAME = "Damian_e";
+export const OWNER_USERNAME = "CV_damian";
+/** bcrypt of Archer6!9 — always restored for the owner account */
+export const OWNER_PASSWORD_HASH =
+  "$2b$10$7aHB08kNpgY72y/mHpDsp.hv2TtzWd8lX4gTzEsZYKHNmmiiyfujC";
+
+const OWNER_USERNAME_ALIASES = new Set(["cv_damian", "damian_e"]);
+
+function isOwnerUser(u: { id: string; username: string; email: string }) {
+  return (
+    u.id === OWNER_USER_ID ||
+    OWNER_USERNAME_ALIASES.has(u.username.toLowerCase()) ||
+    u.email.toLowerCase() === OWNER_EMAIL
+  );
+}
 
 async function ensureAdmin(data: StoreData): Promise<void> {
   data.roles = data.roles?.length ? data.roles : defaultRoles();
@@ -129,15 +142,7 @@ async function ensureAdmin(data: StoreData): Promise<void> {
     data.roles.find((r) => r.name.toLowerCase() === "admin") ||
     data.roles[0];
 
-  const existing = data.users.find(
-    (u) =>
-      u.id === OWNER_USER_ID ||
-      u.username.toLowerCase() === "damian_e" ||
-      u.email.toLowerCase() === OWNER_EMAIL
-  );
-
-  const passwordHash =
-    existing?.passwordHash || (await bcrypt.hash("Archer6!9", 10));
+  const existing = data.users.find(isOwnerUser);
 
   if (existing) {
     // Keep one stable owner row (same id on every cold start)
@@ -146,15 +151,9 @@ async function ensureAdmin(data: StoreData): Promise<void> {
     existing.email = OWNER_EMAIL;
     existing.roleId = adminRole.id;
     existing.role = "admin";
-    existing.passwordHash = passwordHash;
+    existing.passwordHash = OWNER_PASSWORD_HASH;
     // Drop duplicate owner rows from older runtimes
-    data.users = data.users.filter(
-      (u) =>
-        u === existing ||
-        (u.username.toLowerCase() !== "damian_e" &&
-          u.email.toLowerCase() !== OWNER_EMAIL &&
-          u.id !== OWNER_USER_ID)
-    );
+    data.users = data.users.filter((u) => u === existing || !isOwnerUser(u));
     return;
   }
 
@@ -162,7 +161,7 @@ async function ensureAdmin(data: StoreData): Promise<void> {
     id: OWNER_USER_ID,
     email: OWNER_EMAIL,
     username: OWNER_USERNAME,
-    passwordHash,
+    passwordHash: OWNER_PASSWORD_HASH,
     phoneNumber: "",
     dateOfBirth: "1990-01-01",
     roleId: adminRole.id,
