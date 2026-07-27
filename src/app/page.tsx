@@ -25,10 +25,11 @@ export default async function HomePage() {
     clinicSub: "Bring Ballard's Academy to your center",
     storyEyebrow: "Our Story",
     story: "Elite Coaching. Family. Passion.",
+    missionLabel: "Mission",
     mission:
-      "Mission – To provide world-class coaching that will enhance the bowling experience to all bowlers and coaches while growing the sport of bowling at all levels on and off the lanes.",
-    vision:
-      "Vision – To strengthen the bowling community through Education and Coaching.",
+      "To provide world-class coaching that will enhance the bowling experience to all bowlers and coaches while growing the sport of bowling at all levels on and off the lanes.",
+    visionLabel: "Vision",
+    vision: "To strengthen the bowling community through Education and Coaching.",
     storyBody:
       "Ballard's Bowling Academy was created from the love and passion for the sport of bowling. We believe there is a true inner Champion in all of us whether on the lanes or behind the scenes. There are many facets that lead to success and we look to help you develop a plan to achieve your personal goals. At Ballard's Bowling Academy we look to inspire you to reach your bowling goals as well as use the tools learned to achieve off-lane success as well.",
     dealEyebrow: "Deal of the Month",
@@ -56,7 +57,9 @@ export default async function HomePage() {
       clinicSub,
       storyEyebrow,
       story,
+      missionLabel,
       mission,
+      visionLabel,
       vision,
       storyBody,
       dealEyebrow,
@@ -80,7 +83,9 @@ export default async function HomePage() {
       getText("home", "clinic_sub", defaults.clinicSub),
       getText("home", "story_eyebrow", defaults.storyEyebrow),
       getText("home", "story", defaults.story),
+      getText("home", "mission_label", defaults.missionLabel),
       getText("home", "mission", defaults.mission),
+      getText("home", "vision_label", defaults.visionLabel),
       getText("home", "vision", defaults.vision),
       getText("home", "story_body", defaults.storyBody),
       getText("home", "deal_eyebrow", defaults.dealEyebrow),
@@ -105,7 +110,9 @@ export default async function HomePage() {
       clinicSub,
       storyEyebrow,
       story,
+      missionLabel,
       mission,
+      visionLabel,
       vision,
       storyBody,
       dealEyebrow,
@@ -244,25 +251,49 @@ export default async function HomePage() {
             className="display mt-2 max-w-3xl text-4xl md:text-6xl"
           />
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
-            <div className="space-y-4 text-mist leading-relaxed">
-              <EditablePageTitle
-                page="home"
-                slot="mission"
-                initial={t.mission}
-                as="p"
-                multiline
-                rows={4}
-                className="leading-relaxed text-mist"
-              />
-              <EditablePageTitle
-                page="home"
-                slot="vision"
-                initial={t.vision}
-                as="p"
-                multiline
-                rows={3}
-                className="leading-relaxed text-mist"
-              />
+            <div className="space-y-5 text-mist leading-relaxed">
+              <div>
+                <EditablePageTitle
+                  page="home"
+                  slot="mission_label"
+                  initial={t.missionLabel}
+                  as="strong"
+                  editLabel="Mission label"
+                  className="text-chalk"
+                />
+                <span className="text-mist"> – </span>
+                <EditablePageTitle
+                  page="home"
+                  slot="mission"
+                  initial={t.mission.replace(/^Mission\s*[–—-]\s*/i, "")}
+                  as="p"
+                  multiline
+                  rows={5}
+                  editLabel="Mission paragraph"
+                  className="mt-2 leading-relaxed text-mist"
+                />
+              </div>
+              <div>
+                <EditablePageTitle
+                  page="home"
+                  slot="vision_label"
+                  initial={t.visionLabel}
+                  as="strong"
+                  editLabel="Vision label"
+                  className="text-chalk"
+                />
+                <span className="text-mist"> – </span>
+                <EditablePageTitle
+                  page="home"
+                  slot="vision"
+                  initial={t.vision.replace(/^Vision\s*[–—-]\s*/i, "")}
+                  as="p"
+                  multiline
+                  rows={4}
+                  editLabel="Vision paragraph"
+                  className="mt-2 leading-relaxed text-mist"
+                />
+              </div>
             </div>
             <EditablePageTitle
               page="home"
@@ -271,6 +302,7 @@ export default async function HomePage() {
               as="p"
               multiline
               rows={8}
+              editLabel="Story paragraph"
               className="leading-relaxed text-mist"
             />
           </div>

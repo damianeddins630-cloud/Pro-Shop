@@ -12,14 +12,16 @@ export function EditablePageTitle({
   className = "",
   multiline = false,
   rows = 4,
+  editLabel,
 }: {
   page: string;
   slot: string;
   initial: string;
-  as?: "h1" | "h2" | "h3" | "p" | "span";
+  as?: "h1" | "h2" | "h3" | "p" | "span" | "strong";
   className?: string;
   multiline?: boolean;
   rows?: number;
+  editLabel?: string;
 }) {
   const [text, setText] = useState(initial);
   const router = useRouter();
@@ -35,6 +37,7 @@ export function EditablePageTitle({
       value={text}
       multiline={multiline}
       rows={rows}
+      editLabel={editLabel || slot.replace(/_/g, " ")}
       onSave={async (next) => {
         const res = await fetch("/api/texts", {
           method: "PUT",
