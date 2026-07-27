@@ -28,7 +28,7 @@ const createSchema = z.object({
   description: z.string().default(""),
   type: z.enum(["percent", "fixed", "free"]),
   value: z.coerce.number().min(0).default(0),
-  active: z.coerce.boolean().optional(),
+  active: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   }
   try {
     const body = createSchema.parse(await req.json());
-    const coupon = await createCoupon({
+    const result = await createCoupon({
       code: body.code,
       description: body.description,
       type: body.type,
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       active: body.active ?? true,
     });
     return NextResponse.json(
-      { coupon, coupons: await listCoupons() },
+      { coupon: result.coupon, coupons: result.coupons },
       { status: 201, headers: noStore }
     );
   } catch (e) {

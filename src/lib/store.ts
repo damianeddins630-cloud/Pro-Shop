@@ -393,8 +393,9 @@ export async function getStore(): Promise<StoreData> {
 }
 
 async function mutate(updater: (data: StoreData) => void | Promise<void>) {
-  const store = g();
-  const data = store.data || (await getStore());
+  // Always resolve latest store (remote + memory) so coupon/inventory edits
+  // don't clobber newer durable data with a stale in-memory copy.
+  const data = await getStore();
   await updater(data);
   touchUpdatedAt(data);
   g().data = data;
@@ -835,7 +836,7 @@ export async function createOrder(input: {
 export async function listCoupons() {
   const data = await getStore();
   ensureCoupons(data);
-  return data.coupons || [];
+  return [...(data.coupons || [])];
 }
 
 export async function findCouponByCode(code: string) {
@@ -850,72 +851,104 @@ export async function createCoupon(
 ) {
   const code = normalizeCouponCode(input.code);
   if (!code) throw new Error("Coupon code is required");
+  if (!["percent", "fixed", "free"].includes(input.type)) {
+    throw new Error("Coupon type must be percent, fixed, or free");
+  }
+  if (input.type !== "free") {
+    const value = Number(input.value);
+    if (Number.isNaN(value) || value < 0) {
+      throw new Error("Coupon value must be a number 0 or greater");
+    }
+    if (input.type === "percent" && value > 100) {
+      throw new Error("Percent coupons cannot be over 100");
+    }
+  }
   let created: Coupon | null = null;
-  await mutate((data) => {
-    ensureCoupons(data);
-    if ((data.coupons || []).some((c) => codesMatch(c.code, code))) {
+  const data = await mutate((store) => {
+    ensureCoupons(store);
+    if ((store.coupons || []).some((c) => codesMatch(c.code, code))) {
       throw new Error("That coupon code already exists");
     }
     created = {
       id: randomUUID(),
       code,
-      description: input.description || "",
+      description: (input.description || "").trim(),
       type: input.type,
-      value: Number(input.value) || 0,
+      value: input.type === "free" ? 100 : Number(input.value) || 0,
       active: input.active ?? true,
       system: Boolean(input.system),
     };
-    data.coupons = data.coupons || [];
-    data.coupons.unshift(created);
+    store.coupons = store.coupons || [];
+    store.coupons.unshift(created);
   });
-  return created!;
+  return { coupon: created!, coupons: [...(data.coupons || [])] };
 }
 
 export async function updateCoupon(id: string, patch: Partial<Coupon>) {
   let updated: Coupon | null = null;
-  await mutate((data) => {
-    ensureCoupons(data);
-    const idx = (data.coupons || []).findIndex((c) => c.id === id);
+  const data = await mutate((store) => {
+    ensureCoupons(store);
+    const idx = (store.coupons || []).findIndex((c) => c.id === id);
     if (idx === -1) return;
-    const current = data.coupons![idx];
+    const current = store.coupons![idx];
     const nextCode = patch.code
       ? normalizeCouponCode(patch.code)
       : current.code;
+    if (!nextCode) throw new Error("Coupon code is required");
     if (
-      (data.coupons || []).some(
+      (store.coupons || []).some(
         (c) => c.id !== id && codesMatch(c.code, nextCode)
       )
     ) {
       throw new Error("That coupon code already exists");
     }
+    const nextType = current.system
+      ? "free"
+      : patch.type || current.type;
+    let nextValue = current.system
+      ? 100
+      : Number(patch.value ?? current.value);
+    if (Number.isNaN(nextValue) || nextValue < 0) {
+      throw new Error("Coupon value must be a number 0 or greater");
+    }
+    if (nextType === "free") nextValue = 100;
+    if (nextType === "percent" && nextValue > 100) {
+      throw new Error("Percent coupons cannot be over 100");
+    }
     const next: Coupon = {
       ...current,
-      ...patch,
+      description:
+        typeof patch.description === "string"
+          ? patch.description.trim()
+          : current.description,
       id: current.id,
       code: current.system ? OWNER_FREE_COUPON_CODE : nextCode,
-      type: current.system ? "free" : patch.type || current.type,
-      value: current.system ? 100 : Number(patch.value ?? current.value) || 0,
-      active: patch.active ?? current.active,
+      type: nextType,
+      value: nextValue,
+      active: typeof patch.active === "boolean" ? patch.active : current.active,
       system: current.system,
     };
-    data.coupons![idx] = next;
+    // System free code always stays redeemable
+    if (next.system) next.active = true;
+    store.coupons![idx] = next;
     updated = next;
   });
-  return updated;
+  if (!updated) return null;
+  return { coupon: updated, coupons: [...(data.coupons || [])] };
 }
 
 export async function deleteCoupon(id: string) {
   let ok = false;
-  await mutate((data) => {
-    ensureCoupons(data);
-    const target = (data.coupons || []).find((c) => c.id === id);
+  const data = await mutate((store) => {
+    ensureCoupons(store);
+    const target = (store.coupons || []).find((c) => c.id === id);
     if (!target) return;
     if (target.system) throw new Error("Cannot remove the owner free coupon");
-    const before = data.coupons!.length;
-    data.coupons = data.coupons!.filter((c) => c.id !== id);
-    ok = data.coupons.length < before;
+    const before = store.coupons!.length;
+    store.coupons = store.coupons!.filter((c) => c.id !== id);
+    ok = store.coupons.length < before;
   });
-  return ok;
+  return { ok, coupons: [...(data.coupons || [])] };
 }
 
 export async function updateOrder(

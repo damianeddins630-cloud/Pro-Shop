@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
-import { deleteCoupon, listCoupons, updateCoupon } from "@/lib/store";
+import { deleteCoupon, updateCoupon } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ const patchSchema = z.object({
   description: z.string().optional(),
   type: z.enum(["percent", "fixed", "free"]).optional(),
   value: z.coerce.number().min(0).optional(),
-  active: z.coerce.boolean().optional(),
+  active: z.boolean().optional(),
 });
 
 export async function PUT(req: Request, { params }: Params) {
@@ -29,12 +29,12 @@ export async function PUT(req: Request, { params }: Params) {
   const { id } = await params;
   try {
     const body = patchSchema.parse(await req.json());
-    const coupon = await updateCoupon(id, body);
-    if (!coupon) {
+    const result = await updateCoupon(id, body);
+    if (!result) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(
-      { coupon, coupons: await listCoupons() },
+      { coupon: result.coupon, coupons: result.coupons },
       { headers: noStore }
     );
   } catch (e) {
@@ -54,12 +54,12 @@ export async function DELETE(_req: Request, { params }: Params) {
   }
   const { id } = await params;
   try {
-    const ok = await deleteCoupon(id);
-    if (!ok) {
+    const result = await deleteCoupon(id);
+    if (!result.ok) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(
-      { ok: true, coupons: await listCoupons() },
+      { ok: true, coupons: result.coupons },
       { headers: noStore }
     );
   } catch (e) {
