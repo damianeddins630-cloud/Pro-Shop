@@ -71,6 +71,13 @@ export default function OpsOrdersPage() {
                   <h3 className="display mt-1 text-3xl">${order.total.toFixed(2)}</h3>
                   <p className="text-xs capitalize text-mist">
                     {order.paymentProvider || "local"} payment
+                    {order.couponCode
+                      ? ` · coupon ${order.couponCode}${
+                          order.discountAmount
+                            ? ` (−$${order.discountAmount.toFixed(2)})`
+                            : ""
+                        }`
+                      : ""}
                   </p>
                 </div>
                 {canManage ? (

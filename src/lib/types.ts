@@ -152,13 +152,33 @@ export interface Order {
   username: string;
   email: string;
   items: OrderItem[];
+  /** Amount charged after coupon */
   total: number;
+  /** Cart total before coupon */
+  subtotal?: number;
+  discountAmount?: number;
+  couponCode?: string;
   status: OrderStatus;
   createdAt: string;
   /** Shopify draft order GID when paid via Shopify */
   shopifyDraftOrderId?: string;
   shopifyInvoiceUrl?: string;
   paymentProvider?: "shopify" | "local";
+}
+
+export type CouponType = "percent" | "fixed" | "free";
+
+export interface Coupon {
+  id: string;
+  /** What customers type at checkout, e.g. cityviewlanes.com */
+  code: string;
+  description: string;
+  type: CouponType;
+  /** Percent 0–100, or fixed dollar amount. Ignored when type is free. */
+  value: number;
+  active: boolean;
+  /** Built-in coupons (owner free code) can't be deleted */
+  system?: boolean;
 }
 
 export interface StoreData {
@@ -173,6 +193,7 @@ export interface StoreData {
   texts: PageText[];
   roles: Role[];
   orders: Order[];
+  coupons?: Coupon[];
 }
 
 export interface CartItem {

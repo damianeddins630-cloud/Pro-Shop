@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
+import { applyCouponToTotal, couponLabel } from "@/lib/coupons";
 import {
   createOrder,
-  getProduct,
+  findCouponByCode,
   getInventoryUpdatedAt,
+  getProduct,
   listProducts,
   reduceStock,
   updateOrder,
@@ -25,6 +27,7 @@ const schema = z.object({
       })
     )
     .min(1),
+  couponCode: z.string().optional(),
 });
 
 export async function GET() {
@@ -40,7 +43,7 @@ export async function POST(req: Request) {
   try {
     const body = schema.parse(await req.json());
     const lineItems = [];
-    let total = 0;
+    let subtotal = 0;
 
     for (const item of body.items) {
       const product = await getProduct(item.productId);
@@ -64,7 +67,27 @@ export async function POST(req: Request) {
         quantity: item.quantity,
         image: product.image,
       });
-      total += unitPrice * item.quantity;
+      subtotal += unitPrice * item.quantity;
+    }
+
+    let discountAmount = 0;
+    let total = subtotal;
+    let appliedCode: string | undefined;
+    let couponNote = "";
+
+    if (body.couponCode?.trim()) {
+      const coupon = await findCouponByCode(body.couponCode);
+      if (!coupon) {
+        return NextResponse.json(
+          { error: "Coupon not found or inactive" },
+          { status: 400 }
+        );
+      }
+      const applied = applyCouponToTotal(subtotal, coupon);
+      discountAmount = applied.discountAmount;
+      total = applied.total;
+      appliedCode = coupon.code;
+      couponNote = couponLabel(coupon);
     }
 
     // Always take stock when an order is placed, and always create an order record
@@ -75,12 +98,44 @@ export async function POST(req: Request) {
       req.headers.get("origin") ||
       "http://localhost:3000";
 
+    // Free / fully discounted orders skip Shopify and complete on-site
+    if (total <= 0) {
+      const order = await createOrder({
+        userId: session.userId,
+        username: session.username,
+        email: session.email,
+        items: lineItems,
+        subtotal,
+        discountAmount,
+        couponCode: appliedCode,
+        total: 0,
+        status: "completed",
+        paymentProvider: "local",
+      });
+
+      const products = await listProducts({ includeInactive: true });
+      return NextResponse.json({
+        ok: true,
+        provider: "local",
+        free: true,
+        order,
+        products,
+        updatedAt: await getInventoryUpdatedAt(),
+        message: appliedCode
+          ? `Order is free with coupon ${appliedCode}${couponNote ? ` (${couponNote})` : ""}.`
+          : "Order placed for free.",
+      });
+    }
+
     if (isShopifyConfigured()) {
       const order = await createOrder({
         userId: session.userId,
         username: session.username,
         email: session.email,
         items: lineItems,
+        subtotal,
+        discountAmount,
+        couponCode: appliedCode,
         total,
         status: "awaiting_payment",
         paymentProvider: "shopify",
@@ -126,6 +181,9 @@ export async function POST(req: Request) {
       username: session.username,
       email: session.email,
       items: lineItems,
+      subtotal,
+      discountAmount,
+      couponCode: appliedCode,
       total,
       status: "placed",
       paymentProvider: "local",
@@ -138,7 +196,9 @@ export async function POST(req: Request) {
       order,
       products,
       updatedAt: await getInventoryUpdatedAt(),
-      message: "Order placed. Inventory stock updated and order added to Operations.",
+      message: appliedCode
+        ? `Order placed with coupon ${appliedCode}. Inventory updated.`
+        : "Order placed. Inventory stock updated and order added to Operations.",
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Checkout failed";

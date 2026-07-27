@@ -16,6 +16,7 @@ import type {
   OrderItem,
   OrderStatus,
   Permission,
+  Coupon,
 } from "./types";
 import { ALL_PERMISSIONS } from "./types";
 import seedJson from "@/data/seed.json";
@@ -26,6 +27,11 @@ import {
   saveDurableStore,
 } from "./durable-store";
 import { githubWriteConfigured } from "./github-store";
+import {
+  codesMatch,
+  normalizeCouponCode,
+  OWNER_FREE_COUPON_CODE,
+} from "./coupons";
 
 const GLOBAL_KEY = "__bba_store_v6__";
 
@@ -104,7 +110,39 @@ function cloneSeed(): StoreData {
   seed.texts = seed.texts || [];
   seed.roles = seed.roles?.length ? seed.roles : defaultRoles();
   seed.orders = seed.orders || [];
+  seed.coupons = seed.coupons || [];
   return seed;
+}
+
+function ownerFreeCoupon(): Coupon {
+  return {
+    id: "coupon_cityviewlanes",
+    code: OWNER_FREE_COUPON_CODE,
+    description: "City View Lanes / owner free order code",
+    type: "free",
+    value: 100,
+    active: true,
+    system: true,
+  };
+}
+
+function ensureCoupons(data: StoreData) {
+  data.coupons = data.coupons || [];
+  const existing = data.coupons.find((c) =>
+    codesMatch(c.code, OWNER_FREE_COUPON_CODE)
+  );
+  if (existing) {
+    existing.code = OWNER_FREE_COUPON_CODE;
+    existing.type = "free";
+    existing.value = 100;
+    existing.active = true;
+    existing.system = true;
+    existing.description =
+      existing.description || "City View Lanes / owner free order code";
+    existing.id = existing.id || "coupon_cityviewlanes";
+  } else {
+    data.coupons.unshift(ownerFreeCoupon());
+  }
 }
 
 function migrateUsers(users: User[], roles: Role[]): User[] {
@@ -153,6 +191,7 @@ function isOwnerUser(u: { id: string; username: string; email: string }) {
 async function ensureAdmin(data: StoreData): Promise<void> {
   data.roles = data.roles?.length ? data.roles : defaultRoles();
   data.orders = data.orders || [];
+  ensureCoupons(data);
 
   // Owner role always titled Website Owner with full permissions
   let adminRole =
@@ -213,6 +252,8 @@ function mergeWithSeed(parsed: StoreData): StoreData {
   parsed.orders = parsed.orders || [];
   parsed.subscribers = parsed.subscribers || [];
   parsed.users = parsed.users || [];
+  parsed.coupons = parsed.coupons?.length ? parsed.coupons : seed.coupons || [];
+  ensureCoupons(parsed);
   return parsed;
 }
 
@@ -643,6 +684,9 @@ export async function createOrder(input: {
   email: string;
   items: OrderItem[];
   total: number;
+  subtotal?: number;
+  discountAmount?: number;
+  couponCode?: string;
   status?: OrderStatus;
   shopifyDraftOrderId?: string;
   shopifyInvoiceUrl?: string;
@@ -657,6 +701,9 @@ export async function createOrder(input: {
       email: input.email,
       items: input.items,
       total: input.total,
+      subtotal: input.subtotal,
+      discountAmount: input.discountAmount,
+      couponCode: input.couponCode,
       status: input.status || "placed",
       createdAt: new Date().toISOString(),
       shopifyDraftOrderId: input.shopifyDraftOrderId,
@@ -667,6 +714,92 @@ export async function createOrder(input: {
     data.orders.unshift(created);
   });
   return created!;
+}
+
+export async function listCoupons() {
+  const data = await getStore();
+  ensureCoupons(data);
+  return data.coupons || [];
+}
+
+export async function findCouponByCode(code: string) {
+  const key = normalizeCouponCode(code);
+  if (!key) return null;
+  const coupons = await listCoupons();
+  return coupons.find((c) => c.active && codesMatch(c.code, key)) || null;
+}
+
+export async function createCoupon(
+  input: Omit<Coupon, "id" | "system"> & { system?: boolean }
+) {
+  const code = normalizeCouponCode(input.code);
+  if (!code) throw new Error("Coupon code is required");
+  let created: Coupon | null = null;
+  await mutate((data) => {
+    ensureCoupons(data);
+    if ((data.coupons || []).some((c) => codesMatch(c.code, code))) {
+      throw new Error("That coupon code already exists");
+    }
+    created = {
+      id: randomUUID(),
+      code,
+      description: input.description || "",
+      type: input.type,
+      value: Number(input.value) || 0,
+      active: input.active ?? true,
+      system: Boolean(input.system),
+    };
+    data.coupons = data.coupons || [];
+    data.coupons.unshift(created);
+  });
+  return created!;
+}
+
+export async function updateCoupon(id: string, patch: Partial<Coupon>) {
+  let updated: Coupon | null = null;
+  await mutate((data) => {
+    ensureCoupons(data);
+    const idx = (data.coupons || []).findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    const current = data.coupons![idx];
+    const nextCode = patch.code
+      ? normalizeCouponCode(patch.code)
+      : current.code;
+    if (
+      (data.coupons || []).some(
+        (c) => c.id !== id && codesMatch(c.code, nextCode)
+      )
+    ) {
+      throw new Error("That coupon code already exists");
+    }
+    const next: Coupon = {
+      ...current,
+      ...patch,
+      id: current.id,
+      code: current.system ? OWNER_FREE_COUPON_CODE : nextCode,
+      type: current.system ? "free" : patch.type || current.type,
+      value: current.system ? 100 : Number(patch.value ?? current.value) || 0,
+      active: patch.active ?? current.active,
+      system: current.system,
+    };
+    data.coupons![idx] = next;
+    updated = next;
+  });
+  return updated;
+}
+
+export async function deleteCoupon(id: string) {
+  let ok = false;
+  await mutate((data) => {
+    ensureCoupons(data);
+    const target = (data.coupons || []).find((c) => c.id === id);
+    if (!target) return;
+    if (target.system) throw new Error("Cannot remove the owner free coupon");
+    const before = data.coupons!.length;
+    data.coupons = data.coupons!.filter((c) => c.id !== id);
+    ok = data.coupons.length < before;
+  });
+  return ok;
 }
 
 export async function updateOrder(

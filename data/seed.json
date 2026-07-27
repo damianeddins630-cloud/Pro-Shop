@@ -710,5 +710,16 @@
       "system": false
     }
   ],
-  "orders": []
+  "orders": [],
+  "coupons": [
+    {
+      "id": "coupon_cityviewlanes",
+      "code": "cityviewlanes.com",
+      "description": "City View Lanes / owner free order code",
+      "type": "free",
+      "value": 100,
+      "active": true,
+      "system": true
+    }
+  ]
 }

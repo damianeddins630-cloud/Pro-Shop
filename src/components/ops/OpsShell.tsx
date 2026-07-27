@@ -17,6 +17,11 @@ const nav: { href: string; label: string; perms: Permission[] }[] = [
   },
   { href: "/ops/deals", label: "Deals", perms: ["manage_deals", "edit_pages"] },
   {
+    href: "/ops/coupons",
+    label: "Coupons",
+    perms: ["manage_deals", "manage_inventory", "edit_pages"],
+  },
+  {
     href: "/ops/sponsors",
     label: "Sponsors",
     perms: ["manage_sponsors", "edit_pages"],

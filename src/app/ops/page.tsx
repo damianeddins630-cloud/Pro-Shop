@@ -15,6 +15,11 @@ const cards = [
     text: "Add, remove, or update current deals and specials.",
   },
   {
+    href: "/ops/coupons",
+    title: "Coupons",
+    text: "Add or remove redeem codes. Owner free code: cityviewlanes.com",
+  },
+  {
     href: "/ops/sponsors",
     title: "Sponsors",
     text: "Add, remove, or update sponsor names and logos.",

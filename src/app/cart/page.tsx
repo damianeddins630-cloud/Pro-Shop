@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { ProductPrice } from "@/components/ProductPrice";
@@ -15,6 +15,13 @@ import {
 import { effectivePrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
+type AppliedCoupon = {
+  code: string;
+  label: string;
+  discountAmount: number;
+  total: number;
+};
+
 export default function CartPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useEditMode();
@@ -24,6 +31,10 @@ export default function CartPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [shopifyReady, setShopifyReady] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -67,6 +78,71 @@ export default function CartPage() {
     product: Product;
   }[];
 
+  const subtotal = useMemo(() => total(products), [total, products]);
+
+  // Keep redeemed coupon totals in sync if cart quantities change
+  useEffect(() => {
+    if (!coupon) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/coupons/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: coupon.code, subtotal }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setCoupon(null);
+          setCouponError(data.error || "Coupon no longer valid");
+          return;
+        }
+        setCoupon({
+          code: data.coupon.code,
+          label: data.coupon.label,
+          discountAmount: data.discountAmount,
+          total: data.total,
+        });
+      } catch {
+        // keep previous
+      }
+    })();
+  }, [subtotal, coupon?.code]);
+
+  async function redeemCoupon() {
+    setCouponError("");
+    setMessage("");
+    if (!couponInput.trim()) {
+      setCouponError("Enter a coupon code");
+      return;
+    }
+    setRedeeming(true);
+    try {
+      const res = await fetch("/api/coupons/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponInput.trim(), subtotal }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCoupon(null);
+        setCouponError(data.error || "Could not redeem coupon");
+        setRedeeming(false);
+        return;
+      }
+      setCoupon({
+        code: data.coupon.code,
+        label: data.coupon.label,
+        discountAmount: data.discountAmount,
+        total: data.total,
+      });
+      setCouponInput(data.coupon.code);
+      setMessage(`Coupon applied: ${data.coupon.label}`);
+    } catch {
+      setCouponError("Could not redeem coupon");
+    }
+    setRedeeming(false);
+  }
+
   async function checkout() {
     if (!user) {
       router.push("/login?next=/cart");
@@ -79,7 +155,10 @@ export default function CartPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({
+          items,
+          couponCode: coupon?.code || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -95,11 +174,13 @@ export default function CartPage() {
 
       if (data.provider === "shopify" && data.checkoutUrl) {
         clear();
+        setCoupon(null);
         window.location.href = data.checkoutUrl as string;
         return;
       }
 
       clear();
+      setCoupon(null);
       setMessage(data.message || "Order placed!");
       setLoading(false);
     } catch {
@@ -107,6 +188,17 @@ export default function CartPage() {
       setLoading(false);
     }
   }
+
+  const due = coupon ? coupon.total : subtotal;
+  const checkoutLabel = !user
+    ? "Login to checkout"
+    : loading
+      ? "Starting checkout..."
+      : due <= 0
+        ? "Place free order"
+        : shopifyReady
+          ? "Pay with Shopify"
+          : "Place order";
 
   return (
     <section className="site-shell section-pad pt-24">
@@ -171,12 +263,70 @@ export default function CartPage() {
 
           <aside className="h-fit rounded-3xl border border-red/25 bg-lane/40 p-6">
             <h2 className="display text-3xl">Order summary</h2>
-            <p className="mt-4 text-2xl">${total(products).toFixed(2)}</p>
-            <p className="mt-2 text-sm text-mist">
+            <div className="mt-4 space-y-1 text-sm text-mist">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>${subtotal.toFixed(2)}</span>
+              </div>
+              {coupon && (
+                <div className="flex justify-between text-emerald-300">
+                  <span>Coupon ({coupon.code})</span>
+                  <span>-${coupon.discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+            <p className="mt-3 text-2xl">${due.toFixed(2)}</p>
+            {coupon && (
+              <p className="mt-1 text-sm text-emerald-300">{coupon.label}</p>
+            )}
+
+            <div className="mt-5 space-y-2">
+              <label className="label" htmlFor="coupon">
+                Coupon code
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="coupon"
+                  className="field"
+                  placeholder="Enter code"
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-ghost shrink-0"
+                  disabled={redeeming}
+                  onClick={() => void redeemCoupon()}
+                >
+                  {redeeming ? "..." : "Redeem"}
+                </button>
+              </div>
+              {coupon && (
+                <button
+                  type="button"
+                  className="text-xs text-mist underline"
+                  onClick={() => {
+                    setCoupon(null);
+                    setCouponInput("");
+                    setCouponError("");
+                    setMessage("");
+                  }}
+                >
+                  Remove coupon
+                </button>
+              )}
+              {couponError && (
+                <p className="text-sm text-red-300">{couponError}</p>
+              )}
+            </div>
+
+            <p className="mt-4 text-sm text-mist">
               Login required to buy. Shop and cart stay on this website.{" "}
-              {shopifyReady
-                ? "Payment is collected securely by Shopify, then you return here."
-                : "Shopify payments are not connected yet — orders save on the site only."}
+              {due <= 0
+                ? "Free coupon orders complete on this site — no payment needed."
+                : shopifyReady
+                  ? "Payment is collected securely by Shopify, then you return here."
+                  : "Shopify payments are not connected yet — orders save on the site only."}
             </p>
             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
             {message && <p className="mt-3 text-sm text-emerald-300">{message}</p>}
@@ -186,13 +336,7 @@ export default function CartPage() {
               onClick={checkout}
               className="btn btn-primary mt-6 w-full"
             >
-              {!user
-                ? "Login to checkout"
-                : loading
-                  ? "Starting checkout..."
-                  : shopifyReady
-                    ? "Pay with Shopify"
-                    : "Place order"}
+              {checkoutLabel}
             </button>
             {!user && (
               <div className="mt-3 flex justify-center gap-3 text-sm">
