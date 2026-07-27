@@ -43,26 +43,54 @@ export function BrandedPageBackdrop({ children, tone = "auth" }: Props) {
           </>
         )}
 
-        {/* Soft logo watermarks */}
-        <div className="absolute -right-6 top-20 opacity-20 md:right-10 md:top-28">
-          <Image
-            src="/images/logo-light.png"
-            alt=""
-            width={420}
-            height={280}
-            className="h-auto w-[220px] rotate-[-8deg] object-contain md:w-[340px]"
-            priority
-          />
-        </div>
-        <div className="absolute -left-8 bottom-8 opacity-15 md:left-8">
-          <Image
-            src="/images/logo.png"
-            alt=""
-            width={320}
-            height={220}
-            className="h-auto w-[180px] rotate-[8deg] object-contain md:w-[260px]"
-          />
-        </div>
+        {/* Soft logo watermarks — Ops uses the custom animated mark */}
+        {tone === "ops" ? (
+          <>
+            <div className="absolute -right-4 top-16 opacity-30 md:right-8 md:top-24">
+              <Image
+                src="/images/ops-logo.gif"
+                alt=""
+                width={360}
+                height={360}
+                className="h-auto w-[200px] object-contain md:w-[300px]"
+                unoptimized
+                priority
+              />
+            </div>
+            <div className="absolute -left-6 bottom-8 opacity-20 md:left-6">
+              <Image
+                src="/images/ops-logo.gif"
+                alt=""
+                width={280}
+                height={280}
+                className="h-auto w-[160px] rotate-[8deg] object-contain md:w-[220px]"
+                unoptimized
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="absolute -right-6 top-20 opacity-20 md:right-10 md:top-28">
+              <Image
+                src="/images/logo-light.png"
+                alt=""
+                width={420}
+                height={280}
+                className="h-auto w-[220px] rotate-[-8deg] object-contain md:w-[340px]"
+                priority
+              />
+            </div>
+            <div className="absolute -left-8 bottom-8 opacity-15 md:left-8">
+              <Image
+                src="/images/logo.png"
+                alt=""
+                width={320}
+                height={220}
+                className="h-auto w-[180px] rotate-[8deg] object-contain md:w-[260px]"
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="site-shell relative z-10 pt-24 pb-16">{children}</div>

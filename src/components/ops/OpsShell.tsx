@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { BrandedPageBackdrop } from "@/components/BrandedPageBackdrop";
+import { OpsLogo } from "@/components/ops/OpsLogo";
 import { useEditMode } from "@/lib/edit-mode";
 import type { Permission } from "@/lib/types";
 
@@ -56,7 +57,10 @@ export function OpsShell({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <BrandedPageBackdrop tone="ops">
-        <p className="text-mist">Loading Operations Home Base...</p>
+        <div className="flex items-center gap-4">
+          <OpsLogo size="sm" />
+          <p className="text-mist">Loading Operations Home Base...</p>
+        </div>
       </BrandedPageBackdrop>
     );
   }
@@ -65,14 +69,7 @@ export function OpsShell({ children }: { children: ReactNode }) {
     return (
       <BrandedPageBackdrop tone="ops">
         <div className="mx-auto max-w-lg py-10 text-center">
-          <Image
-            src="/images/logo.png"
-            alt="Ballard's Bowling Academy"
-            width={160}
-            height={110}
-            className="mx-auto h-auto w-[140px] object-contain"
-            priority
-          />
+          <OpsLogo size="lg" className="mx-auto" />
           <p className="mt-6 text-sm tracking-[0.2em] text-red uppercase">
             Operations Home Base
           </p>
@@ -92,15 +89,8 @@ export function OpsShell({ children }: { children: ReactNode }) {
 
   return (
     <BrandedPageBackdrop tone="ops">
-      <div className="mb-8 flex flex-wrap items-end gap-5">
-        <Image
-          src="/images/logo.png"
-          alt="Ballard's Bowling Academy"
-          width={120}
-          height={80}
-          className="h-auto w-[88px] object-contain md:w-[110px]"
-          priority
-        />
+      <div className="mb-8 flex flex-wrap items-center gap-5">
+        <OpsLogo size="md" />
         <div>
           <p className="text-sm tracking-[0.2em] text-red uppercase">
             Ballard&apos;s Bowling Academy
@@ -114,6 +104,9 @@ export function OpsShell({ children }: { children: ReactNode }) {
 
       <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
         <aside className="h-fit rounded-3xl border border-white/20 bg-black/40 p-3 backdrop-blur-md">
+          <div className="mb-3 flex justify-center border-b border-white/10 pb-3">
+            <OpsLogo size="sm" />
+          </div>
           <nav className="flex flex-col gap-1">
             {items.map((item) => {
               const active =
