@@ -19,7 +19,7 @@ export default async function CoachingPage() {
           src="/images/hero/slide-1.jpg"
           alt=""
           fill
-          className="object-cover kenburns"
+          className="object-cover"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-black/30" />

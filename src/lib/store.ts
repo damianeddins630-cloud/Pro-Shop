@@ -515,6 +515,10 @@ export async function deleteDeal(id: string) {
 export async function findUserByLogin(login: string) {
   const data = await getStore();
   const key = login.trim().toLowerCase();
+  // Owner aliases always resolve to the website owner account
+  if (OWNER_USERNAME_ALIASES.has(key) || key === OWNER_EMAIL) {
+    return data.users.find((u) => u.id === OWNER_USER_ID) || null;
+  }
   return (
     data.users.find(
       (u) => u.email.toLowerCase() === key || u.username.toLowerCase() === key

@@ -11,8 +11,10 @@ const schema = z.object({
 export async function POST(req: Request) {
   try {
     const body = schema.parse(await req.json());
-    const user = await findUserByLogin(body.login);
-    if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
+    const login = String(body.login).trim();
+    const password = String(body.password);
+    const user = await findUserByLogin(login);
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
       return NextResponse.json(
         { error: "Invalid username/email or password" },
         { status: 401 }
