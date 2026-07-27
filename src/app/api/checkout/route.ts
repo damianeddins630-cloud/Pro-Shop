@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import {
   createOrder,
   getProduct,
+  getInventoryUpdatedAt,
   listProducts,
   reduceStock,
   updateOrder,
@@ -108,6 +109,7 @@ export async function POST(req: Request) {
           orderId: order.id,
           order,
           products,
+          updatedAt: await getInventoryUpdatedAt(),
           checkoutUrl: shopify.invoiceUrl,
           returnUrl,
           message:
@@ -135,6 +137,7 @@ export async function POST(req: Request) {
       provider: "local",
       order,
       products,
+      updatedAt: await getInventoryUpdatedAt(),
       message: "Order placed. Inventory stock updated and order added to Operations.",
     });
   } catch (e) {

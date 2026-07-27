@@ -29,11 +29,13 @@ export default function OpsInventoryPage() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/products?admin=1", { cache: "no-store" });
+    const res = await fetch(`/api/products?admin=1&t=${Date.now()}`, {
+      cache: "no-store",
+    });
     const data = await res.json();
     const list = data.products || [];
     setProducts(list);
-    saveLocalInventory(list);
+    saveLocalInventory(list, data.updatedAt);
     setLoading(false);
   }, []);
 
@@ -80,8 +82,7 @@ export default function OpsInventoryPage() {
         ? [data.product, ...products.filter((p) => p.id !== data.product.id)]
         : products;
     setProducts(next);
-    saveLocalInventory(next);
-    window.dispatchEvent(new Event("bba-inventory"));
+    saveLocalInventory(next, data.updatedAt);
     setMessage(
       `${editingId ? "Updated" : "Added"} "${payload.name}" — live on the shop.`
     );
@@ -101,8 +102,7 @@ export default function OpsInventoryPage() {
       ? data.products
       : products.filter((p) => p.id !== id);
     setProducts(next);
-    saveLocalInventory(next);
-    window.dispatchEvent(new Event("bba-inventory"));
+    saveLocalInventory(next, data.updatedAt);
     setMessage("Item removed from inventory and shop.");
     if (editingId === id) {
       setEditingId(null);

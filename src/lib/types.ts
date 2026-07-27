@@ -162,6 +162,8 @@ export interface Order {
 }
 
 export interface StoreData {
+  /** Bumped on every inventory / catalog change so shop can pick the newest copy */
+  updatedAt?: string;
   products: Product[];
   sponsors: Sponsor[];
   deals: Deal[];

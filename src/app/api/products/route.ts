@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
 import {
   createProduct,
+  getInventoryUpdatedAt,
   listProducts,
   storePersistStatus,
 } from "@/lib/store";
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         products: await listProducts({ includeInactive: true }),
+        updatedAt: await getInventoryUpdatedAt(),
         persist: storePersistStatus(),
       },
       { headers: noStore }
@@ -33,7 +35,11 @@ export async function GET(req: Request) {
   }
   const products = await listProducts();
   return NextResponse.json(
-    { products, updatedAt: new Date().toISOString() },
+    {
+      products,
+      // Real catalog timestamp — NOT "now" (that was breaking shop sync)
+      updatedAt: await getInventoryUpdatedAt(),
+    },
     { headers: noStore }
   );
 }
@@ -85,15 +91,17 @@ export async function POST(req: Request) {
       shopifyVariantId: body.shopifyVariantId,
     });
     const products = await listProducts({ includeInactive: true });
+    const updatedAt = await getInventoryUpdatedAt();
     const persist = storePersistStatus();
     return NextResponse.json(
       {
         product,
         products,
+        updatedAt,
         persist,
         warning: persist.githubWriteConfigured
           ? undefined
-          : "Saved. Add GITHUB_TOKEN in Vercel so every visitor sees shop updates (or refresh shop on this same browser).",
+          : "Saved on this server. Add GITHUB_TOKEN in Vercel so every visitor sees shop updates (or open shop in this same browser).",
       },
       { status: 201, headers: noStore }
     );

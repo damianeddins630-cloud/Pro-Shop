@@ -42,12 +42,6 @@ function applyFilters(list: Product[], filters?: Filters) {
   return next;
 }
 
-function readInitial(filters?: Filters, serverInitial: Product[] = []) {
-  const local = loadLocalInventory();
-  if (local?.products?.length) return applyFilters(local.products, filters);
-  return applyFilters(serverInitial, filters);
-}
-
 export function EditableProductGrid({
   initial = [],
   filters,
@@ -56,7 +50,9 @@ export function EditableProductGrid({
   filters?: Filters;
 }) {
   const filterKey = JSON.stringify(filters || {});
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() =>
+    applyFilters(initial, filters)
+  );
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<"local" | "api" | "">("");
   const { editMode: editing, user, loading: authLoading } = useEditMode();
@@ -66,59 +62,48 @@ export function EditableProductGrid({
   const load = useCallback(async () => {
     const activeFilters = JSON.parse(filterKey) as Filters;
 
-    // 1) Show local admin inventory immediately (this is what makes shop update)
-    const local = loadLocalInventory();
-    if (local?.products?.length) {
-      setProducts(applyFilters(local.products, activeFilters));
+    // Show whatever this browser already has from Ops (instant)
+    const localNow = loadLocalInventory();
+    if (localNow?.products?.length) {
+      setProducts(applyFilters(localNow.products, activeFilters));
       setSource("local");
       setLoading(false);
     }
 
-    // 2) Also try API / GitHub-backed store
     try {
       const res = await fetch(`/api/products?t=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       const apiProducts = (data.products || []) as Product[];
+      const apiUpdatedAt = typeof data.updatedAt === "string" ? data.updatedAt : undefined;
 
-      // If we already have local admin edits, keep them and ignore stale API seed
-      if (local?.products?.length) {
-        setProducts(applyFilters(local.products, activeFilters));
-        setSource("local");
-        return;
-      }
-
-      const merged = pickNewestProducts(apiProducts);
+      // Re-read local AFTER the network call — Ops may have saved mid-request
+      const merged = pickNewestProducts(apiProducts, apiUpdatedAt);
       setProducts(applyFilters(merged, activeFilters));
-      setSource("api");
+      setSource(loadLocalInventory()?.products?.length ? "local" : "api");
     } catch {
-      if (!local?.products?.length) {
-        setProducts(readInitial(activeFilters, initial));
-      }
+      const fallback = loadLocalInventory()?.products?.length
+        ? loadLocalInventory()!.products
+        : initial;
+      setProducts(applyFilters(fallback, activeFilters));
     } finally {
       setLoading(false);
     }
   }, [filterKey, initial]);
 
   useEffect(() => {
-    // Hydrate from localStorage on mount (server initial is often stale on Vercel)
-    const activeFilters = JSON.parse(filterKey) as Filters;
-    const hydrated = readInitial(activeFilters, initial);
-    if (hydrated.length) {
-      setProducts(hydrated);
-      setSource(loadLocalInventory()?.products?.length ? "local" : "api");
-      setLoading(false);
-    }
     void load();
-  }, [load, filterKey, initial]);
+  }, [load]);
 
   useEffect(() => {
     const refresh = () => void load();
     window.addEventListener("focus", refresh);
     window.addEventListener("bba-inventory", refresh);
-    const id = window.setInterval(refresh, 8000);
+    window.addEventListener("storage", refresh);
+    const id = window.setInterval(refresh, 5000);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("bba-inventory", refresh);
+      window.removeEventListener("storage", refresh);
       window.clearInterval(id);
     };
   }, [load]);
@@ -140,11 +125,8 @@ export function EditableProductGrid({
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Rename failed");
-    if (Array.isArray(data.products)) saveLocalInventory(data.products);
-    else {
-      const local = loadLocalInventory()?.products || products;
-      const next = local.map((p) => (p.id === id ? { ...p, name } : p));
-      saveLocalInventory(next);
+    if (Array.isArray(data.products)) {
+      saveLocalInventory(data.products, data.updatedAt);
     }
     await load();
     router.refresh();
@@ -158,10 +140,8 @@ export function EditableProductGrid({
       alert(data.error || "Delete failed");
       return;
     }
-    if (Array.isArray(data.products)) saveLocalInventory(data.products);
-    else {
-      const local = loadLocalInventory()?.products || products;
-      saveLocalInventory(local.filter((p) => p.id !== id));
+    if (Array.isArray(data.products)) {
+      saveLocalInventory(data.products, data.updatedAt);
     }
     await load();
     router.refresh();
@@ -191,10 +171,11 @@ export function EditableProductGrid({
       alert(data.error || "Add failed");
       return;
     }
-    if (Array.isArray(data.products)) saveLocalInventory(data.products);
-    else if (data.product) {
+    if (Array.isArray(data.products)) {
+      saveLocalInventory(data.products, data.updatedAt);
+    } else if (data.product) {
       const local = loadLocalInventory()?.products || products;
-      saveLocalInventory([data.product, ...local]);
+      saveLocalInventory([data.product, ...local], data.updatedAt);
     }
     await load();
     router.refresh();

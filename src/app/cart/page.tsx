@@ -9,7 +9,7 @@ import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
 import {
-  loadLocalInventory,
+  pickNewestProducts,
   saveLocalInventory,
 } from "@/lib/inventory-client";
 import { effectivePrice } from "@/lib/pricing";
@@ -26,26 +26,34 @@ export default function CartPage() {
   const [shopifyReady, setShopifyReady] = useState(false);
 
   useEffect(() => {
-    const loadProducts = () => {
-      const local = loadLocalInventory();
-      if (local?.products?.length) {
-        setProducts(local.products);
-        return;
+    const loadProducts = async () => {
+      try {
+        const res = await fetch(`/api/products?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        const d = await res.json();
+        const merged = pickNewestProducts(
+          d.products || [],
+          typeof d.updatedAt === "string" ? d.updatedAt : undefined
+        );
+        setProducts(merged);
+      } catch {
+        setProducts(pickNewestProducts([]));
       }
-      fetch("/api/products", { cache: "no-store" })
-        .then((r) => r.json())
-        .then((d) => setProducts(d.products || []));
+    };
+    const onRefresh = () => {
+      void loadProducts();
     };
     void loadProducts();
-    window.addEventListener("bba-inventory", loadProducts);
-    window.addEventListener("focus", loadProducts);
+    window.addEventListener("bba-inventory", onRefresh);
+    window.addEventListener("focus", onRefresh);
     fetch("/api/checkout")
       .then((r) => r.json())
       .then((d) => setShopifyReady(Boolean(d.shopify?.configured)))
       .catch(() => setShopifyReady(false));
     return () => {
-      window.removeEventListener("bba-inventory", loadProducts);
-      window.removeEventListener("focus", loadProducts);
+      window.removeEventListener("bba-inventory", onRefresh);
+      window.removeEventListener("focus", onRefresh);
     };
   }, []);
 
@@ -81,9 +89,8 @@ export default function CartPage() {
       }
 
       if (Array.isArray(data.products)) {
-        saveLocalInventory(data.products);
+        saveLocalInventory(data.products, data.updatedAt);
         setProducts(data.products);
-        window.dispatchEvent(new Event("bba-inventory"));
       }
 
       if (data.provider === "shopify" && data.checkoutUrl) {

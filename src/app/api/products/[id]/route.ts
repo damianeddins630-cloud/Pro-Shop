@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
 import {
   deleteProduct,
+  getInventoryUpdatedAt,
   getProduct,
   listProducts,
   storePersistStatus,
@@ -53,7 +54,12 @@ export async function PUT(req: Request, { params }: Params) {
     }
     const products = await listProducts({ includeInactive: true });
     return NextResponse.json(
-      { product, products, persist: storePersistStatus() },
+      {
+        product,
+        products,
+        updatedAt: await getInventoryUpdatedAt(),
+        persist: storePersistStatus(),
+      },
       { headers: noStore }
     );
   } catch (e) {
@@ -74,7 +80,12 @@ export async function DELETE(_req: Request, { params }: Params) {
   }
   const products = await listProducts({ includeInactive: true });
   return NextResponse.json(
-    { ok: true, products, persist: storePersistStatus() },
+    {
+      ok: true,
+      products,
+      updatedAt: await getInventoryUpdatedAt(),
+      persist: storePersistStatus(),
+    },
     { headers: noStore }
   );
 }

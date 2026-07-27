@@ -27,13 +27,23 @@ import {
 } from "./durable-store";
 import { githubWriteConfigured } from "./github-store";
 
-const GLOBAL_KEY = "__bba_store_v5__";
+const GLOBAL_KEY = "__bba_store_v6__";
 
 type GlobalStore = {
   data: StoreData | null;
   ready: Promise<StoreData> | null;
   lastPersistOk: boolean;
 };
+
+function storeUpdatedAtMs(data: StoreData | null | undefined) {
+  if (!data?.updatedAt) return 0;
+  const n = Date.parse(data.updatedAt);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function touchUpdatedAt(data: StoreData) {
+  data.updatedAt = new Date().toISOString();
+}
 
 function g(): GlobalStore {
   const root = globalThis as typeof globalThis & { [GLOBAL_KEY]?: GlobalStore };
@@ -231,12 +241,28 @@ async function loadFromDisk(): Promise<StoreData> {
 async function persist(data: StoreData) {
   const store = g();
   let ok = true;
+  touchUpdatedAt(data);
+  const payload = JSON.stringify(
+    { version: 2, ...data, updatedAt: data.updatedAt },
+    null,
+    2
+  );
   try {
     const rt = runtimePath();
     await fs.mkdir(path.dirname(rt), { recursive: true });
-    await fs.writeFile(rt, JSON.stringify(data), "utf8");
+    await fs.writeFile(rt, payload, "utf8");
   } catch {
     ok = false;
+  }
+
+  // Keep committed live-store path in sync for local / non-Vercel
+  try {
+    const live = path.join(process.cwd(), "data", "live-store.json");
+    await fs.mkdir(path.dirname(live), { recursive: true });
+    await fs.writeFile(live, payload, "utf8");
+    ok = true;
+  } catch {
+    // Vercel FS is read-only outside /tmp — ignore
   }
 
   if (durableStoreConfigured()) {
@@ -259,15 +285,26 @@ export function storePersistStatus() {
 export async function getStore(): Promise<StoreData> {
   const store = g();
 
-  // When durable WRITE works, always reload so every serverless instance sees admin edits
-  if (durableWriteConfigured()) {
-    const remote = await loadDurableStore();
-    if (remote) {
-      const merged = mergeWithSeed(remote);
-      await ensureAdmin(merged);
-      store.data = merged;
-      return merged;
+  // Always try GitHub/Redis/Blob so EVERY serverless instance sees Ops edits
+  // (public GitHub live-store is readable even without GITHUB_TOKEN)
+  let remote: StoreData | null = null;
+  try {
+    remote = await loadDurableStore();
+  } catch {
+    remote = null;
+  }
+
+  if (remote) {
+    const merged = mergeWithSeed(remote);
+    await ensureAdmin(merged);
+    const remoteTs = storeUpdatedAtMs(merged);
+    const memTs = storeUpdatedAtMs(store.data);
+    // Keep in-memory copy only when this instance just saved something newer
+    if (store.data && memTs > remoteTs) {
+      return store.data;
     }
+    store.data = merged;
+    return merged;
   }
 
   // Same-instance memory wins (admin just edited on this lambda)
@@ -282,6 +319,7 @@ export async function getStore(): Promise<StoreData> {
       .catch(async () => {
         const fallback = cloneSeed();
         await ensureAdmin(fallback);
+        touchUpdatedAt(fallback);
         store.data = fallback;
         return fallback;
       });
@@ -293,9 +331,16 @@ async function mutate(updater: (data: StoreData) => void | Promise<void>) {
   const store = g();
   const data = store.data || (await getStore());
   await updater(data);
+  touchUpdatedAt(data);
   g().data = data;
   await persist(data);
   return data;
+}
+
+/** ISO timestamp of the latest catalog mutation */
+export async function getInventoryUpdatedAt() {
+  const data = await getStore();
+  return data.updatedAt || new Date(0).toISOString();
 }
 
 export async function getRoleById(id: string) {
