@@ -57,7 +57,7 @@ function LoginForm() {
         </p>
       </div>
 
-      <div className="rounded-3xl border border-white/15 bg-black/55 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.55)] backdrop-blur-md">
+      <div className="rounded-3xl border border-white/20 bg-black/40 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur-md">
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="label" htmlFor="login">

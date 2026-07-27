@@ -108,7 +108,7 @@ export function OpsShell({ children }: { children: ReactNode }) {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-        <aside className="h-fit rounded-3xl border border-white/15 bg-black/55 p-3 backdrop-blur-md">
+        <aside className="h-fit rounded-3xl border border-white/20 bg-black/40 p-3 backdrop-blur-md">
           <nav className="flex flex-col gap-1">
             {items.map((item) => {
               const active =
@@ -137,7 +137,7 @@ export function OpsShell({ children }: { children: ReactNode }) {
             </Link>
           </nav>
         </aside>
-        <div className="min-w-0 rounded-3xl border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-7">
+        <div className="min-w-0 rounded-3xl border border-white/15 bg-black/35 p-5 backdrop-blur-md md:p-7">
           {children}
         </div>
       </div>
