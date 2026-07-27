@@ -28,10 +28,10 @@ body {
   background-color: #000;
   background-image:
     linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.72) 55%, rgba(0, 0, 0, 0.92) 100%),
-    url("/images/site-bg.gif");
+    url("/images/site-bg.jpg");
   background-size: cover;
   background-position: center top;
-  background-attachment: fixed;
+  background-attachment: scroll;
   background-repeat: no-repeat;
   min-height: 100vh;
 }

@@ -9,11 +9,10 @@ export function HeroSlider({ heroTitle = "Perfect Your Game" }: { heroTitle?: st
     <section className="relative min-h-[100svh] overflow-hidden">
       <div className="absolute inset-0">
         <Image
-          src="/images/site-bg.gif"
+          src="/images/site-bg.jpg"
           alt="Ballard's Bowling Academy"
           fill
           priority
-          unoptimized
           className="object-cover"
           sizes="100vw"
         />
