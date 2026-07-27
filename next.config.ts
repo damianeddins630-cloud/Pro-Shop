@@ -13,6 +13,25 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "cdn.shopify.com" },
     ],
   },
+  async redirects() {
+    return [
+      { source: "/admin", destination: "/ops", permanent: true },
+      { source: "/admin/:path*", destination: "/ops", permanent: true },
+      { source: "/images/site-bg.gif", destination: "/images/venue-still.jpg", permanent: true },
+      { source: "/images/site-bg.jpg", destination: "/images/venue-still.jpg", permanent: true },
+      { source: "/images/site-bg.png", destination: "/images/venue-still.jpg", permanent: true },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: "/images/venue-still.jpg",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
