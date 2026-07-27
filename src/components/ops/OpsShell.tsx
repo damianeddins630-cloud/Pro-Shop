@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { BrandedPageBackdrop } from "@/components/BrandedPageBackdrop";
 import { useEditMode } from "@/lib/edit-mode";
 import type { Permission } from "@/lib/types";
 
@@ -48,43 +50,65 @@ export function OpsShell({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <section className="site-shell section-pad pt-24">
+      <BrandedPageBackdrop tone="ops">
         <p className="text-mist">Loading Operations Home Base...</p>
-      </section>
+      </BrandedPageBackdrop>
     );
   }
 
   if (!user || !allowed) {
     return (
-      <section className="site-shell section-pad pt-24">
-        <p className="text-sm tracking-[0.2em] text-red uppercase">
-          Operations Home Base
-        </p>
-        <h1 className="display mt-2 text-5xl">Access required</h1>
-        <p className="mt-4 text-mist">Log in with an operations account to continue.</p>
-        <Link href="/login?next=/ops" className="btn btn-primary mt-6">
-          Login
-        </Link>
-      </section>
+      <BrandedPageBackdrop tone="ops">
+        <div className="mx-auto max-w-lg py-10 text-center">
+          <Image
+            src="/images/logo.png"
+            alt="Ballard's Bowling Academy"
+            width={160}
+            height={110}
+            className="mx-auto h-auto w-[140px] object-contain"
+            priority
+          />
+          <p className="mt-6 text-sm tracking-[0.2em] text-red uppercase">
+            Operations Home Base
+          </p>
+          <h1 className="display mt-2 text-5xl">Access required</h1>
+          <p className="mt-4 text-mist">
+            Log in with an operations account to continue.
+          </p>
+          <Link href="/login?next=/ops" className="btn btn-primary mt-6">
+            Login
+          </Link>
+        </div>
+      </BrandedPageBackdrop>
     );
   }
 
   const items = nav.filter((item) => canSee(user.permissions, item.perms));
 
   return (
-    <section className="site-shell section-pad pt-24">
-      <div className="mb-8">
-        <p className="text-sm tracking-[0.2em] text-red uppercase">
-          Ballard&apos;s Bowling Academy
-        </p>
-        <h1 className="display mt-2 text-5xl md:text-6xl">Operations Home Base</h1>
-        <p className="mt-2 text-mist">
-          Signed in as <span className="text-red">{user.username}</span> · {user.roleName}
-        </p>
+    <BrandedPageBackdrop tone="ops">
+      <div className="mb-8 flex flex-wrap items-end gap-5">
+        <Image
+          src="/images/logo.png"
+          alt="Ballard's Bowling Academy"
+          width={120}
+          height={80}
+          className="h-auto w-[88px] object-contain md:w-[110px]"
+          priority
+        />
+        <div>
+          <p className="text-sm tracking-[0.2em] text-red uppercase">
+            Ballard&apos;s Bowling Academy
+          </p>
+          <h1 className="display mt-1 text-5xl md:text-6xl">Operations Home Base</h1>
+          <p className="mt-2 text-mist">
+            Signed in as <span className="text-red">{user.username}</span> · {user.roleName}
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-        <aside className="h-fit rounded-3xl border border-white/10 bg-black/50 p-3">
+        <aside className="h-fit rounded-3xl border border-white/15 bg-black/55 p-3 backdrop-blur-md">
           <nav className="flex flex-col gap-1">
             {items.map((item) => {
               const active =
@@ -113,8 +137,10 @@ export function OpsShell({ children }: { children: ReactNode }) {
             </Link>
           </nav>
         </aside>
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0 rounded-3xl border border-white/10 bg-black/45 p-5 backdrop-blur-md md:p-7">
+          {children}
+        </div>
       </div>
-    </section>
+    </BrandedPageBackdrop>
   );
 }
