@@ -54,7 +54,7 @@ function defaultRoles(): Role[] {
   return [
     {
       id: "role_admin",
-      name: "Admin",
+      name: "Website Owner",
       description: "Full website owner access",
       permissions: [...ALL_PERMISSIONS],
       system: true,
@@ -98,7 +98,13 @@ function cloneSeed(): StoreData {
 }
 
 function migrateUsers(users: User[], roles: Role[]): User[] {
-  const adminId = roles.find((r) => r.name.toLowerCase() === "admin")?.id || "role_admin";
+  const adminId =
+    roles.find((r) => r.id === "role_admin")?.id ||
+    roles.find((r) => {
+      const n = r.name.toLowerCase();
+      return n === "website owner" || n === "admin";
+    })?.id ||
+    "role_admin";
   const customerId =
     roles.find((r) => r.name.toLowerCase() === "customer")?.id || "role_customer";
 
@@ -106,7 +112,9 @@ function migrateUsers(users: User[], roles: Role[]): User[] {
     const next = { ...u };
     if (!next.roleId) {
       next.roleId =
-        next.role === "admin" || next.username?.toLowerCase() === "damian_e"
+        next.role === "admin" ||
+        next.username?.toLowerCase() === "cv_damian" ||
+        next.username?.toLowerCase() === "damian_e"
           ? adminId
           : customerId;
     }
@@ -135,12 +143,26 @@ function isOwnerUser(u: { id: string; username: string; email: string }) {
 async function ensureAdmin(data: StoreData): Promise<void> {
   data.roles = data.roles?.length ? data.roles : defaultRoles();
   data.orders = data.orders || [];
-  data.users = migrateUsers(data.users || [], data.roles);
 
-  const adminRole =
+  // Owner role always titled Website Owner with full permissions
+  let adminRole =
     data.roles.find((r) => r.id === "role_admin") ||
-    data.roles.find((r) => r.name.toLowerCase() === "admin") ||
-    data.roles[0];
+    data.roles.find((r) => {
+      const n = r.name.toLowerCase();
+      return n === "website owner" || n === "admin";
+    });
+  if (!adminRole) {
+    adminRole = defaultRoles()[0];
+    data.roles.unshift(adminRole);
+  } else {
+    adminRole.id = "role_admin";
+    adminRole.name = "Website Owner";
+    adminRole.description = "Full website owner access";
+    adminRole.permissions = [...ALL_PERMISSIONS];
+    adminRole.system = true;
+  }
+
+  data.users = migrateUsers(data.users || [], data.roles);
 
   const existing = data.users.find(isOwnerUser);
 

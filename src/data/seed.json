@@ -673,7 +673,7 @@
   "roles": [
     {
       "id": "role_admin",
-      "name": "Admin",
+      "name": "Website Owner",
       "description": "Full website owner access",
       "permissions": [
         "edit_pages",

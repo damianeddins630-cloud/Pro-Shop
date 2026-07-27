@@ -48,7 +48,12 @@ export async function GET() {
       phoneNumber: "",
       dateOfBirth: "",
       roleId: session.roleId,
-      roleName: role?.name || "Customer",
+      roleName:
+        role?.name ||
+        (session.userId === OWNER_USER_ID ||
+        session.email?.toLowerCase() === OWNER_EMAIL
+          ? "Website Owner"
+          : "Customer"),
       permissions: session.permissions || [],
     };
     return NextResponse.json({ user: publicUser });
