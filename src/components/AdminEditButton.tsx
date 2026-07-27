@@ -9,8 +9,9 @@ export function AdminEditButton() {
   return (
     <div className="fixed bottom-5 right-5 z-[80] flex flex-col items-end gap-2">
       {editMode && (
-        <p className="rounded-full border border-red/40 bg-black/90 px-3 py-1 text-xs text-mist shadow-lg">
-          Edit mode on — rename items, use + / −
+        <p className="max-w-[240px] rounded-2xl border border-red/40 bg-black/90 px-3 py-2 text-xs text-mist shadow-lg">
+          Edit mode on — click any page text to change it. Longer copy uses a text box.
+          Click away to save.
         </p>
       )}
       <button
@@ -20,7 +21,7 @@ export function AdminEditButton() {
           editMode ? "bg-white text-black" : "bg-red text-white hover:bg-red-deep"
         }`}
       >
-        {editMode ? "Done editing" : "Edit"}
+        {editMode ? "Done editing" : "Edit all text"}
       </button>
     </div>
   );

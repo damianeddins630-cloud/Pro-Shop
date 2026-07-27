@@ -1,11 +1,32 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 
 export default function SubscribePage() {
   const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [eyebrow, setEyebrow] = useState("Stay connected");
+  const [title, setTitle] = useState("Subscribe for Email Updates");
+  const [intro, setIntro] = useState(
+    "We will email you periodically with news, updates and offers. We will never sell, rent or give away your contact information."
+  );
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/texts?page=subscribe", { cache: "no-store" });
+        const data = await res.json();
+        const texts = (data.texts || []) as { slot: string; text: string }[];
+        const map = Object.fromEntries(texts.map((t) => [t.slot, t.text]));
+        if (map.eyebrow) setEyebrow(map.eyebrow);
+        if (map.title) setTitle(map.title);
+        if (map.intro) setIntro(map.intro);
+      } catch {
+        // keep defaults
+      }
+    })();
+  }, []);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -35,18 +56,29 @@ export default function SubscribePage() {
 
   return (
     <section className="site-shell section-pad pt-24">
-      <p className="text-sm tracking-[0.22em] text-red uppercase">Stay connected</p>
+      <EditablePageTitle
+        page="subscribe"
+        slot="eyebrow"
+        initial={eyebrow}
+        as="p"
+        className="text-sm tracking-[0.22em] text-red uppercase"
+      />
       <EditablePageTitle
         page="subscribe"
         slot="title"
-        initial="Subscribe for Email Updates"
+        initial={title}
         as="h1"
         className="display mt-2 text-5xl md:text-7xl"
       />
-      <p className="mt-4 max-w-2xl text-mist">
-        We will email you periodically with news, updates and offers. We will never sell, rent or
-        give away your contact information.
-      </p>
+      <EditablePageTitle
+        page="subscribe"
+        slot="intro"
+        initial={intro}
+        as="p"
+        multiline
+        rows={3}
+        className="mt-4 max-w-2xl text-mist"
+      />
 
       <form
         onSubmit={onSubmit}

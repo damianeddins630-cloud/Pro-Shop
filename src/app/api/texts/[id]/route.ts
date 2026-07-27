@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 import { deleteText } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function DELETE(_req: Request, { params }: Params) {
-  const session = await requireAdmin();
+  const session = await requireAnyPermission("edit_pages", "manage_roles");
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const ok = await deleteText(id);

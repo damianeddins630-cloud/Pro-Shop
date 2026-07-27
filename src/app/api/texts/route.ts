@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 import { createText, listTexts, upsertText } from "@/lib/store";
 
 export async function GET(req: Request) {
@@ -11,11 +11,11 @@ export async function GET(req: Request) {
 const upsertSchema = z.object({
   page: z.string().min(1),
   slot: z.string().min(1),
-  text: z.string().min(1),
+  text: z.string().min(1).max(20000),
 });
 
 export async function PUT(req: Request) {
-  const session = await requireAdmin();
+  const session = await requireAnyPermission("edit_pages", "manage_roles");
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = upsertSchema.parse(await req.json());
@@ -30,7 +30,7 @@ export async function PUT(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await requireAdmin();
+  const session = await requireAnyPermission("edit_pages", "manage_roles");
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = upsertSchema.parse(await req.json());

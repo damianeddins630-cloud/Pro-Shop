@@ -11,44 +11,151 @@ export const runtime = "nodejs";
 export default async function HomePage() {
   let products: Awaited<ReturnType<typeof listProducts>> = [];
   let deals: Awaited<ReturnType<typeof listDeals>> = [];
-  let hero = "Perfect Your Game";
-  let training = "Bowling Lessons";
-  let story = "Elite Coaching. Family. Passion.";
-  let featuredTitle = "Featured Gear";
+  const defaults = {
+    hero: "Perfect Your Game",
+    heroSub: "Hall of Fame coaching and a state-of-the-art pro shop.",
+    heroCta1: "Book a Lesson →",
+    heroCta2: "Shop gear →",
+    trainingEyebrow: "Training",
+    training: "Bowling Lessons",
+    trainingLink: "View all",
+    lessonTitle: "Bowling Lessons",
+    lessonSub: "Private coaching to perfect your game",
+    clinicTitle: "Coaching Clinics / Group Lessons",
+    clinicSub: "Bring Ballard's Academy to your center",
+    storyEyebrow: "Our Story",
+    story: "Elite Coaching. Family. Passion.",
+    mission:
+      "Mission – To provide world-class coaching that will enhance the bowling experience to all bowlers and coaches while growing the sport of bowling at all levels on and off the lanes.",
+    vision:
+      "Vision – To strengthen the bowling community through Education and Coaching.",
+    storyBody:
+      "Ballard's Bowling Academy was created from the love and passion for the sport of bowling. We believe there is a true inner Champion in all of us whether on the lanes or behind the scenes. There are many facets that lead to success and we look to help you develop a plan to achieve your personal goals. At Ballard's Bowling Academy we look to inspire you to reach your bowling goals as well as use the tools learned to achieve off-lane success as well.",
+    dealEyebrow: "Deal of the Month",
+    dealCta: "See deals & specials",
+    shopEyebrow: "Pro Shop",
+    featured: "Featured Gear",
+    shopLink: "Shop all",
+  };
+
+  let t = { ...defaults };
   try {
-    [products, deals, hero, training, story, featuredTitle] = await Promise.all([
+    const [
+      productList,
+      dealList,
+      hero,
+      heroSub,
+      heroCta1,
+      heroCta2,
+      trainingEyebrow,
+      training,
+      trainingLink,
+      lessonTitle,
+      lessonSub,
+      clinicTitle,
+      clinicSub,
+      storyEyebrow,
+      story,
+      mission,
+      vision,
+      storyBody,
+      dealEyebrow,
+      dealCta,
+      shopEyebrow,
+      featured,
+      shopLink,
+    ] = await Promise.all([
       listProducts(),
       listDeals(),
-      getText("home", "hero", "Perfect Your Game"),
-      getText("home", "training", "Bowling Lessons"),
-      getText("home", "story", "Elite Coaching. Family. Passion."),
-      getText("home", "featured", "Featured Gear"),
+      getText("home", "hero", defaults.hero),
+      getText("home", "hero_sub", defaults.heroSub),
+      getText("home", "hero_cta_primary", defaults.heroCta1),
+      getText("home", "hero_cta_secondary", defaults.heroCta2),
+      getText("home", "training_eyebrow", defaults.trainingEyebrow),
+      getText("home", "training", defaults.training),
+      getText("home", "training_link", defaults.trainingLink),
+      getText("home", "lesson_title", defaults.lessonTitle),
+      getText("home", "lesson_sub", defaults.lessonSub),
+      getText("home", "clinic_title", defaults.clinicTitle),
+      getText("home", "clinic_sub", defaults.clinicSub),
+      getText("home", "story_eyebrow", defaults.storyEyebrow),
+      getText("home", "story", defaults.story),
+      getText("home", "mission", defaults.mission),
+      getText("home", "vision", defaults.vision),
+      getText("home", "story_body", defaults.storyBody),
+      getText("home", "deal_eyebrow", defaults.dealEyebrow),
+      getText("home", "deal_cta", defaults.dealCta),
+      getText("home", "shop_eyebrow", defaults.shopEyebrow),
+      getText("home", "featured", defaults.featured),
+      getText("home", "shop_link", defaults.shopLink),
     ]);
+    products = productList;
+    deals = dealList;
+    t = {
+      hero,
+      heroSub,
+      heroCta1,
+      heroCta2,
+      trainingEyebrow,
+      training,
+      trainingLink,
+      lessonTitle,
+      lessonSub,
+      clinicTitle,
+      clinicSub,
+      storyEyebrow,
+      story,
+      mission,
+      vision,
+      storyBody,
+      dealEyebrow,
+      dealCta,
+      shopEyebrow,
+      featured,
+      shopLink,
+    };
   } catch {
     products = [];
     deals = [];
   }
-  const featured = products.filter((p) => p.featured).slice(0, 4);
+
   const deal = deals.find((d) => d.featured && d.active) || deals.find((d) => d.active);
 
   return (
     <>
-      <HeroSlider heroTitle={hero} />
+      <HeroSlider
+        heroTitle={t.hero}
+        heroSub={t.heroSub}
+        ctaPrimary={t.heroCta1}
+        ctaSecondary={t.heroCta2}
+      />
 
       <section className="site-shell section-pad">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm tracking-[0.2em] text-red uppercase">Training</p>
+            <EditablePageTitle
+              page="home"
+              slot="training_eyebrow"
+              initial={t.trainingEyebrow}
+              as="p"
+              className="text-sm tracking-[0.2em] text-red uppercase"
+            />
             <EditablePageTitle
               page="home"
               slot="training"
-              initial={training}
+              initial={t.training}
               as="h2"
               className="display text-4xl md:text-5xl"
             />
           </div>
           <Link href="/coaching" className="text-sm text-mist underline decoration-red/40">
-            View all
+            <EditablePageTitle
+              page="home"
+              slot="training_link"
+              initial={t.trainingLink}
+              as="span"
+              className="inline"
+            />
           </Link>
         </div>
         <div className="grid gap-5 md:grid-cols-2">
@@ -64,8 +171,20 @@ export default async function HomePage() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
             <div className="absolute bottom-0 p-6">
-              <h3 className="display text-3xl">Bowling Lessons</h3>
-              <p className="mt-1 text-sm text-mist">Private coaching to perfect your game</p>
+              <EditablePageTitle
+                page="home"
+                slot="lesson_title"
+                initial={t.lessonTitle}
+                as="h3"
+                className="display text-3xl"
+              />
+              <EditablePageTitle
+                page="home"
+                slot="lesson_sub"
+                initial={t.lessonSub}
+                as="p"
+                className="mt-1 text-sm text-mist"
+              />
             </div>
           </Link>
           <Link
@@ -80,8 +199,20 @@ export default async function HomePage() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
             <div className="absolute bottom-0 p-6">
-              <h3 className="display text-3xl">Coaching Clinics / Group Lessons</h3>
-              <p className="mt-1 text-sm text-mist">Bring Ballard&apos;s Academy to your center</p>
+              <EditablePageTitle
+                page="home"
+                slot="clinic_title"
+                initial={t.clinicTitle}
+                as="h3"
+                className="display text-3xl"
+              />
+              <EditablePageTitle
+                page="home"
+                slot="clinic_sub"
+                initial={t.clinicSub}
+                as="p"
+                className="mt-1 text-sm text-mist"
+              />
             </div>
           </Link>
         </div>
@@ -98,34 +229,50 @@ export default async function HomePage() {
           <div className="absolute inset-0 bg-black/85" />
         </div>
         <div className="site-shell section-pad relative">
-          <p className="text-sm tracking-[0.22em] text-red uppercase">Our Story</p>
+          <EditablePageTitle
+            page="home"
+            slot="story_eyebrow"
+            initial={t.storyEyebrow}
+            as="p"
+            className="text-sm tracking-[0.22em] text-red uppercase"
+          />
           <EditablePageTitle
             page="home"
             slot="story"
-            initial={story}
+            initial={t.story}
             as="h2"
             className="display mt-2 max-w-3xl text-4xl md:text-6xl"
           />
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
             <div className="space-y-4 text-mist leading-relaxed">
-              <p>
-                <strong className="text-chalk">Mission</strong> – To provide world-class coaching
-                that will enhance the bowling experience to all bowlers and coaches while growing
-                the sport of bowling at all levels on and off the lanes.
-              </p>
-              <p>
-                <strong className="text-chalk">Vision</strong> – To strengthen the bowling community
-                through Education and Coaching.
-              </p>
+              <EditablePageTitle
+                page="home"
+                slot="mission"
+                initial={t.mission}
+                as="p"
+                multiline
+                rows={4}
+                className="leading-relaxed text-mist"
+              />
+              <EditablePageTitle
+                page="home"
+                slot="vision"
+                initial={t.vision}
+                as="p"
+                multiline
+                rows={3}
+                className="leading-relaxed text-mist"
+              />
             </div>
-            <p className="text-mist leading-relaxed">
-              Ballard&apos;s Bowling Academy was created from the love and passion for the sport of
-              bowling. We believe there is a true inner Champion in all of us whether on the lanes
-              or behind the scenes. There are many facets that lead to success and we look to help
-              you develop a plan to achieve your personal goals. At Ballard&apos;s Bowling Academy
-              we look to inspire you to reach your bowling goals as well as use the tools learned
-              to achieve off-lane success as well.
-            </p>
+            <EditablePageTitle
+              page="home"
+              slot="story_body"
+              initial={t.storyBody}
+              as="p"
+              multiline
+              rows={8}
+              className="leading-relaxed text-mist"
+            />
           </div>
         </div>
       </section>
@@ -137,11 +284,23 @@ export default async function HomePage() {
               <Image src={deal.image} alt={deal.title} fill className="object-cover" />
             </div>
             <div className="p-8 md:p-10">
-              <p className="text-sm tracking-[0.2em] text-red uppercase">Deal of the Month</p>
+              <EditablePageTitle
+                page="home"
+                slot="deal_eyebrow"
+                initial={t.dealEyebrow}
+                as="p"
+                className="text-sm tracking-[0.2em] text-red uppercase"
+              />
               <h2 className="display mt-2 text-4xl md:text-5xl">{deal.title}</h2>
               <p className="mt-4 text-mist">{deal.description}</p>
               <Link href="/deals" className="btn btn-primary mt-6">
-                See deals & specials
+                <EditablePageTitle
+                  page="home"
+                  slot="deal_cta"
+                  initial={t.dealCta}
+                  as="span"
+                  className="inline"
+                />
               </Link>
             </div>
           </div>
@@ -151,23 +310,32 @@ export default async function HomePage() {
       <section className="site-shell section-pad pt-0">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm tracking-[0.2em] text-red uppercase">Pro Shop</p>
+            <EditablePageTitle
+              page="home"
+              slot="shop_eyebrow"
+              initial={t.shopEyebrow}
+              as="p"
+              className="text-sm tracking-[0.2em] text-red uppercase"
+            />
             <EditablePageTitle
               page="home"
               slot="featured"
-              initial={featuredTitle}
+              initial={t.featured}
               as="h2"
               className="display text-4xl md:text-5xl"
             />
           </div>
           <Link href="/shop" className="text-sm text-mist underline decoration-red/40">
-            Shop all
+            <EditablePageTitle
+              page="home"
+              slot="shop_link"
+              initial={t.shopLink}
+              as="span"
+              className="inline"
+            />
           </Link>
         </div>
-        <EditableProductGrid
-          initial={[]}
-          filters={{ featuredOnly: true, limit: 4 }}
-        />
+        <EditableProductGrid initial={[]} filters={{ featuredOnly: true, limit: 4 }} />
       </section>
     </>
   );

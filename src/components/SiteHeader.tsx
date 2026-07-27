@@ -76,7 +76,7 @@ export function SiteHeader() {
                   : "bg-red text-white hover:bg-red-deep"
               }`}
             >
-              {editMode ? "Done" : "Edit"}
+              {editMode ? "Done editing" : "Edit all text"}
             </button>
           )}
           <Link
@@ -145,7 +145,7 @@ export function SiteHeader() {
                 }}
                 className="rounded-lg px-3 py-2 text-left text-red"
               >
-                {editMode ? "Done editing" : "Edit pages"}
+                {editMode ? "Done editing" : "Edit all text"}
               </button>
             )}
             {showAdmin && (

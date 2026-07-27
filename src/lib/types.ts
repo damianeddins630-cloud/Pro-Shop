@@ -22,7 +22,7 @@ export const ALL_PERMISSIONS: Permission[] = [
 ];
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
-  edit_pages: "Edit pages (rename / + / −)",
+  edit_pages: "Edit all page text (titles, body, CTAs)",
   manage_inventory: "Manage inventory",
   manage_sponsors: "Manage sponsors",
   manage_deals: "Manage deals",

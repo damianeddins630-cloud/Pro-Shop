@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useEditMode } from "@/lib/edit-mode";
 
 type EditableTextProps = {
@@ -8,6 +8,9 @@ type EditableTextProps = {
   onSave: (next: string) => Promise<void> | void;
   as?: "h1" | "h2" | "h3" | "p" | "span";
   className?: string;
+  /** Use a textarea so longer page copy can be edited */
+  multiline?: boolean;
+  rows?: number;
 };
 
 export function EditableText({
@@ -15,20 +18,52 @@ export function EditableText({
   onSave,
   as = "span",
   className = "",
+  multiline = false,
+  rows = 4,
 }: EditableTextProps) {
   const { editMode: editing } = useEditMode();
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
-  const [activeValue, setActiveValue] = useState(value);
   const Tag = as;
 
-  if (value !== activeValue) {
-    setActiveValue(value);
+  useEffect(() => {
     setDraft(value);
+  }, [value]);
+
+  async function commit() {
+    const next = draft.trim();
+    if (!next || next === value) {
+      setDraft(value);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(next);
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!editing) {
     return <Tag className={className}>{value}</Tag>;
+  }
+
+  if (multiline) {
+    return (
+      <span className="relative block">
+        <textarea
+          className={`field min-h-[6rem] ${className}`}
+          value={draft}
+          rows={rows}
+          disabled={saving}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+        />
+        <span className="mt-1 block text-[11px] tracking-wide text-red/80 uppercase">
+          {saving ? "Saving…" : "Edit text — click away to save"}
+        </span>
+      </span>
+    );
   }
 
   return (
@@ -38,25 +73,16 @@ export function EditableText({
         value={draft}
         disabled={saving}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={async () => {
-          const next = draft.trim();
-          if (!next || next === value) {
-            setDraft(value);
-            return;
-          }
-          setSaving(true);
-          try {
-            await onSave(next);
-          } finally {
-            setSaving(false);
-          }
-        }}
+        onBlur={() => void commit()}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             (e.target as HTMLInputElement).blur();
           }
         }}
       />
+      <span className="mt-1 block text-[11px] tracking-wide text-red/80 uppercase">
+        {saving ? "Saving…" : "Edit text — Enter or click away to save"}
+      </span>
     </span>
   );
 }

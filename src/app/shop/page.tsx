@@ -20,9 +20,15 @@ export default async function ShopPage({
   searchParams: Promise<{ brand?: string; q?: string; category?: string }>;
 }) {
   const params = await searchParams;
-  const [products, title] = await Promise.all([
+  const [products, eyebrow, title, intro] = await Promise.all([
     listProducts(),
+    getText("shop", "eyebrow", "Pro Shop"),
     getText("shop", "title", "Inventory & Gear"),
+    getText(
+      "shop",
+      "intro",
+      "Real products from Ballard's Bowling Academy — balls, bags, Turbo accessories, and coaching services. Inventory is live and admin-managed."
+    ),
   ]);
   const filters = {
     brand: params.brand,
@@ -46,7 +52,13 @@ export default async function ShopPage({
           <div className="flex items-center gap-4">
             <BrandMark mode="cart" size={72} />
             <div>
-              <p className="text-sm tracking-[0.22em] text-red uppercase">Pro Shop</p>
+              <EditablePageTitle
+                page="shop"
+                slot="eyebrow"
+                initial={eyebrow}
+                as="p"
+                className="text-sm tracking-[0.22em] text-red uppercase"
+              />
               <EditablePageTitle
                 page="shop"
                 slot="title"
@@ -56,10 +68,15 @@ export default async function ShopPage({
               />
             </div>
           </div>
-          <p className="mt-4 max-w-2xl text-mist">
-            Real products from Ballard&apos;s Bowling Academy — balls, bags, Turbo accessories,
-            and coaching services. Inventory is live and admin-managed.
-          </p>
+          <EditablePageTitle
+            page="shop"
+            slot="intro"
+            initial={intro}
+            as="p"
+            multiline
+            rows={3}
+            className="mt-4 max-w-2xl text-mist"
+          />
         </div>
       </section>
 
@@ -119,10 +136,7 @@ export default async function ShopPage({
           </p>
         )}
 
-        <EditableProductGrid
-          initial={[]}
-          filters={filters}
-        />
+        <EditableProductGrid initial={[]} filters={filters} />
       </section>
     </>
   );

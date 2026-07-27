@@ -4,7 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 
-export function HeroSlider({ heroTitle = "Perfect Your Game" }: { heroTitle?: string }) {
+export function HeroSlider({
+  heroTitle = "Perfect Your Game",
+  heroSub = "Hall of Fame coaching and a state-of-the-art pro shop.",
+  ctaPrimary = "Book a Lesson →",
+  ctaSecondary = "Shop gear →",
+}: {
+  heroTitle?: string;
+  heroSub?: string;
+  ctaPrimary?: string;
+  ctaSecondary?: string;
+}) {
   return (
     <section className="relative min-h-[100svh] overflow-hidden">
       <div className="absolute inset-0">
@@ -39,15 +49,33 @@ export function HeroSlider({ heroTitle = "Perfect Your Game" }: { heroTitle?: st
           as="h1"
           className="display fade-up max-w-3xl text-5xl text-white md:text-7xl lg:text-8xl"
         />
-        <p className="fade-up-delay mt-5 max-w-xl text-base text-mist md:text-lg">
-          Hall of Fame coaching and a state-of-the-art pro shop.
-        </p>
+        <EditablePageTitle
+          page="home"
+          slot="hero_sub"
+          initial={heroSub}
+          as="p"
+          multiline
+          rows={2}
+          className="fade-up-delay mt-5 max-w-xl text-base text-mist md:text-lg"
+        />
         <div className="fade-up-delay mt-8 flex flex-wrap gap-3">
           <Link href="/coaching" className="btn btn-primary">
-            Book a Lesson →
+            <EditablePageTitle
+              page="home"
+              slot="hero_cta_primary"
+              initial={ctaPrimary}
+              as="span"
+              className="inline"
+            />
           </Link>
           <Link href="/shop" className="btn btn-ghost">
-            Shop gear →
+            <EditablePageTitle
+              page="home"
+              slot="hero_cta_secondary"
+              initial={ctaSecondary}
+              as="span"
+              className="inline"
+            />
           </Link>
         </div>
       </div>
