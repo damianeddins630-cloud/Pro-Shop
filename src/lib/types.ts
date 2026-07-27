@@ -39,6 +39,11 @@ export interface Role {
   description: string;
   permissions: Permission[];
   system?: boolean;
+  /**
+   * Higher = more authority.
+   * Website Owner is 100 and locked. Actors can only manage roles/users below their rank.
+   */
+  rank?: number;
 }
 
 /** @deprecated use roleId — kept for migration */

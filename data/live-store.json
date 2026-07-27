@@ -711,14 +711,16 @@
         "view_orders",
         "manage_orders"
       ],
-      "system": true
+      "system": true,
+      "rank": 100
     },
     {
       "id": "role_customer",
       "name": "Customer",
       "description": "Shop and place orders",
       "permissions": [],
-      "system": true
+      "system": true,
+      "rank": 0
     },
     {
       "id": "role_staff",
@@ -732,7 +734,8 @@
         "manage_coaches",
         "view_orders"
       ],
-      "system": false
+      "system": false,
+      "rank": 50
     }
   ],
   "orders": [],

@@ -32,6 +32,18 @@ import {
   normalizeCouponCode,
   OWNER_FREE_COUPON_CODE,
 } from "./coupons";
+import {
+  CUSTOM_ROLE_RANK_DEFAULT,
+  CUSTOMER_ROLE_ID,
+  CUSTOMER_ROLE_RANK,
+  isOwnerRole,
+  normalizeRole,
+  OWNER_ROLE_ID,
+  OWNER_ROLE_RANK,
+  roleRank,
+  STAFF_ROLE_ID,
+  STAFF_ROLE_RANK,
+} from "./role-rank";
 
 const GLOBAL_KEY = "__bba_store_v6__";
 
@@ -69,21 +81,23 @@ function runtimePath() {
 function defaultRoles(): Role[] {
   return [
     {
-      id: "role_admin",
+      id: OWNER_ROLE_ID,
       name: "Website Owner",
-      description: "Full website owner access",
+      description: "Full website owner access — locked top rank",
       permissions: [...ALL_PERMISSIONS],
       system: true,
+      rank: OWNER_ROLE_RANK,
     },
     {
-      id: "role_customer",
+      id: CUSTOMER_ROLE_ID,
       name: "Customer",
       description: "Shop and place orders",
       permissions: [],
       system: true,
+      rank: CUSTOMER_ROLE_RANK,
     },
     {
-      id: "role_staff",
+      id: STAFF_ROLE_ID,
       name: "Staff",
       description: "Edit pages and manage shop content",
       permissions: [
@@ -95,8 +109,24 @@ function defaultRoles(): Role[] {
         "view_orders",
       ],
       system: false,
+      rank: STAFF_ROLE_RANK,
     },
   ];
+}
+
+function ensureRoleRanks(data: StoreData) {
+  data.roles = (data.roles || []).map(normalizeRole);
+  // Guarantee Website Owner + Customer exist
+  if (!data.roles.some((r) => r.id === OWNER_ROLE_ID || isOwnerRole(r))) {
+    data.roles.unshift(defaultRoles()[0]);
+  } else {
+    data.roles = data.roles.map((r) =>
+      isOwnerRole(r) ? normalizeRole({ ...r, id: OWNER_ROLE_ID }) : r
+    );
+  }
+  if (!data.roles.some((r) => r.id === CUSTOMER_ROLE_ID)) {
+    data.roles.push(defaultRoles()[1]);
+  }
 }
 
 function cloneSeed(): StoreData {
@@ -191,24 +221,18 @@ function isOwnerUser(u: { id: string; username: string; email: string }) {
 async function ensureAdmin(data: StoreData): Promise<void> {
   data.roles = data.roles?.length ? data.roles : defaultRoles();
   data.orders = data.orders || [];
+  ensureRoleRanks(data);
   ensureCoupons(data);
 
   // Owner role always titled Website Owner with full permissions
   let adminRole =
-    data.roles.find((r) => r.id === "role_admin") ||
-    data.roles.find((r) => {
-      const n = r.name.toLowerCase();
-      return n === "website owner" || n === "admin";
-    });
+    data.roles.find((r) => r.id === OWNER_ROLE_ID) ||
+    data.roles.find((r) => isOwnerRole(r));
   if (!adminRole) {
     adminRole = defaultRoles()[0];
     data.roles.unshift(adminRole);
   } else {
-    adminRole.id = "role_admin";
-    adminRole.name = "Website Owner";
-    adminRole.description = "Full website owner access";
-    adminRole.permissions = [...ALL_PERMISSIONS];
-    adminRole.system = true;
+    Object.assign(adminRole, normalizeRole(adminRole));
   }
 
   data.users = migrateUsers(data.users || [], data.roles);
@@ -406,49 +430,108 @@ export async function resolveUserRole(user: User): Promise<Role> {
 }
 
 export async function listRoles() {
-  return (await getStore()).roles;
+  const data = await getStore();
+  ensureRoleRanks(data);
+  return [...data.roles].sort((a, b) => roleRank(b) - roleRank(a));
 }
 
-export async function createRole(input: Omit<Role, "id" | "system">) {
+export async function createRole(
+  input: Omit<Role, "id" | "system"> & { rank?: number },
+  opts?: { actorRank: number }
+) {
+  const actorRank = opts?.actorRank ?? OWNER_ROLE_RANK;
   let created: Role | null = null;
   await mutate((data) => {
+    ensureRoleRanks(data);
+    const requested =
+      typeof input.rank === "number" ? Math.floor(input.rank) : CUSTOM_ROLE_RANK_DEFAULT;
+    const rank = Math.max(1, Math.min(actorRank - 1, requested));
+    if (rank >= actorRank) {
+      throw new Error("You cannot create a role at or above your own rank");
+    }
     created = {
       id: randomUUID(),
       name: input.name,
       description: input.description || "",
       permissions: input.permissions || [],
       system: false,
+      rank,
     };
     data.roles.push(created);
   });
   return created!;
 }
 
-export async function updateRole(id: string, patch: Partial<Role>) {
+export async function updateRole(
+  id: string,
+  patch: Partial<Role>,
+  opts?: { actorRank: number }
+) {
+  const actorRank = opts?.actorRank ?? OWNER_ROLE_RANK;
   let updated: Role | null = null;
   await mutate((data) => {
+    ensureRoleRanks(data);
     const idx = data.roles.findIndex((r) => r.id === id);
     if (idx === -1) return;
-    const current = data.roles[idx];
-    data.roles[idx] = {
+    const current = normalizeRole(data.roles[idx]);
+
+    if (isOwnerRole(current)) {
+      // Website Owner permissions/rank/name cannot be taken away
+      if (
+        patch.permissions ||
+        (patch.name && patch.name !== "Website Owner") ||
+        typeof patch.rank === "number" ||
+        patch.system === false
+      ) {
+        throw new Error(
+          "Website Owner permissions and rank are locked and cannot be changed"
+        );
+      }
+      data.roles[idx] = normalizeRole({
+        ...current,
+        description:
+          patch.description !== undefined ? patch.description : current.description,
+      });
+      updated = data.roles[idx];
+      return;
+    }
+
+    if (roleRank(current) >= actorRank) {
+      throw new Error("You cannot edit a role at or above your own rank");
+    }
+
+    let nextRank = current.rank ?? CUSTOM_ROLE_RANK_DEFAULT;
+    if (typeof patch.rank === "number") {
+      nextRank = Math.max(1, Math.min(actorRank - 1, Math.floor(patch.rank)));
+    }
+
+    data.roles[idx] = normalizeRole({
       ...current,
       ...patch,
       id,
       system: current.system,
+      rank: nextRank,
       permissions: patch.permissions || current.permissions,
-    };
+    });
     updated = data.roles[idx];
   });
   return updated;
 }
 
-export async function deleteRole(id: string) {
+export async function deleteRole(id: string, opts?: { actorRank: number }) {
+  const actorRank = opts?.actorRank ?? OWNER_ROLE_RANK;
   let ok = false;
   await mutate((data) => {
+    ensureRoleRanks(data);
     const role = data.roles.find((r) => r.id === id);
-    if (!role || role.system) return;
+    if (!role || role.system || isOwnerRole(role)) {
+      throw new Error("Cannot delete this role");
+    }
+    if (roleRank(role) >= actorRank) {
+      throw new Error("You cannot delete a role at or above your own rank");
+    }
     const customer =
-      data.roles.find((r) => r.id === "role_customer") || data.roles[1];
+      data.roles.find((r) => r.id === CUSTOMER_ROLE_ID) || data.roles[1];
     data.users = data.users.map((u) =>
       u.roleId === id ? { ...u, roleId: customer.id } : u
     );
@@ -463,12 +546,45 @@ export async function listUsers() {
   return (await getStore()).users;
 }
 
-export async function updateUser(id: string, patch: Partial<User>) {
+export async function updateUser(
+  id: string,
+  patch: Partial<User>,
+  opts?: { actorRank: number; actorUserId?: string }
+) {
+  const actorRank = opts?.actorRank ?? OWNER_ROLE_RANK;
   let updated: User | null = null;
   await mutate((data) => {
+    ensureRoleRanks(data);
     const idx = data.users.findIndex((u) => u.id === id);
     if (idx === -1) return;
-    data.users[idx] = { ...data.users[idx], ...patch, id };
+    const current = data.users[idx];
+
+    // Website owner account role cannot be changed
+    if (
+      current.id === OWNER_USER_ID ||
+      current.username.toLowerCase() === OWNER_USERNAME.toLowerCase() ||
+      current.email.toLowerCase() === OWNER_EMAIL
+    ) {
+      if (patch.roleId && patch.roleId !== OWNER_ROLE_ID) {
+        throw new Error("The Website Owner account role cannot be changed");
+      }
+      patch = { ...patch, roleId: OWNER_ROLE_ID };
+    }
+
+    if (patch.roleId) {
+      const targetRole = data.roles.find((r) => r.id === patch.roleId);
+      if (!targetRole) throw new Error("Role not found");
+      if (roleRank(targetRole) >= actorRank) {
+        throw new Error("You cannot assign a role at or above your own rank");
+      }
+      // Cannot demote/change users who currently outrank you
+      const currentRole = data.roles.find((r) => r.id === current.roleId);
+      if (roleRank(currentRole) >= actorRank && current.id !== opts?.actorUserId) {
+        throw new Error("You cannot change a user at or above your own rank");
+      }
+    }
+
+    data.users[idx] = { ...current, ...patch, id };
     updated = data.users[idx];
   });
   return updated;
