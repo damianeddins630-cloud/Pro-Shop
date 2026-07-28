@@ -17,7 +17,7 @@ const cards = [
   {
     href: "/ops/coupons",
     title: "Coupons",
-    text: "Add, edit, or remove redeem codes and set how many times each can be used.",
+    text: "Add, edit, or remove any redeem code and set how many times each can be used.",
   },
   {
     href: "/ops/sponsors",

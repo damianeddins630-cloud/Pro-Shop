@@ -186,7 +186,7 @@ export interface Coupon {
   maxUses: number;
   /** How many times this code has been used at checkout */
   usedCount: number;
-  /** Built-in coupons (owner free code) can't be deleted */
+  /** Optional label for built-in starter coupons — all coupons can be edited/removed */
   system?: boolean;
 }
 

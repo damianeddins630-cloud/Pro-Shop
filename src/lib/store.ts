@@ -147,20 +147,6 @@ function cloneSeed(): StoreData {
   return seed;
 }
 
-function ownerFreeCoupon(): Coupon {
-  return {
-    id: "coupon_cityviewlanes",
-    code: OWNER_FREE_COUPON_CODE,
-    description: "City View Lanes / owner free order code",
-    type: "free",
-    value: 100,
-    active: true,
-    maxUses: 0,
-    usedCount: 0,
-    system: true,
-  };
-}
-
 function normalizeCoupon(c: Coupon): Coupon {
   return {
     ...c,
@@ -174,23 +160,14 @@ function normalizeCoupon(c: Coupon): Coupon {
 }
 
 function ensureCoupons(data: StoreData) {
+  // Normalize only — do NOT recreate deleted coupons (including the owner free code).
   data.coupons = (data.coupons || []).map(normalizeCoupon);
-  const existing = data.coupons.find((c) =>
-    codesMatch(c.code, OWNER_FREE_COUPON_CODE)
-  );
-  if (existing) {
-    existing.code = OWNER_FREE_COUPON_CODE;
-    existing.type = "free";
-    existing.value = 100;
-    existing.active = true;
-    existing.system = true;
-    existing.description =
-      existing.description || "City View Lanes / owner free order code";
-    existing.id = existing.id || "coupon_cityviewlanes";
-    existing.maxUses = couponMaxUses(existing);
-    existing.usedCount = couponUsedCount(existing);
-  } else {
-    data.coupons.unshift(ownerFreeCoupon());
+  for (const c of data.coupons) {
+    if (codesMatch(c.code, OWNER_FREE_COUPON_CODE)) {
+      // Keep a stable id/label if the owner code is still present; never force it back.
+      c.id = c.id || "coupon_cityviewlanes";
+      c.code = OWNER_FREE_COUPON_CODE;
+    }
   }
 }
 
@@ -950,10 +927,8 @@ export async function updateCoupon(id: string, patch: Partial<Coupon>) {
     ) {
       throw new Error("That coupon code already exists");
     }
-    const nextType = current.system ? "free" : patch.type || current.type;
-    let nextValue = current.system
-      ? 100
-      : Number(patch.value ?? current.value);
+    const nextType = patch.type || current.type;
+    let nextValue = Number(patch.value ?? current.value);
     if (Number.isNaN(nextValue) || nextValue < 0) {
       throw new Error("Coupon value must be a number 0 or greater");
     }
@@ -977,16 +952,15 @@ export async function updateCoupon(id: string, patch: Partial<Coupon>) {
           ? patch.description.trim()
           : current.description,
       id: current.id,
-      code: current.system ? OWNER_FREE_COUPON_CODE : nextCode,
+      code: nextCode,
       type: nextType,
       value: nextValue,
       active: typeof patch.active === "boolean" ? patch.active : current.active,
       maxUses: nextMaxUses,
       usedCount: nextUsedCount,
+      // Keep system flag only as a label; coupons are fully editable/removable
       system: current.system,
     });
-    // System free code always stays redeemable
-    if (next.system) next.active = true;
     store.coupons![idx] = next;
     updated = next;
   });
@@ -1001,11 +975,6 @@ export async function deleteCoupon(id: string) {
     ensureCoupons(store);
     const target = (store.coupons || []).find((c) => c.id === id);
     if (!target) return;
-    if (target.system) {
-      throw new Error(
-        "Cannot remove the owner free coupon (cityviewlanes.com). You can still set how many times it can be used."
-      );
-    }
     removedCode = target.code;
     const before = store.coupons!.length;
     store.coupons = store.coupons!.filter((c) => c.id !== id);
