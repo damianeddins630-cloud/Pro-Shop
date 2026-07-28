@@ -9,7 +9,7 @@ type Props = {
 
 /**
  * Full-bleed photo + logo treatment for login / Operations.
- * Ops uses a custom animated bowling-ball GIF with the academy logo.
+ * Ops uses a custom Ballard's logo bowling ball for mark + background.
  */
 export function BrandedPageBackdrop({ children, tone = "auth" }: Props) {
   return (
@@ -17,25 +17,26 @@ export function BrandedPageBackdrop({ children, tone = "auth" }: Props) {
       <div className="pointer-events-none absolute inset-0">
         {tone === "ops" ? (
           <>
-            <Image
-              src="/images/ops-ball-bg.gif"
-              alt=""
-              fill
-              priority
-              unoptimized
-              className="object-cover object-center"
-              sizes="100vw"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/30" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/45" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(225,6,0,0.2),transparent_55%)]" />
-            <div className="absolute right-4 top-20 opacity-35 md:right-10 md:top-28">
+            <div className="ops-ball-bg absolute inset-[-4%]">
+              <Image
+                src="/images/ops-ball-bg.jpg"
+                alt=""
+                fill
+                priority
+                className="object-cover object-center"
+                sizes="100vw"
+              />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-black/82 via-black/52 to-black/38" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-transparent to-black/52" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(225,6,0,0.24),transparent_58%)]" />
+            <div className="ops-ball-float absolute right-3 top-16 opacity-80 md:right-8 md:top-24">
               <Image
                 src="/images/ops-logo.gif"
                 alt=""
                 width={280}
                 height={280}
-                className="h-auto w-[140px] object-contain md:w-[220px]"
+                className="h-auto w-[130px] object-contain drop-shadow-[0_0_30px_rgba(225,6,0,0.5)] md:w-[210px]"
                 unoptimized
                 priority
               />
