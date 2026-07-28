@@ -30,14 +30,13 @@ export function BrandedPageBackdrop({ children, tone = "auth" }: Props) {
             <div className="absolute inset-0 bg-gradient-to-r from-black/82 via-black/52 to-black/38" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-transparent to-black/52" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(225,6,0,0.24),transparent_58%)]" />
-            <div className="ops-ball-float absolute right-3 top-16 opacity-80 md:right-8 md:top-24">
+            <div className="ops-ball-float absolute right-3 top-16 opacity-85 md:right-8 md:top-24">
               <Image
-                src="/images/ops-logo.gif"
+                src="/images/ops-logo.png"
                 alt=""
                 width={280}
                 height={280}
                 className="h-auto w-[130px] object-contain drop-shadow-[0_0_30px_rgba(225,6,0,0.5)] md:w-[210px]"
-                unoptimized
                 priority
               />
             </div>
