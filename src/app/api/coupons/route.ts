@@ -29,6 +29,8 @@ const createSchema = z.object({
   type: z.enum(["percent", "fixed", "free"]),
   value: z.coerce.number().min(0).default(0),
   active: z.boolean().optional(),
+  /** 0 = unlimited */
+  maxUses: z.coerce.number().int().min(0).default(0),
 });
 
 export async function POST(req: Request) {
@@ -48,6 +50,7 @@ export async function POST(req: Request) {
       type: body.type,
       value: body.type === "free" ? 100 : body.value,
       active: body.active ?? true,
+      maxUses: body.maxUses,
     });
     return NextResponse.json(
       { coupon: result.coupon, coupons: result.coupons },

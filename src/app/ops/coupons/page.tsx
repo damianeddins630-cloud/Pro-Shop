@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { couponLabel } from "@/lib/coupons";
+import { couponLabel, couponUsesLabel } from "@/lib/coupons";
 import type { Coupon, CouponType } from "@/lib/types";
 
 const empty = {
@@ -9,6 +9,7 @@ const empty = {
   description: "",
   type: "percent" as CouponType,
   value: "10",
+  maxUses: "0",
   active: true,
 };
 
@@ -59,6 +60,7 @@ export default function OpsCouponsPage() {
       description: c.description,
       type: c.type,
       value: String(c.value),
+      maxUses: String(c.maxUses ?? 0),
       active: c.active,
     });
     setError("");
@@ -83,8 +85,7 @@ export default function OpsCouponsPage() {
       return;
     }
 
-    const value =
-      form.type === "free" ? 100 : Number(form.value);
+    const value = form.type === "free" ? 100 : Number(form.value);
     if (form.type !== "free" && (Number.isNaN(value) || value < 0)) {
       setError("Value must be a number 0 or greater");
       return;
@@ -94,11 +95,18 @@ export default function OpsCouponsPage() {
       return;
     }
 
+    const maxUses = Math.max(0, Math.floor(Number(form.maxUses) || 0));
+    if (Number.isNaN(Number(form.maxUses)) || Number(form.maxUses) < 0) {
+      setError("Times it can be used must be 0 or a whole number");
+      return;
+    }
+
     const payload = {
       code,
       description: form.description,
       type: form.type,
       value,
+      maxUses,
       active: form.active,
     };
 
@@ -135,10 +143,16 @@ export default function OpsCouponsPage() {
 
   async function remove(c: Coupon) {
     if (c.system) {
-      setError("The owner free coupon cannot be deleted.");
+      setError(
+        "cityviewlanes.com is the owner free code and cannot be removed. You can still set how many times it can be used."
+      );
       return;
     }
-    if (!confirm(`Delete coupon "${c.code}"? Customers will no longer be able to use it.`)) {
+    if (
+      !confirm(
+        `Remove coupon "${c.code}"?\n\nCustomers will no longer be able to use it.`
+      )
+    ) {
       return;
     }
     setError("");
@@ -151,10 +165,10 @@ export default function OpsCouponsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Delete failed");
+        setError(data.error || "Remove failed");
         return;
       }
-      setMessage(`Deleted "${c.code}".`);
+      setMessage(`Removed "${c.code}".`);
       if (editingId === c.id) {
         setEditingId(null);
         setForm(empty);
@@ -165,7 +179,34 @@ export default function OpsCouponsPage() {
         await load();
       }
     } catch {
-      setError("Delete failed — check your connection and try again.");
+      setError("Remove failed — check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetUses(c: Coupon) {
+    if (!confirm(`Reset used count for "${c.code}" back to 0?`)) return;
+    setError("");
+    setMessage("");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/coupons/${c.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ usedCount: 0 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not reset uses");
+        return;
+      }
+      setMessage(`Reset uses for "${c.code}".`);
+      if (Array.isArray(data.coupons)) setCoupons(data.coupons);
+      else await load();
+    } catch {
+      setError("Could not reset uses.");
     } finally {
       setBusy(false);
     }
@@ -191,11 +232,8 @@ export default function OpsCouponsPage() {
       setMessage(
         !c.active ? `"${c.code}" is now active.` : `"${c.code}" is now inactive.`
       );
-      if (Array.isArray(data.coupons)) {
-        setCoupons(data.coupons);
-      } else {
-        await load();
-      }
+      if (Array.isArray(data.coupons)) setCoupons(data.coupons);
+      else await load();
       if (editingId === c.id && data.coupon) {
         setForm((f) => ({ ...f, active: Boolean(data.coupon.active) }));
       }
@@ -212,7 +250,8 @@ export default function OpsCouponsPage() {
     <div>
       <h2 className="display text-4xl">Coupons</h2>
       <p className="mt-1 text-sm text-mist">
-        Add, edit, or delete redeem codes for the cart. The locked owner free code is{" "}
+        Add, edit, or remove redeem codes. Set how many times each code can be
+        used (0 = unlimited). Owner free code stays locked:{" "}
         <span className="text-red">cityviewlanes.com</span>.
       </p>
       {(message || error) && (
@@ -231,7 +270,8 @@ export default function OpsCouponsPage() {
           </h3>
           {editingIsSystem && (
             <p className="text-xs text-mist">
-              System coupon: code and discount stay locked. You can still update the note.
+              System coupon: code and discount stay locked. You can change the
+              note and how many times it can be used.
             </p>
           )}
           <label className="block text-xs uppercase tracking-wide text-mist">
@@ -288,6 +328,26 @@ export default function OpsCouponsPage() {
               />
             </label>
           )}
+          <label className="block text-xs uppercase tracking-wide text-mist">
+            How many times it can be used
+            <input
+              className="field mt-1"
+              inputMode="numeric"
+              placeholder="0 = unlimited"
+              value={form.maxUses}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  maxUses: e.target.value.replace(/[^0-9]/g, ""),
+                })
+              }
+              disabled={busy}
+            />
+            <span className="mt-1 block text-[11px] normal-case tracking-normal text-mist/80">
+              Enter 0 for unlimited. Example: 10 means only 10 checkouts can use
+              this code.
+            </span>
+          </label>
           {!editingIsSystem && (
             <label className="flex items-center gap-2 text-sm text-mist">
               <input
@@ -328,7 +388,7 @@ export default function OpsCouponsPage() {
               className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-chalk">{c.code}</p>
                   <p className="text-sm text-red">{couponLabel(c)}</p>
                   {c.description ? (
@@ -338,36 +398,51 @@ export default function OpsCouponsPage() {
                     {c.active ? "Active" : "Inactive"}
                     {c.system ? " · Locked system coupon" : ""}
                   </p>
+                  <p className="mt-1 text-xs text-chalk/80">
+                    {couponUsesLabel(c)}
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="text-sm text-red underline disabled:opacity-40"
-                    onClick={() => startEdit(c)}
-                    disabled={busy}
-                  >
-                    Edit
-                  </button>
-                  {!c.system && (
-                    <>
+                <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-ghost text-sm"
+                      onClick={() => startEdit(c)}
+                      disabled={busy}
+                    >
+                      Edit
+                    </button>
+                    {!c.system && (
                       <button
                         type="button"
-                        className="text-sm text-mist underline disabled:opacity-40"
+                        className="btn btn-ghost text-sm"
                         onClick={() => toggleActive(c)}
                         disabled={busy}
                       >
                         {c.active ? "Deactivate" : "Activate"}
                       </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-ghost text-sm"
+                      onClick={() => resetUses(c)}
+                      disabled={busy || !(c.usedCount > 0)}
+                    >
+                      Reset uses
+                    </button>
+                    {!c.system && (
                       <button
                         type="button"
-                        className="text-sm text-red-300 underline disabled:opacity-40"
+                        className="btn btn-primary text-sm"
                         onClick={() => remove(c)}
                         disabled={busy}
                       >
-                        Delete
+                        Remove
                       </button>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

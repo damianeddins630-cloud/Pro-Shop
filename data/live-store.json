@@ -761,7 +761,9 @@
       "type": "free",
       "value": 100,
       "active": true,
-      "system": true
+      "system": true,
+      "maxUses": 0,
+      "usedCount": 0
     }
   ]
 }

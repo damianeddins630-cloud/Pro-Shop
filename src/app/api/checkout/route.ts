@@ -5,9 +5,11 @@ import { applyCouponToTotal, couponLabel } from "@/lib/coupons";
 import {
   createOrder,
   findCouponByCode,
+  getCouponRedeemBlockReason,
   getInventoryUpdatedAt,
   getProduct,
   listProducts,
+  recordCouponUse,
   reduceStock,
   updateOrder,
 } from "@/lib/store";
@@ -78,10 +80,10 @@ export async function POST(req: Request) {
     if (body.couponCode?.trim()) {
       const coupon = await findCouponByCode(body.couponCode);
       if (!coupon) {
-        return NextResponse.json(
-          { error: "Coupon not found or inactive" },
-          { status: 400 }
-        );
+        const reason =
+          (await getCouponRedeemBlockReason(body.couponCode)) ||
+          "Coupon not found or inactive";
+        return NextResponse.json({ error: reason }, { status: 400 });
       }
       const applied = applyCouponToTotal(subtotal, coupon);
       discountAmount = applied.discountAmount;
@@ -92,6 +94,9 @@ export async function POST(req: Request) {
 
     // Always take stock when an order is placed, and always create an order record
     await reduceStock(body.items);
+    if (appliedCode) {
+      await recordCouponUse(appliedCode);
+    }
 
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||

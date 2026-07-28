@@ -182,6 +182,10 @@ export interface Coupon {
   /** Percent 0–100, or fixed dollar amount. Ignored when type is free. */
   value: number;
   active: boolean;
+  /** Max successful checkouts. 0 = unlimited */
+  maxUses: number;
+  /** How many times this code has been used at checkout */
+  usedCount: number;
   /** Built-in coupons (owner free code) can't be deleted */
   system?: boolean;
 }

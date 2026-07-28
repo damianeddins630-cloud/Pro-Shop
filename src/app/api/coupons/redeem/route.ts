@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { applyCouponToTotal, couponLabel } from "@/lib/coupons";
-import { findCouponByCode } from "@/lib/store";
+import {
+  applyCouponToTotal,
+  couponLabel,
+  couponUsesLabel,
+} from "@/lib/coupons";
+import {
+  findCouponByCode,
+  getCouponRedeemBlockReason,
+} from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +23,10 @@ export async function POST(req: Request) {
     const body = schema.parse(await req.json());
     const coupon = await findCouponByCode(body.code);
     if (!coupon) {
-      return NextResponse.json(
-        { error: "Coupon not found or inactive" },
-        { status: 404 }
-      );
+      const reason =
+        (await getCouponRedeemBlockReason(body.code)) ||
+        "Coupon not found or inactive";
+      return NextResponse.json({ error: reason }, { status: 404 });
     }
     const { discountAmount, total } = applyCouponToTotal(body.subtotal, coupon);
     return NextResponse.json({
@@ -29,6 +36,9 @@ export async function POST(req: Request) {
         description: coupon.description,
         type: coupon.type,
         label: couponLabel(coupon),
+        usesLabel: couponUsesLabel(coupon),
+        maxUses: coupon.maxUses,
+        usedCount: coupon.usedCount,
       },
       subtotal: body.subtotal,
       discountAmount,

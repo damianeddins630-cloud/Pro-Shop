@@ -29,6 +29,9 @@ import {
 import { githubWriteConfigured } from "./github-store";
 import {
   codesMatch,
+  couponHasUsesLeft,
+  couponMaxUses,
+  couponUsedCount,
   normalizeCouponCode,
   OWNER_FREE_COUPON_CODE,
 } from "./coupons";
@@ -152,12 +155,26 @@ function ownerFreeCoupon(): Coupon {
     type: "free",
     value: 100,
     active: true,
+    maxUses: 0,
+    usedCount: 0,
     system: true,
   };
 }
 
+function normalizeCoupon(c: Coupon): Coupon {
+  return {
+    ...c,
+    description: c.description || "",
+    value: Number(c.value) || 0,
+    active: c.active !== false,
+    maxUses: couponMaxUses(c),
+    usedCount: couponUsedCount(c),
+    system: Boolean(c.system),
+  };
+}
+
 function ensureCoupons(data: StoreData) {
-  data.coupons = data.coupons || [];
+  data.coupons = (data.coupons || []).map(normalizeCoupon);
   const existing = data.coupons.find((c) =>
     codesMatch(c.code, OWNER_FREE_COUPON_CODE)
   );
@@ -170,6 +187,8 @@ function ensureCoupons(data: StoreData) {
     existing.description =
       existing.description || "City View Lanes / owner free order code";
     existing.id = existing.id || "coupon_cityviewlanes";
+    existing.maxUses = couponMaxUses(existing);
+    existing.usedCount = couponUsedCount(existing);
   } else {
     data.coupons.unshift(ownerFreeCoupon());
   }
@@ -276,7 +295,11 @@ function mergeWithSeed(parsed: StoreData): StoreData {
   parsed.orders = parsed.orders || [];
   parsed.subscribers = parsed.subscribers || [];
   parsed.users = parsed.users || [];
-  parsed.coupons = parsed.coupons?.length ? parsed.coupons : seed.coupons || [];
+  // Keep an empty coupons list if ops deleted every custom code — only
+  // fall back to seed when the field is missing entirely.
+  parsed.coupons = Array.isArray(parsed.coupons)
+    ? parsed.coupons
+    : seed.coupons || [];
   ensureCoupons(parsed);
   return parsed;
 }
@@ -843,11 +866,33 @@ export async function findCouponByCode(code: string) {
   const key = normalizeCouponCode(code);
   if (!key) return null;
   const coupons = await listCoupons();
-  return coupons.find((c) => c.active && codesMatch(c.code, key)) || null;
+  const coupon =
+    coupons.find((c) => c.active && codesMatch(c.code, key)) || null;
+  if (!coupon) return null;
+  if (!couponHasUsesLeft(coupon)) return null;
+  return coupon;
+}
+
+/** Why a code cannot be redeemed (for clearer cart errors) */
+export async function getCouponRedeemBlockReason(code: string) {
+  const key = normalizeCouponCode(code);
+  if (!key) return "Enter a coupon code";
+  const coupons = await listCoupons();
+  const coupon = coupons.find((c) => codesMatch(c.code, key));
+  if (!coupon) return "Coupon not found";
+  if (!coupon.active) return "This coupon is inactive";
+  if (!couponHasUsesLeft(coupon)) {
+    return "This coupon has reached its use limit";
+  }
+  return null;
 }
 
 export async function createCoupon(
-  input: Omit<Coupon, "id" | "system"> & { system?: boolean }
+  input: Omit<Coupon, "id" | "system" | "usedCount"> & {
+    system?: boolean;
+    usedCount?: number;
+    maxUses?: number;
+  }
 ) {
   const code = normalizeCouponCode(input.code);
   if (!code) throw new Error("Coupon code is required");
@@ -863,21 +908,24 @@ export async function createCoupon(
       throw new Error("Percent coupons cannot be over 100");
     }
   }
+  const maxUses = couponMaxUses({ maxUses: Number(input.maxUses) || 0 });
   let created: Coupon | null = null;
   const data = await mutate((store) => {
     ensureCoupons(store);
     if ((store.coupons || []).some((c) => codesMatch(c.code, code))) {
       throw new Error("That coupon code already exists");
     }
-    created = {
+    created = normalizeCoupon({
       id: randomUUID(),
       code,
       description: (input.description || "").trim(),
       type: input.type,
       value: input.type === "free" ? 100 : Number(input.value) || 0,
       active: input.active ?? true,
+      maxUses,
+      usedCount: Math.max(0, Math.floor(Number(input.usedCount) || 0)),
       system: Boolean(input.system),
-    };
+    });
     store.coupons = store.coupons || [];
     store.coupons.unshift(created);
   });
@@ -902,9 +950,7 @@ export async function updateCoupon(id: string, patch: Partial<Coupon>) {
     ) {
       throw new Error("That coupon code already exists");
     }
-    const nextType = current.system
-      ? "free"
-      : patch.type || current.type;
+    const nextType = current.system ? "free" : patch.type || current.type;
     let nextValue = current.system
       ? 100
       : Number(patch.value ?? current.value);
@@ -915,7 +961,16 @@ export async function updateCoupon(id: string, patch: Partial<Coupon>) {
     if (nextType === "percent" && nextValue > 100) {
       throw new Error("Percent coupons cannot be over 100");
     }
-    const next: Coupon = {
+    const nextMaxUses =
+      typeof patch.maxUses === "number"
+        ? couponMaxUses({ maxUses: patch.maxUses })
+        : current.maxUses;
+    const nextUsedCount =
+      typeof patch.usedCount === "number"
+        ? Math.max(0, Math.floor(patch.usedCount))
+        : current.usedCount;
+
+    const next: Coupon = normalizeCoupon({
       ...current,
       description:
         typeof patch.description === "string"
@@ -926,8 +981,10 @@ export async function updateCoupon(id: string, patch: Partial<Coupon>) {
       type: nextType,
       value: nextValue,
       active: typeof patch.active === "boolean" ? patch.active : current.active,
+      maxUses: nextMaxUses,
+      usedCount: nextUsedCount,
       system: current.system,
-    };
+    });
     // System free code always stays redeemable
     if (next.system) next.active = true;
     store.coupons![idx] = next;
@@ -939,16 +996,44 @@ export async function updateCoupon(id: string, patch: Partial<Coupon>) {
 
 export async function deleteCoupon(id: string) {
   let ok = false;
+  let removedCode = "";
   const data = await mutate((store) => {
     ensureCoupons(store);
     const target = (store.coupons || []).find((c) => c.id === id);
     if (!target) return;
-    if (target.system) throw new Error("Cannot remove the owner free coupon");
+    if (target.system) {
+      throw new Error(
+        "Cannot remove the owner free coupon (cityviewlanes.com). You can still set how many times it can be used."
+      );
+    }
+    removedCode = target.code;
     const before = store.coupons!.length;
     store.coupons = store.coupons!.filter((c) => c.id !== id);
     ok = store.coupons.length < before;
   });
-  return { ok, coupons: [...(data.coupons || [])] };
+  return { ok, removedCode, coupons: [...(data.coupons || [])] };
+}
+
+/** Count one successful checkout redemption for a coupon code */
+export async function recordCouponUse(code: string) {
+  const key = normalizeCouponCode(code);
+  if (!key) return null;
+  let updated: Coupon | null = null;
+  const data = await mutate((store) => {
+    ensureCoupons(store);
+    const idx = (store.coupons || []).findIndex((c) => codesMatch(c.code, key));
+    if (idx === -1) return;
+    const current = store.coupons![idx];
+    const next = normalizeCoupon({
+      ...current,
+      usedCount: couponUsedCount(current) + 1,
+    });
+    store.coupons![idx] = next;
+    updated = next;
+  });
+  return updated
+    ? { coupon: updated, coupons: [...(data.coupons || [])] }
+    : null;
 }
 
 export async function updateOrder(

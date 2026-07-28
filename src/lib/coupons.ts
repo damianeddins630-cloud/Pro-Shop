@@ -53,3 +53,30 @@ export function couponLabel(coupon: Coupon) {
   if (coupon.type === "percent") return `${coupon.value}% off`;
   return `$${Number(coupon.value).toFixed(2)} off`;
 }
+
+/** 0 or missing maxUses = unlimited */
+export function couponMaxUses(coupon: Pick<Coupon, "maxUses"> | { maxUses?: number }) {
+  const n = Number(coupon.maxUses);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+
+export function couponUsedCount(coupon: Pick<Coupon, "usedCount"> | { usedCount?: number }) {
+  const n = Number(coupon.usedCount);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
+}
+
+export function couponHasUsesLeft(coupon: Coupon) {
+  const max = couponMaxUses(coupon);
+  if (max <= 0) return true;
+  return couponUsedCount(coupon) < max;
+}
+
+export function couponUsesLabel(coupon: Coupon) {
+  const max = couponMaxUses(coupon);
+  const used = couponUsedCount(coupon);
+  if (max <= 0) return `${used} used · unlimited`;
+  const left = Math.max(0, max - used);
+  return `${used} / ${max} used · ${left} left`;
+}

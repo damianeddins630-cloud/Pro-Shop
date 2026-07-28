@@ -15,6 +15,8 @@ const patchSchema = z.object({
   type: z.enum(["percent", "fixed", "free"]).optional(),
   value: z.coerce.number().min(0).optional(),
   active: z.boolean().optional(),
+  maxUses: z.coerce.number().int().min(0).optional(),
+  usedCount: z.coerce.number().int().min(0).optional(),
 });
 
 export async function PUT(req: Request, { params }: Params) {
@@ -59,7 +61,7 @@ export async function DELETE(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json(
-      { ok: true, coupons: result.coupons },
+      { ok: true, removedCode: result.removedCode, coupons: result.coupons },
       { headers: noStore }
     );
   } catch (e) {
