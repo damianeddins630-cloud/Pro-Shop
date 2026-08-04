@@ -5,6 +5,7 @@ import { applyCouponToTotal, couponLabel } from "@/lib/coupons";
 import {
   createOrder,
   findCouponByCode,
+  findReusableShopifyCheckout,
   getCouponRedeemBlockReason,
   getInventoryUpdatedAt,
   getProduct,
@@ -170,7 +171,30 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1) Record website order first so Ops always has a row even if Shopify fails
+    // Reuse an unpaid Shopify invoice for the same cart so retries don't
+    // create new drafts / wipe shopper progress. Stock stays untouched.
+    const reusable = await findReusableShopifyCheckout({
+      userId: session.userId,
+      items: lineItems,
+      total,
+      couponCode: appliedCode,
+    });
+    if (reusable?.shopifyInvoiceUrl) {
+      return NextResponse.json({
+        ok: true,
+        provider: "shopify",
+        reused: true,
+        orderId: reusable.id,
+        order: reusable,
+        checkoutUrl: reusable.shopifyInvoiceUrl,
+        returnUrl: `${origin}/order/success?orderId=${reusable.id}`,
+        message:
+          "Resuming your unpaid Shopify payment page. Cart stays until you pay or remove items. Stock updates only after payment.",
+      });
+    }
+
+    // 1) Record website order first so Ops always has a row even if Shopify fails.
+    //    inventoryApplied=false — stock does NOT drop until webhook/confirm paid.
     const order = await createOrder({
       userId: session.userId,
       username: session.username,
@@ -188,7 +212,7 @@ export async function POST(req: Request) {
     const returnUrl = `${origin}/order/success?orderId=${order.id}`;
 
     try {
-      // 2) Create Shopify Draft Order → invoice / payment URL
+      // 2) Create Shopify Draft Order (payment only; website prices)
       const shopify = await createShopifyCheckout({
         email: session.email,
         username: session.username,
@@ -204,7 +228,7 @@ export async function POST(req: Request) {
         shopifyInvoiceUrl: shopify.invoiceUrl,
       });
 
-      // 3) Client must redirect to checkoutUrl (Shopify hosted payment)
+      // 3) Client redirects to checkoutUrl — cart should NOT clear until paid.
       return NextResponse.json({
         ok: true,
         provider: "shopify",
@@ -213,7 +237,7 @@ export async function POST(req: Request) {
         checkoutUrl: shopify.invoiceUrl,
         returnUrl,
         message:
-          "Redirecting to Shopify to collect payment. Inventory updates after payment succeeds.",
+          "Redirecting to Shopify to collect payment. Cart stays until you pay. Inventory updates only after payment succeeds.",
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Shopify checkout failed";

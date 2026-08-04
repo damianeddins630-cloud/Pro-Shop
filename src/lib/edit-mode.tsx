@@ -53,10 +53,6 @@ export function EditModeProvider({ children }: { children: ReactNode }) {
 
   const canEdit = can("edit_pages");
 
-  useEffect(() => {
-    if (!canEdit) setEditMode(false);
-  }, [canEdit]);
-
   const value = useMemo(
     () => ({
       user,

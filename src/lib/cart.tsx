@@ -19,6 +19,7 @@ type CartContextValue = {
   count: number;
   add: (productId: string, quantity?: number) => void;
   remove: (productId: string) => void;
+  removeMany: (productIds: string[]) => void;
   setQty: (productId: string, quantity: number) => void;
   clear: () => void;
   total: (products: Product[]) => number;
@@ -65,10 +66,18 @@ function subscribe(onStoreChange: () => void) {
 function writeCart(items: CartItem[]) {
   const next = items.length ? items : EMPTY;
   const raw = JSON.stringify(next);
-  localStorage.setItem(STORAGE_KEY, raw);
+  try {
+    localStorage.setItem(STORAGE_KEY, raw);
+  } catch {
+    // Still update in-memory cart if storage is blocked.
+  }
   cachedRaw = raw;
   cachedItems = next;
-  window.dispatchEvent(new Event("bba-cart"));
+  try {
+    window.dispatchEvent(new Event("bba-cart"));
+  } catch {
+    // ignore
+  }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -87,6 +96,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     writeCart(getSnapshot().filter((i) => i.productId !== productId));
   }, []);
 
+  const removeMany = useCallback((productIds: string[]) => {
+    const drop = new Set(productIds);
+    writeCart(getSnapshot().filter((i) => !drop.has(i.productId)));
+  }, []);
+
   const setQty = useCallback((productId: string, quantity: number) => {
     if (quantity <= 0) {
       writeCart(getSnapshot().filter((i) => i.productId !== productId));
@@ -94,7 +108,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
     writeCart(
       getSnapshot().map((i) =>
-        i.productId === productId ? { ...i, quantity } : i
+        i.productId === productId
+          ? { ...i, quantity: Math.max(1, Math.floor(quantity)) }
+          : i
       )
     );
   }, []);
@@ -118,11 +134,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       count: items.reduce((n, i) => n + i.quantity, 0),
       add,
       remove,
+      removeMany,
       setQty,
       clear,
       total,
     }),
-    [items, add, remove, setQty, clear, total]
+    [items, add, remove, removeMany, setQty, clear, total]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

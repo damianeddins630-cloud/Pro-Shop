@@ -408,6 +408,17 @@ export async function createShopifyCheckout(input: {
           name
           invoiceUrl
           status
+          totalPriceSet {
+            presentmentMoney {
+              amount
+              currencyCode
+            }
+          }
+          totalTaxSet {
+            presentmentMoney {
+              amount
+            }
+          }
         }
         userErrors {
           field
@@ -417,15 +428,27 @@ export async function createShopifyCheckout(input: {
     }
   `;
 
-  const lineItems = input.items.map((item) => ({
-    title: item.name.slice(0, 255),
-    quantity: item.quantity,
-    originalUnitPrice: Number(item.price).toFixed(2),
-    customAttributes: [
-      { key: "website_product_id", value: String(item.productId) },
-      { key: "website_order_id", value: input.localOrderId },
-    ],
-  }));
+  // Website is the catalog boss: custom line items only (never Shopify variants),
+  // exact website unit prices, taxExempt so Shopify taxes/catalog can't change totals.
+  const currency = "USD";
+  const lineItems = input.items.map((item) => {
+    const amount = Number(item.price).toFixed(2);
+    return {
+      title: item.name.slice(0, 255),
+      quantity: item.quantity,
+      taxable: false,
+      originalUnitPrice: amount,
+      originalUnitPriceWithCurrency: {
+        amount,
+        currencyCode: currency,
+      },
+      customAttributes: [
+        { key: "website_product_id", value: String(item.productId) },
+        { key: "website_order_id", value: input.localOrderId },
+        { key: "website_unit_price", value: amount },
+      ],
+    };
+  });
 
   const draftInput: Record<string, unknown> = {
     email: input.email.trim().toLowerCase(),
@@ -435,9 +458,12 @@ export async function createShopifyCheckout(input: {
       { key: "website_order_id", value: input.localOrderId },
       { key: "website_username", value: input.username },
       { key: "return_url", value: input.returnUrl },
+      { key: "price_source", value: "website" },
     ],
     lineItems,
     allowDiscountCodesInCheckout: false,
+    taxExempt: true,
+    presentmentCurrencyCode: currency,
   };
 
   const discount = Number(input.discountAmount || 0);
@@ -459,6 +485,8 @@ export async function createShopifyCheckout(input: {
         name: string;
         invoiceUrl: string | null;
         status: string;
+        totalPriceSet?: { presentmentMoney?: { amount?: string } };
+        totalTaxSet?: { presentmentMoney?: { amount?: string } };
       } | null;
       userErrors: { field: string[] | null; message: string }[];
     };
@@ -472,6 +500,24 @@ export async function createShopifyCheckout(input: {
   }
   if (!payload.draftOrder?.id) {
     throw new Error("Shopify did not create a draft order");
+  }
+
+  const websiteTotal = Number(
+    (
+      input.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0) -
+      Math.max(0, Number(input.discountAmount || 0))
+    ).toFixed(2)
+  );
+  const shopifyTotal = Number(
+    payload.draftOrder.totalPriceSet?.presentmentMoney?.amount || NaN
+  );
+  if (
+    Number.isFinite(shopifyTotal) &&
+    Math.abs(shopifyTotal - websiteTotal) > 0.02
+  ) {
+    throw new Error(
+      `Shopify total $${shopifyTotal.toFixed(2)} did not match website total $${websiteTotal.toFixed(2)}. Checkout aborted so prices stay website-owned.`
+    );
   }
 
   let invoiceUrl = payload.draftOrder.invoiceUrl;

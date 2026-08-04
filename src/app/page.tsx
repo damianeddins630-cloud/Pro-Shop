@@ -3,13 +3,12 @@ import Link from "next/link";
 import { HeroSlider } from "@/components/HeroSlider";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 import { EditableProductGrid } from "@/components/EditableProductGrid";
-import { getText, listDeals, listProducts } from "@/lib/store";
+import { getText, listDeals } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export default async function HomePage() {
-  let products: Awaited<ReturnType<typeof listProducts>> = [];
   let deals: Awaited<ReturnType<typeof listDeals>> = [];
   const defaults = {
     hero: "Perfect Your Game",
@@ -42,7 +41,6 @@ export default async function HomePage() {
   let t = { ...defaults };
   try {
     const [
-      productList,
       dealList,
       hero,
       heroSub,
@@ -68,7 +66,6 @@ export default async function HomePage() {
       featured,
       shopLink,
     ] = await Promise.all([
-      listProducts(),
       listDeals(),
       getText("home", "hero", defaults.hero),
       getText("home", "hero_sub", defaults.heroSub),
@@ -94,7 +91,6 @@ export default async function HomePage() {
       getText("home", "featured", defaults.featured),
       getText("home", "shop_link", defaults.shopLink),
     ]);
-    products = productList;
     deals = dealList;
     t = {
       hero,
@@ -122,7 +118,6 @@ export default async function HomePage() {
       shopLink,
     };
   } catch {
-    products = [];
     deals = [];
   }
 

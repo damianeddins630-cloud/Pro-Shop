@@ -29,11 +29,11 @@ export async function GET() {
         lastPersistOk: persist.lastPersistOk,
       },
       checkoutFlow: [
-        "Customer carts products on this website",
-        "POST /api/checkout creates a website order (awaiting_payment)",
-        "Server creates a Shopify Draft Order (custom line items — not Shopify products)",
-        "Customer is redirected to Shopify invoiceUrl to pay",
-        "Shopify webhook orders/paid marks website order paid and reduces inventory",
+        "Website owns catalog, prices, cart, and stock",
+        "Cart items stay in the browser until the shopper pays or removes them",
+        "POST /api/checkout creates a website order (awaiting_payment) without reducing stock",
+        "Shopify Draft Order uses custom line items at exact website prices (payment only)",
+        "Shopify webhook / return confirm marks paid, then website stock drops once",
       ],
       webhookUrl:
         (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||

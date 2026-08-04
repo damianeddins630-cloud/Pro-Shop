@@ -3,24 +3,40 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { useCart } from "@/lib/cart";
 import { saveLocalInventory } from "@/lib/inventory-client";
+import {
+  clearPendingCheckout,
+  readPendingCheckout,
+} from "@/lib/pending-checkout";
 import type { Order, Product } from "@/lib/types";
 
 function SuccessInner() {
   const params = useSearchParams();
   const orderId = params.get("orderId");
+  const { clear, removeMany } = useCart();
   const [order, setOrder] = useState<Order | null>(null);
-  const [message, setMessage] = useState("Checking your payment...");
+  const [message, setMessage] = useState(() =>
+    orderId
+      ? "Checking your payment..."
+      : "If you paid on Shopify, your order will appear under your account once payment is confirmed."
+  );
 
   useEffect(() => {
-    if (!orderId) {
-      setMessage(
-        "If you paid on Shopify, your order will appear under your account once payment is confirmed."
-      );
-      return;
-    }
+    if (!orderId) return;
 
     let cancelled = false;
+
+    function clearCartAfterPaid(paidOrder: Order) {
+      const pending = readPendingCheckout();
+      const ids =
+        pending?.orderId === paidOrder.id
+          ? pending.productIds
+          : paidOrder.items.map((i) => i.productId);
+      if (ids.length) removeMany(ids);
+      else clear();
+      clearPendingCheckout();
+    }
 
     async function settle() {
       try {
@@ -33,10 +49,15 @@ function SuccessInner() {
           Array.isArray(confirmData.products) &&
           confirmData.updatedAt
         ) {
-          saveLocalInventory(confirmData.products as Product[], confirmData.updatedAt);
+          saveLocalInventory(
+            confirmData.products as Product[],
+            confirmData.updatedAt
+          );
         }
         if (!cancelled && confirmData.order && !confirmData.awaiting) {
-          setOrder(confirmData.order as Order);
+          const paid = confirmData.order as Order;
+          setOrder(paid);
+          clearCartAfterPaid(paid);
           setMessage(
             "Payment received. Your order is saved on this website and inventory was updated."
           );
@@ -45,7 +66,7 @@ function SuccessInner() {
         if (!cancelled && confirmData.awaiting) {
           setOrder((confirmData.order as Order) || null);
           setMessage(
-            "Waiting for Shopify to confirm payment. This usually finishes within a minute — check Previous orders shortly."
+            "Waiting for Shopify to confirm payment. Your cart is still saved until payment finishes or you remove items."
           );
         }
       } catch {
@@ -60,7 +81,12 @@ function SuccessInner() {
           setOrder(found || null);
           if (found?.status === "awaiting_payment") {
             setMessage(
-              "Order saved — waiting for Shopify payment confirmation. Inventory updates after payment clears."
+              "Order saved — waiting for Shopify payment confirmation. Cart and stock stay unchanged until payment clears."
+            );
+          } else if (found && found.inventoryApplied) {
+            clearCartAfterPaid(found);
+            setMessage(
+              "Your order is saved on your website account under Previous orders."
             );
           } else if (found) {
             setMessage(
@@ -85,7 +111,7 @@ function SuccessInner() {
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, clear, removeMany]);
 
   return (
     <section className="site-shell section-pad pt-24">
@@ -108,6 +134,16 @@ function SuccessInner() {
           <Link href="/shop" className="btn btn-ghost">
             Keep shopping
           </Link>
+          {order?.status === "awaiting_payment" && order.shopifyInvoiceUrl ? (
+            <a href={order.shopifyInvoiceUrl} className="btn btn-primary">
+              Resume Shopify payment
+            </a>
+          ) : null}
+          {order?.status === "awaiting_payment" ? (
+            <Link href="/cart" className="btn btn-ghost">
+              Back to cart
+            </Link>
+          ) : null}
         </div>
       </div>
     </section>

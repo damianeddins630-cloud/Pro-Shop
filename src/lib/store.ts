@@ -1025,6 +1025,7 @@ export async function markOrderPaid(
     if (idx === -1) return;
     const current: Order = { ...data.orders[idx] };
 
+    // Stock drops only after a real paid settlement (never on add-to-cart / unpaid draft).
     if (!current.inventoryApplied) {
       for (const item of current.items) {
         const p = data.products.find((x) => x.id === item.productId);
@@ -1049,7 +1050,12 @@ export async function markOrderPaid(
       current.inventoryApplied = true;
     }
 
-    if (current.status === "awaiting_payment" || current.status === "placed") {
+    // Paid always wins over a stale cancelled/awaiting row.
+    if (
+      current.status === "awaiting_payment" ||
+      current.status === "placed" ||
+      current.status === "cancelled"
+    ) {
       current.status = nextStatus;
     }
     data.orders[idx] = current;
@@ -1267,6 +1273,35 @@ export async function findOrderByShopifyDraftId(draftId: string) {
 export async function listOrdersForUser(userId: string) {
   const data = await getStore();
   return (data.orders || []).filter((o) => o.userId === userId);
+}
+
+/** Reuse an open Shopify invoice when the shopper retries the same cart. */
+export async function findReusableShopifyCheckout(input: {
+  userId: string;
+  items: OrderItem[];
+  total: number;
+  couponCode?: string;
+}): Promise<Order | null> {
+  const data = await getStore();
+  const fingerprint = (items: OrderItem[]) =>
+    items
+      .map((i) => `${i.productId}:${i.quantity}:${Number(i.price).toFixed(2)}`)
+      .sort()
+      .join("|");
+  const want = fingerprint(input.items);
+  const coupon = (input.couponCode || "").trim().toLowerCase();
+
+  return (
+    (data.orders || []).find((o) => {
+      if (o.userId !== input.userId) return false;
+      if (o.status !== "awaiting_payment") return false;
+      if (o.paymentProvider !== "shopify") return false;
+      if (!o.shopifyInvoiceUrl || !o.shopifyDraftOrderId) return false;
+      if (Math.abs(Number(o.total) - Number(input.total)) > 0.009) return false;
+      if ((o.couponCode || "").trim().toLowerCase() !== coupon) return false;
+      return fingerprint(o.items || []) === want;
+    }) || null
+  );
 }
 
 export async function listAllOrders() {

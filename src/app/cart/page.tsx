@@ -12,6 +12,7 @@ import {
   pickNewestProducts,
   saveLocalInventory,
 } from "@/lib/inventory-client";
+import { savePendingCheckout } from "@/lib/pending-checkout";
 import { effectivePrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
@@ -45,7 +46,9 @@ export default function CartPage() {
   const [couponError, setCouponError] = useState("");
   const [redeeming, setRedeeming] = useState(false);
 
-  const shopifyReady = Boolean(shopify?.configured);
+  const shopifyReady = Boolean(
+    shopify?.checkoutReady ?? shopify?.configured
+  );
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -67,7 +70,13 @@ export default function CartPage() {
       try {
         const res = await fetch("/api/shopify/status", { cache: "no-store" });
         const d = await res.json();
-        setShopify(d.shopify || { configured: false });
+        const s = (d.shopify || { configured: false }) as ShopifyClientStatus;
+        // Prefer live Admin ping (top-level ok) when present.
+        if (typeof d.ok === "boolean") {
+          s.checkoutReady = d.ok;
+          s.configured = d.ok || Boolean(s.configured);
+        }
+        setShopify(s);
       } catch {
         try {
           const res = await fetch("/api/checkout", { cache: "no-store" });
@@ -129,7 +138,7 @@ export default function CartPage() {
         // keep previous
       }
     })();
-  }, [subtotal, coupon?.code]);
+  }, [subtotal, coupon]);
 
   async function redeemCoupon() {
     setCouponError("");
@@ -202,15 +211,23 @@ export default function CartPage() {
         setProducts(data.products);
       }
 
-      // Paid path: leave this site and open Shopify payment page
+      // Paid path: open Shopify payment — keep cart until paid or shopper removes items.
       if (data.provider === "shopify" && data.checkoutUrl) {
-        clear();
+        savePendingCheckout({
+          orderId: String(data.orderId || ""),
+          productIds: items.map((i) => i.productId),
+          checkoutUrl: String(data.checkoutUrl),
+          createdAt: new Date().toISOString(),
+        });
         setCoupon(null);
+        setMessage(
+          "Opening Shopify payment… Your cart stays here until you finish paying or remove items. Stock only drops after payment."
+        );
         window.location.assign(String(data.checkoutUrl));
         return;
       }
 
-      // Free / local path — keep a visible order record message
+      // Free / local path — purchase completed on this site, so clear cart.
       clear();
       setCoupon(null);
       setMessage(
@@ -305,7 +322,14 @@ export default function CartPage() {
                       min={1}
                       max={product.stock}
                       value={item.quantity}
-                      onChange={(e) => setQty(product.id, Number(e.target.value))}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return;
+                        setQty(
+                          product.id,
+                          Math.min(product.stock, Math.max(1, Math.floor(n)))
+                        );
+                      }}
                       className="field w-24"
                     />
                     <button
@@ -384,11 +408,13 @@ export default function CartPage() {
             </div>
 
             <p className="mt-4 text-sm text-mist">
-              Login required to buy. Catalog and cart stay on this website.{" "}
+              Login required to buy. This website owns the catalog, prices, cart,
+              and stock. Shopify is payment only. Cart items stay until you pay
+              or remove them — stock drops only after a successful purchase.{" "}
               {due <= 0
                 ? "This is a free coupon order — it records on the website with no Shopify payment page."
                 : shopifyReady
-                  ? "Pay with Shopify opens Shopify’s secure payment page (card / Shop Pay / Apple Pay / Google Pay)."
+                  ? "Pay with Shopify opens Shopify’s secure payment page using this website’s prices."
                   : "Paid checkout opens after Shopify status shows Ready — refresh or check Ops → Shopify."}
             </p>
             {shopifyReady && shopify?.storeDomain && (
