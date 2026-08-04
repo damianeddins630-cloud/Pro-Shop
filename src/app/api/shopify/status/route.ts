@@ -13,9 +13,13 @@ export async function GET() {
   const persist = storePersistStatus();
   const ping = status.configured ? await pingShopifyAdmin() : null;
 
+  const draftReady =
+    Boolean(ping?.ok) &&
+    (ping?.canDraftOrders === true || ping?.canDraftOrders === undefined);
+
   return NextResponse.json(
     {
-      ok: status.configured && Boolean(ping?.ok),
+      ok: status.configured && Boolean(ping?.ok) && draftReady,
       shopify: status,
       adminApi: ping,
       persist: {
@@ -35,12 +39,16 @@ export async function GET() {
           "https://pro-shop-lemon.vercel.app") + "/api/shopify/webhook",
       requiredEnv: [
         "SHOPIFY_STORE_DOMAIN",
-        "SHOPIFY_ADMIN_ACCESS_TOKEN",
+        "SHOPIFY_CLIENT_ID",
+        "SHOPIFY_CLIENT_SECRET",
         "SHOPIFY_API_VERSION",
         "SHOPIFY_WEBHOOK_SECRET",
         "NEXT_PUBLIC_SITE_URL",
-        "AUTH_SECRET",
       ],
+      important:
+        ping?.canDraftOrders === false
+          ? "Shopify app is missing write_draft_orders scope. Enable it in the app Admin API scopes, save, then refresh."
+          : null,
     },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );

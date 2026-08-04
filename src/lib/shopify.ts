@@ -24,11 +24,15 @@ export type ShopifyStatus = {
   configured: boolean;
   webhookConfigured: boolean;
   checkoutReady: boolean;
+  authMode: "admin_token" | "client_credentials" | "none";
   storeDomain: string | null;
   apiVersion: string;
   missing: string[];
   hints: string[];
 };
+
+type TokenCache = { token: string; expiresAtMs: number };
+let tokenCache: TokenCache | null = null;
 
 function storeDomainRaw() {
   return env("SHOPIFY_STORE_DOMAIN")
@@ -36,51 +40,145 @@ function storeDomainRaw() {
     .replace(/\/$/, "");
 }
 
-function adminToken() {
+function staticAdminToken() {
   return env("SHOPIFY_ADMIN_ACCESS_TOKEN");
 }
 
+function clientId() {
+  return env("SHOPIFY_CLIENT_ID") || env("SHOPIFY_API_KEY");
+}
+
+function clientSecret() {
+  return (
+    env("SHOPIFY_CLIENT_SECRET") ||
+    env("SHOPIFY_API_SECRET") ||
+    env("SHOPIFY_WEBHOOK_SECRET")
+  );
+}
+
 export function isShopifyConfigured() {
-  return Boolean(storeDomainRaw() && adminToken());
+  if (!storeDomainRaw()) return false;
+  if (staticAdminToken()) return true;
+  return Boolean(clientId() && clientSecret());
 }
 
 export function isShopifyWebhookConfigured() {
-  return Boolean(env("SHOPIFY_WEBHOOK_SECRET"));
+  return Boolean(env("SHOPIFY_WEBHOOK_SECRET") || clientSecret());
+}
+
+export function shopifyWebhookSecret() {
+  return env("SHOPIFY_WEBHOOK_SECRET") || clientSecret();
 }
 
 export function shopifyStatus(): ShopifyStatus {
   const missing: string[] = [];
   const hints: string[] = [];
+  const domain = storeDomainRaw();
+  const hasStatic = Boolean(staticAdminToken());
+  const hasClient = Boolean(clientId() && clientSecret());
 
-  if (!storeDomainRaw()) missing.push("SHOPIFY_STORE_DOMAIN");
-  if (!adminToken()) missing.push("SHOPIFY_ADMIN_ACCESS_TOKEN");
-  if (!env("SHOPIFY_WEBHOOK_SECRET")) missing.push("SHOPIFY_WEBHOOK_SECRET");
+  if (!domain) missing.push("SHOPIFY_STORE_DOMAIN");
+  if (!hasStatic && !hasClient) {
+    missing.push("SHOPIFY_CLIENT_ID");
+    missing.push("SHOPIFY_CLIENT_SECRET");
+  }
+  if (!isShopifyWebhookConfigured()) missing.push("SHOPIFY_WEBHOOK_SECRET");
+
   if (!env("NEXT_PUBLIC_SITE_URL")) {
     hints.push(
       "Set NEXT_PUBLIC_SITE_URL to https://pro-shop-lemon.vercel.app so return links work."
     );
   }
-  if (missing.includes("SHOPIFY_STORE_DOMAIN") || missing.includes("SHOPIFY_ADMIN_ACCESS_TOKEN")) {
+  if (!domain || (!hasStatic && !hasClient)) {
     hints.push(
-      "Add Shopify vars on the Vercel project pro-shop-lemon (Production), then Redeploy with cache off."
+      "Add Shopify vars on Vercel project pro-shop-lemon (Production), then Redeploy with cache off."
     );
   }
-  if (missing.includes("SHOPIFY_WEBHOOK_SECRET")) {
-    hints.push(
-      "Webhook topic orders/paid → https://pro-shop-lemon.vercel.app/api/shopify/webhook"
-    );
-  }
+  hints.push(
+    "Shopify app must include Admin API scopes: write_draft_orders, read_draft_orders, read_orders."
+  );
+  hints.push(
+    "Webhook topic orders/paid → https://pro-shop-lemon.vercel.app/api/shopify/webhook"
+  );
+
+  const authMode: ShopifyStatus["authMode"] = hasStatic
+    ? "admin_token"
+    : hasClient
+      ? "client_credentials"
+      : "none";
 
   const configured = isShopifyConfigured();
   return {
     configured,
     webhookConfigured: isShopifyWebhookConfigured(),
     checkoutReady: configured,
-    storeDomain: storeDomainRaw() || null,
+    authMode,
+    storeDomain: domain || null,
     apiVersion: API_VERSION,
     missing,
     hints,
   };
+}
+
+/**
+ * Resolve a usable Admin API token.
+ * Prefer a static SHOPIFY_ADMIN_ACCESS_TOKEN; otherwise use Client ID + Secret
+ * (client_credentials) and cache until near expiry (~24h tokens).
+ */
+async function getAdminAccessToken(): Promise<string> {
+  const staticToken = staticAdminToken();
+  if (staticToken) return staticToken;
+
+  const id = clientId();
+  const secret = clientSecret();
+  const domain = storeDomainRaw();
+  if (!id || !secret || !domain) {
+    throw new Error(
+      "Shopify is not configured. Set SHOPIFY_STORE_DOMAIN plus SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET (or SHOPIFY_ADMIN_ACCESS_TOKEN) in Vercel."
+    );
+  }
+
+  const now = Date.now();
+  if (tokenCache && tokenCache.expiresAtMs - 60_000 > now) {
+    return tokenCache.token;
+  }
+
+  const res = await fetch(`https://${domain}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      client_id: id,
+      client_secret: secret,
+      grant_type: "client_credentials",
+    }),
+    cache: "no-store",
+  });
+
+  const json = (await res.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    scope?: string;
+    error?: string;
+    error_description?: string;
+  };
+
+  if (!res.ok || !json.access_token) {
+    throw new Error(
+      json.error_description ||
+        json.error ||
+        `Shopify token request failed (${res.status})`
+    );
+  }
+
+  const expiresInSec = Number(json.expires_in) || 60 * 60;
+  tokenCache = {
+    token: json.access_token,
+    expiresAtMs: now + expiresInSec * 1000,
+  };
+  return json.access_token;
 }
 
 async function adminGraphql<T>(
@@ -88,12 +186,10 @@ async function adminGraphql<T>(
   variables?: Record<string, unknown>
 ): Promise<T> {
   const domain = storeDomainRaw();
-  const token = adminToken();
-  if (!domain || !token) {
-    throw new Error(
-      "Shopify is not configured. Set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN in Vercel."
-    );
+  if (!domain) {
+    throw new Error("SHOPIFY_STORE_DOMAIN is not set in Vercel.");
   }
+  const token = await getAdminAccessToken();
 
   const res = await fetch(
     `https://${domain}/admin/api/${API_VERSION}/graphql.json`,
@@ -110,10 +206,18 @@ async function adminGraphql<T>(
 
   const json = (await res.json()) as {
     data?: T;
-    errors?: { message: string }[];
+    errors?: { message: string; extensions?: { code?: string; requiredAccess?: string } }[];
   };
 
   if (!res.ok || json.errors?.length) {
+    const denied = json.errors?.find((e) =>
+      /draftOrder|ACCESS_DENIED|access scope/i.test(e.message)
+    );
+    if (denied) {
+      throw new Error(
+        "Shopify app is missing Draft Order permission. In Shopify → custom app → Admin API scopes, enable write_draft_orders and read_draft_orders, save, then try checkout again."
+      );
+    }
     const msg =
       json.errors?.map((e) => e.message).join("; ") ||
       `Shopify API error (${res.status})`;
@@ -139,7 +243,6 @@ async function fetchDraftInvoiceUrl(draftOrderId: string): Promise<string | null
   return data.draftOrder?.invoiceUrl || null;
 }
 
-/** Some stores only mint invoiceUrl after invoice send. */
 async function sendDraftInvoice(draftOrderId: string): Promise<string | null> {
   const data = await adminGraphql<{
     draftOrderInvoiceSend: {
@@ -226,7 +329,6 @@ export async function createShopifyCheckout(input: {
       { key: "return_url", value: input.returnUrl },
     ],
     lineItems,
-    // Website coupons applied below — do not also allow Shopify discount codes
     allowDiscountCodesInCheckout: false,
   };
 
@@ -269,12 +371,11 @@ export async function createShopifyCheckout(input: {
     invoiceUrl = await fetchDraftInvoiceUrl(payload.draftOrder.id);
   }
   if (!invoiceUrl) {
-    // Force Shopify to mint the customer payment / invoice link
     invoiceUrl = await sendDraftInvoice(payload.draftOrder.id);
   }
   if (!invoiceUrl) {
     throw new Error(
-      "Shopify created the draft order but did not return a payment link. Check the custom app has write_draft_orders and the store can invoice customers."
+      "Shopify created the draft order but did not return a payment link. Confirm write_draft_orders is enabled."
     );
   }
 
@@ -285,7 +386,6 @@ export async function createShopifyCheckout(input: {
   };
 }
 
-/** True when the Shopify draft order was completed / paid. */
 export async function isShopifyDraftOrderPaid(
   draftOrderGid: string
 ): Promise<boolean> {
@@ -325,22 +425,68 @@ export async function isShopifyDraftOrderPaid(
   }
 }
 
-/** Lightweight Admin API probe used by /api/shopify/status */
 export async function pingShopifyAdmin(): Promise<{
   ok: boolean;
   shopName?: string;
+  scopes?: string;
+  canDraftOrders?: boolean;
   error?: string;
 }> {
   if (!isShopifyConfigured()) {
     return { ok: false, error: "Shopify env vars are missing" };
   }
   try {
-    const data = await adminGraphql<{ shop: { name: string; myshopifyDomain: string } }>(
-      `query { shop { name myshopifyDomain } }`
-    );
+    const domain = storeDomainRaw();
+    const id = clientId();
+    const secret = clientSecret();
+    let scopes = "";
+
+    // When using client credentials, read scopes from the token response
+    if (!staticAdminToken() && id && secret && domain) {
+      tokenCache = null;
+      const res = await fetch(`https://${domain}/admin/oauth/access_token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          client_id: id,
+          client_secret: secret,
+          grant_type: "client_credentials",
+        }),
+        cache: "no-store",
+      });
+      const json = (await res.json()) as {
+        access_token?: string;
+        expires_in?: number;
+        scope?: string;
+        error_description?: string;
+        error?: string;
+      };
+      if (!res.ok || !json.access_token) {
+        return {
+          ok: false,
+          error: json.error_description || json.error || "Token request failed",
+        };
+      }
+      scopes = json.scope || "";
+      tokenCache = {
+        token: json.access_token,
+        expiresAtMs: Date.now() + (Number(json.expires_in) || 3600) * 1000,
+      };
+    }
+
+    const data = await adminGraphql<{
+      shop: { name: string; myshopifyDomain: string };
+    }>(`query { shop { name myshopifyDomain } }`);
+
+    const canDraftOrders = /write_draft_orders|write_quick_sale/i.test(scopes);
     return {
       ok: true,
       shopName: data.shop?.name || data.shop?.myshopifyDomain,
+      scopes: scopes || undefined,
+      canDraftOrders: scopes ? canDraftOrders : undefined,
     };
   } catch (e) {
     return {

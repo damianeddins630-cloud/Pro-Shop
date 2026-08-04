@@ -158,7 +158,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Shopify payment is not connected on this server. Add SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN in Vercel project pro-shop-lemon, then Redeploy.",
+            "Shopify payment is not connected on this server. Add SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID, and SHOPIFY_CLIENT_SECRET in Vercel project pro-shop-lemon, then Redeploy.",
           code: "SHOPIFY_NOT_CONFIGURED",
           shopify: status,
         },

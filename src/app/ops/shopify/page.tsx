@@ -4,15 +4,23 @@ import { useCallback, useEffect, useState } from "react";
 
 type StatusPayload = {
   ok?: boolean;
+  important?: string | null;
   shopify?: {
     configured?: boolean;
     webhookConfigured?: boolean;
     checkoutReady?: boolean;
+    authMode?: string;
     storeDomain?: string | null;
     missing?: string[];
     hints?: string[];
   };
-  adminApi?: { ok?: boolean; shopName?: string; error?: string } | null;
+  adminApi?: {
+    ok?: boolean;
+    shopName?: string;
+    error?: string;
+    scopes?: string;
+    canDraftOrders?: boolean;
+  } | null;
   webhookUrl?: string;
 };
 
@@ -140,11 +148,30 @@ export default function OpsShopifyPage() {
               label="Admin API ping"
               detail={
                 data?.adminApi?.ok
-                  ? `Reached Shopify Admin API`
+                  ? `Reached Shopify Admin API${
+                      data.adminApi.shopName ? ` (${data.adminApi.shopName})` : ""
+                    }`
                   : data?.adminApi?.error || "Cannot reach Shopify until env vars are set"
               }
             />
+            <Row
+              ok={data?.adminApi?.canDraftOrders !== false}
+              label="Draft Orders permission"
+              detail={
+                data?.adminApi?.canDraftOrders === false
+                  ? "Missing write_draft_orders — enable it on the Shopify app scopes"
+                  : data?.adminApi?.scopes
+                    ? `Scopes: ${data.adminApi.scopes}`
+                    : "Needed so cart can open Shopify payment"
+              }
+            />
           </div>
+
+          {data?.important && (
+            <p className="mt-4 rounded-2xl border border-red/40 bg-red/10 px-4 py-3 text-sm text-red-200">
+              {data.important}
+            </p>
+          )}
 
           <div className="mt-8 space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-mist">
             <h3 className="display text-3xl text-chalk">Connect in 4 steps</h3>
@@ -166,18 +193,20 @@ export default function OpsShopifyPage() {
                 Add these for Production (+ Preview if shown):
                 <div className="mt-3 space-y-2 rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-xs text-chalk">
                   <p>SHOPIFY_STORE_DOMAIN = ballards-bowling.myshopify.com</p>
-                  <p>SHOPIFY_ADMIN_ACCESS_TOKEN = shpat_… (from Shopify custom app)</p>
+                  <p>SHOPIFY_CLIENT_ID = (your app Client ID)</p>
+                  <p>SHOPIFY_CLIENT_SECRET = shpss_… (your app Secret)</p>
+                  <p>SHOPIFY_WEBHOOK_SECRET = same shpss_… Secret</p>
                   <p>SHOPIFY_API_VERSION = 2025-01</p>
-                  <p>SHOPIFY_WEBHOOK_SECRET = (Shopify app Client secret)</p>
                   <p>NEXT_PUBLIC_SITE_URL = https://pro-shop-lemon.vercel.app</p>
                 </div>
               </li>
               <li>
-                In Shopify Admin → custom app scopes:{" "}
+                In Shopify → your app → Admin API scopes, enable{" "}
                 <strong className="text-chalk">write_draft_orders</strong>,{" "}
-                <strong className="text-chalk">read_draft_orders</strong>,{" "}
-                <strong className="text-chalk">read_orders</strong>. Create webhook topic{" "}
-                <strong className="text-chalk">orders/paid</strong> to:
+                <strong className="text-chalk">read_draft_orders</strong>, and{" "}
+                <strong className="text-chalk">read_orders</strong>, then save.
+                Create webhook topic <strong className="text-chalk">orders/paid</strong>{" "}
+                to:
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <code className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-chalk">
                     {webhookUrl}

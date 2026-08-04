@@ -258,8 +258,10 @@ export default function CartPage() {
           <p className="mt-2 text-amber-100/90">
             In Vercel project <strong>pro-shop-lemon</strong>, add{" "}
             <code className="text-amber-50">SHOPIFY_STORE_DOMAIN</code>,{" "}
-            <code className="text-amber-50">SHOPIFY_ADMIN_ACCESS_TOKEN</code>, and{" "}
+            <code className="text-amber-50">SHOPIFY_CLIENT_ID</code>,{" "}
+            <code className="text-amber-50">SHOPIFY_CLIENT_SECRET</code>, and{" "}
             <code className="text-amber-50">SHOPIFY_WEBHOOK_SECRET</code>, then Redeploy.
+            Also enable <code className="text-amber-50">write_draft_orders</code> on the Shopify app.
           </p>
           {shopify?.missing?.length ? (
             <p className="mt-2 text-amber-100/80">

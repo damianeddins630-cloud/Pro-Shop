@@ -5,17 +5,13 @@ import {
   findOrderByShopifyDraftId,
   markOrderPaid,
 } from "@/lib/store";
-import { draftOrderGidFromNumericId } from "@/lib/shopify";
+import {
+  draftOrderGidFromNumericId,
+  shopifyWebhookSecret,
+} from "@/lib/shopify";
 
 function webhookSecret() {
-  let v = (process.env.SHOPIFY_WEBHOOK_SECRET || "").trim();
-  if (
-    (v.startsWith('"') && v.endsWith('"')) ||
-    (v.startsWith("'") && v.endsWith("'"))
-  ) {
-    v = v.slice(1, -1).trim();
-  }
-  return v;
+  return shopifyWebhookSecret();
 }
 
 function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
