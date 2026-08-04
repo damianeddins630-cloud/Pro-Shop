@@ -3,12 +3,12 @@ import { z } from "zod";
 import { getSession } from "@/lib/auth";
 import { applyCouponToTotal, couponLabel } from "@/lib/coupons";
 import {
+  cancelOpenShopifyCheckoutsForUser,
   createOrder,
-  findCouponByCode,
-  findReusableShopifyCheckout,
   getCouponRedeemBlockReason,
+  getFreshCouponForCheckout,
+  getFreshProductForCheckout,
   getInventoryUpdatedAt,
-  getProduct,
   listProducts,
   recordCouponUse,
   reduceStock,
@@ -16,11 +16,13 @@ import {
 } from "@/lib/store";
 import {
   createShopifyCheckout,
+  deleteShopifyDraftOrder,
   isShopifyConfigured,
   loadShopifyRuntimeConfig,
   shopifyStatus,
 } from "@/lib/shopify";
 import { effectivePrice } from "@/lib/pricing";
+import type { OrderItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,59 @@ export async function GET() {
   );
 }
 
+/** Build line items from the live website catalog (prices + % discounts). */
+async function priceCartFromWebsite(
+  items: { productId: string; quantity: number }[]
+): Promise<
+  | { ok: true; lineItems: OrderItem[]; subtotal: number }
+  | { ok: false; status: number; body: Record<string, unknown> }
+> {
+  const lineItems: OrderItem[] = [];
+  let subtotal = 0;
+
+  for (const item of items) {
+    const product = await getFreshProductForCheckout(item.productId);
+    if (!product || !product.active) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: `Product unavailable: ${item.productId}`,
+          code: "PRODUCT_UNAVAILABLE",
+        },
+      };
+    }
+    if (product.stock < item.quantity) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: `Not enough stock for ${product.name} (have ${product.stock}, need ${item.quantity})`,
+          code: "OUT_OF_STOCK",
+        },
+      };
+    }
+    const unitPrice = effectivePrice(product);
+    lineItems.push({
+      productId: product.id,
+      name:
+        (product.discountPercent || 0) > 0
+          ? `${product.name} (${product.discountPercent}% off)`
+          : product.name,
+      price: unitPrice,
+      quantity: item.quantity,
+      image: product.image,
+    });
+    subtotal += unitPrice * item.quantity;
+  }
+
+  return {
+    ok: true,
+    lineItems,
+    subtotal: Math.round(subtotal * 100) / 100,
+  };
+}
+
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) {
@@ -56,44 +111,13 @@ export async function POST(req: Request) {
   try {
     await loadShopifyRuntimeConfig();
     const body = schema.parse(await req.json());
-    const lineItems = [];
-    let subtotal = 0;
 
-    for (const item of body.items) {
-      const product = await getProduct(item.productId);
-      if (!product || !product.active) {
-        return NextResponse.json(
-          {
-            error: `Product unavailable: ${item.productId}`,
-            code: "PRODUCT_UNAVAILABLE",
-          },
-          { status: 400 }
-        );
-      }
-      if (product.stock < item.quantity) {
-        return NextResponse.json(
-          {
-            error: `Not enough stock for ${product.name} (have ${product.stock}, need ${item.quantity})`,
-            code: "OUT_OF_STOCK",
-          },
-          { status: 400 }
-        );
-      }
-      const unitPrice = effectivePrice(product);
-      lineItems.push({
-        productId: product.id,
-        name:
-          (product.discountPercent || 0) > 0
-            ? `${product.name} (${product.discountPercent}% off)`
-            : product.name,
-        price: unitPrice,
-        quantity: item.quantity,
-        image: product.image,
-      });
-      subtotal += unitPrice * item.quantity;
+    // Always re-read website prices/discounts at charge time (never trust cart cache).
+    const priced = await priceCartFromWebsite(body.items);
+    if (!priced.ok) {
+      return NextResponse.json(priced.body, { status: priced.status });
     }
-
-    subtotal = Math.round(subtotal * 100) / 100;
+    const { lineItems, subtotal } = priced;
 
     let discountAmount = 0;
     let total = subtotal;
@@ -101,7 +125,7 @@ export async function POST(req: Request) {
     let couponNote = "";
 
     if (body.couponCode?.trim()) {
-      const coupon = await findCouponByCode(body.couponCode);
+      const coupon = await getFreshCouponForCheckout(body.couponCode);
       if (!coupon) {
         const reason =
           (await getCouponRedeemBlockReason(body.couponCode)) ||
@@ -171,30 +195,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // Reuse an unpaid Shopify invoice for the same cart so retries don't
-    // create new drafts / wipe shopper progress. Stock stays untouched.
-    const reusable = await findReusableShopifyCheckout({
-      userId: session.userId,
-      items: lineItems,
-      total,
-      couponCode: appliedCode,
-    });
-    if (reusable?.shopifyInvoiceUrl) {
-      return NextResponse.json({
-        ok: true,
-        provider: "shopify",
-        reused: true,
-        orderId: reusable.id,
-        order: reusable,
-        checkoutUrl: reusable.shopifyInvoiceUrl,
-        returnUrl: `${origin}/order/success?orderId=${reusable.id}`,
-        message:
-          "Resuming your unpaid Shopify payment page. Cart stays until you pay or remove items. Stock updates only after payment.",
-      });
-    }
+    // Cancel any older unpaid invoices for this shopper so they can't pay a
+    // stale website price / discount from a previous Shopify draft.
+    const superseded = await cancelOpenShopifyCheckoutsForUser(session.userId);
+    await Promise.all(
+      superseded.map((o) => deleteShopifyDraftOrder(o.shopifyDraftOrderId))
+    );
 
-    // 1) Record website order first so Ops always has a row even if Shopify fails.
-    //    inventoryApplied=false — stock does NOT drop until webhook/confirm paid.
+    // 1) Record website order with LIVE prices. Stock stays until paid.
     const order = await createOrder({
       userId: session.userId,
       username: session.username,
@@ -212,7 +220,7 @@ export async function POST(req: Request) {
     const returnUrl = `${origin}/order/success?orderId=${order.id}`;
 
     try {
-      // 2) Create Shopify Draft Order (payment only; website prices)
+      // 2) Brand-new Shopify Draft Order every charge attempt = instant website prices.
       const shopify = await createShopifyCheckout({
         email: session.email,
         username: session.username,
@@ -228,7 +236,6 @@ export async function POST(req: Request) {
         shopifyInvoiceUrl: shopify.invoiceUrl,
       });
 
-      // 3) Client redirects to checkoutUrl — cart should NOT clear until paid.
       return NextResponse.json({
         ok: true,
         provider: "shopify",
@@ -236,8 +243,12 @@ export async function POST(req: Request) {
         order: updated || order,
         checkoutUrl: shopify.invoiceUrl,
         returnUrl,
+        pricedFromWebsite: true,
+        subtotal,
+        discountAmount,
+        total,
         message:
-          "Redirecting to Shopify to collect payment. Cart stays until you pay. Inventory updates only after payment succeeds.",
+          "Redirecting to Shopify with this website’s current prices and discounts. Cart stays until you pay. Stock updates only after payment.",
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Shopify checkout failed";

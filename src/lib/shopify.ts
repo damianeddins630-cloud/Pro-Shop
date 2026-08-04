@@ -536,6 +536,34 @@ export async function createShopifyCheckout(input: {
   };
 }
 
+/** Best-effort delete of a superseded unpaid draft so old prices can't be paid. */
+export async function deleteShopifyDraftOrder(
+  draftOrderGid: string | undefined | null
+): Promise<boolean> {
+  if (!draftOrderGid) return false;
+  await loadShopifyRuntimeConfig();
+  if (!isShopifyConfigured()) return false;
+  try {
+    const data = await adminGraphql<{
+      draftOrderDelete: {
+        deletedId: string | null;
+        userErrors: { message: string }[];
+      };
+    }>(
+      `mutation DraftOrderDelete($input: DraftOrderDeleteInput!) {
+        draftOrderDelete(input: $input) {
+          deletedId
+          userErrors { message }
+        }
+      }`,
+      { input: { id: draftOrderGid } }
+    );
+    return Boolean(data.draftOrderDelete?.deletedId);
+  } catch {
+    return false;
+  }
+}
+
 export async function isShopifyDraftOrderPaid(
   draftOrderGid: string
 ): Promise<boolean> {

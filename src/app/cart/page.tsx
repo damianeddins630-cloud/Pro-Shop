@@ -184,6 +184,23 @@ export default function CartPage() {
     setError("");
     setMessage("");
     try {
+      // Pull latest website prices/discounts into the cart UI before charging.
+      try {
+        const fresh = await fetch(`/api/products?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        const freshData = await fresh.json();
+        const merged = pickNewestProducts(
+          freshData.products || [],
+          typeof freshData.updatedAt === "string"
+            ? freshData.updatedAt
+            : undefined
+        );
+        setProducts(merged);
+      } catch {
+        // checkout API still re-prices from the server
+      }
+
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

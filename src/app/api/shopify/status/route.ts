@@ -32,7 +32,7 @@ export async function GET() {
         "Website owns catalog, prices, cart, and stock",
         "Cart items stay in the browser until the shopper pays or removes them",
         "POST /api/checkout creates a website order (awaiting_payment) without reducing stock",
-        "Shopify Draft Order uses custom line items at exact website prices (payment only)",
+        "Each Pay click rebuilds a Shopify Draft Order from LIVE website prices/discounts",
         "Shopify webhook / return confirm marks paid, then website stock drops once",
       ],
       webhookUrl:

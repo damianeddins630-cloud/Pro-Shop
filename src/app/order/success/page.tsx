@@ -16,11 +16,32 @@ function SuccessInner() {
   const orderId = params.get("orderId");
   const { clear, removeMany } = useCart();
   const [order, setOrder] = useState<Order | null>(null);
+  const [resuming, setResuming] = useState(false);
   const [message, setMessage] = useState(() =>
     orderId
       ? "Checking your payment..."
       : "If you paid on Shopify, your order will appear under your account once payment is confirmed."
   );
+
+  async function resumeWithLivePrices() {
+    if (!orderId || resuming) return;
+    setResuming(true);
+    setMessage("Refreshing Shopify payment with this website’s current prices…");
+    try {
+      const res = await fetch(`/api/orders/${orderId}/pay`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.checkoutUrl) {
+        setMessage(data.error || "Could not rebuild payment link.");
+        setResuming(false);
+        return;
+      }
+      if (data.order) setOrder(data.order as Order);
+      window.location.assign(String(data.checkoutUrl));
+    } catch {
+      setMessage("Could not rebuild payment link.");
+      setResuming(false);
+    }
+  }
 
   useEffect(() => {
     if (!orderId) return;
@@ -134,10 +155,17 @@ function SuccessInner() {
           <Link href="/shop" className="btn btn-ghost">
             Keep shopping
           </Link>
-          {order?.status === "awaiting_payment" && order.shopifyInvoiceUrl ? (
-            <a href={order.shopifyInvoiceUrl} className="btn btn-primary">
-              Resume Shopify payment
-            </a>
+          {order?.status === "awaiting_payment" ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={resuming}
+              onClick={() => void resumeWithLivePrices()}
+            >
+              {resuming
+                ? "Updating prices…"
+                : "Resume Shopify payment (live website prices)"}
+            </button>
           ) : null}
           {order?.status === "awaiting_payment" ? (
             <Link href="/cart" className="btn btn-ghost">

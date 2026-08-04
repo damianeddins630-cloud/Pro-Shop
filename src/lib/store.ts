@@ -771,6 +771,42 @@ export async function getProduct(id: string) {
   return product ? normalizeProduct(product) : null;
 }
 
+/**
+ * Checkout / charge path: force a durable catalog read so website price and
+ * discount edits apply instantly when Shopify is asked to collect payment.
+ */
+export async function getFreshProductForCheckout(id: string) {
+  try {
+    const remote = await loadDurableStore();
+    if (remote?.products?.length) {
+      const product = remote.products.find((p) => p.id === id || p.slug === id);
+      if (product) return normalizeProduct(product);
+    }
+  } catch {
+    // fall through to memory store
+  }
+  return getProduct(id);
+}
+
+export async function getFreshCouponForCheckout(code: string) {
+  const key = normalizeCouponCode(code);
+  if (!key) return null;
+  try {
+    const remote = await loadDurableStore();
+    if (Array.isArray(remote?.coupons)) {
+      ensureCoupons(remote);
+      const found = remote.coupons.find(
+        (c) => c.active !== false && codesMatch(c.code, key)
+      );
+      if (found) return normalizeCoupon(found);
+      return null;
+    }
+  } catch {
+    // fall through
+  }
+  return findCouponByCode(code);
+}
+
 export async function createProduct(input: Omit<Product, "id">) {
   let created: Product | null = null;
   await mutate((data) => {
@@ -1245,6 +1281,11 @@ export async function updateOrder(
       | "shopifyDraftOrderId"
       | "shopifyInvoiceUrl"
       | "paymentProvider"
+      | "items"
+      | "subtotal"
+      | "discountAmount"
+      | "couponCode"
+      | "total"
     >
   >
 ) {
@@ -1256,6 +1297,27 @@ export async function updateOrder(
     updated = data.orders[idx];
   });
   return updated;
+}
+
+/** Cancel stale unpaid Shopify checkouts so shoppers can't pay old prices. */
+export async function cancelOpenShopifyCheckoutsForUser(
+  userId: string,
+  exceptOrderId?: string
+) {
+  const cancelled: Order[] = [];
+  await mutate((data) => {
+    data.orders = (data.orders || []).map((o) => {
+      if (o.userId !== userId) return o;
+      if (exceptOrderId && o.id === exceptOrderId) return o;
+      if (o.status !== "awaiting_payment") return o;
+      if (o.paymentProvider !== "shopify") return o;
+      if (o.inventoryApplied) return o;
+      const next = { ...o, status: "cancelled" as OrderStatus };
+      cancelled.push(next);
+      return next;
+    });
+  });
+  return cancelled;
 }
 
 export async function findOrderById(id: string) {
@@ -1273,35 +1335,6 @@ export async function findOrderByShopifyDraftId(draftId: string) {
 export async function listOrdersForUser(userId: string) {
   const data = await getStore();
   return (data.orders || []).filter((o) => o.userId === userId);
-}
-
-/** Reuse an open Shopify invoice when the shopper retries the same cart. */
-export async function findReusableShopifyCheckout(input: {
-  userId: string;
-  items: OrderItem[];
-  total: number;
-  couponCode?: string;
-}): Promise<Order | null> {
-  const data = await getStore();
-  const fingerprint = (items: OrderItem[]) =>
-    items
-      .map((i) => `${i.productId}:${i.quantity}:${Number(i.price).toFixed(2)}`)
-      .sort()
-      .join("|");
-  const want = fingerprint(input.items);
-  const coupon = (input.couponCode || "").trim().toLowerCase();
-
-  return (
-    (data.orders || []).find((o) => {
-      if (o.userId !== input.userId) return false;
-      if (o.status !== "awaiting_payment") return false;
-      if (o.paymentProvider !== "shopify") return false;
-      if (!o.shopifyInvoiceUrl || !o.shopifyDraftOrderId) return false;
-      if (Math.abs(Number(o.total) - Number(input.total)) > 0.009) return false;
-      if ((o.couponCode || "").trim().toLowerCase() !== coupon) return false;
-      return fingerprint(o.items || []) === want;
-    }) || null
-  );
 }
 
 export async function listAllOrders() {
