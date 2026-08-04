@@ -78,6 +78,21 @@ export async function PUT(req: Request) {
     const body = schema.parse(await req.json());
     const existing = await getShopifyConfig();
 
+    const clientId = body.clientId.trim();
+    if (
+      clientId.toLowerCase() === "cv_damian" ||
+      clientId.includes("@") ||
+      clientId.length < 16
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Client ID looks wrong. Use the Shopify app Client ID (long hex like 9f9509ec...), not your website login username.",
+        },
+        { status: 400 }
+      );
+    }
+
     const clientSecret =
       body.clientSecret?.trim() || existing?.clientSecret || "";
     const webhookSecret =
@@ -91,11 +106,20 @@ export async function PUT(req: Request) {
         { status: 400 }
       );
     }
+    if (!clientSecret.startsWith("shpss_") && !clientSecret.startsWith("shpat_")) {
+      return NextResponse.json(
+        {
+          error:
+            "Client Secret should start with shpss_ (from Shopify app Credentials).",
+        },
+        { status: 400 }
+      );
+    }
 
     const saved = await saveShopifyConfig(
       {
         storeDomain: body.storeDomain,
-        clientId: body.clientId,
+        clientId,
         clientSecret,
         webhookSecret,
         apiVersion: body.apiVersion || "2025-01",
@@ -108,9 +132,13 @@ export async function PUT(req: Request) {
     const status = shopifyStatus();
     const persist = storePersistStatus();
 
+    const persistDetail = (
+      saved as { _persistDetail?: string }
+    )._persistDetail;
+
     return NextResponse.json(
       {
-        ok: Boolean(ping.ok) && persist.lastPersistOk,
+        ok: Boolean(ping.ok),
         saved: {
           storeDomain: saved.storeDomain,
           clientId: saved.clientId,
@@ -119,12 +147,10 @@ export async function PUT(req: Request) {
         },
         status,
         adminApi: ping,
-        persist,
+        persist: { ...persist, detail: persistDetail },
         message: ping.ok
-          ? `Connected to ${ping.shopName || "Shopify"}. Tap Refresh if the page still looks old.`
-          : !persist.lastPersistOk
-            ? "Saved, but storage write may have failed. Try Save Connect again."
-            : ping.error || "Saved, but Shopify ping failed.",
+          ? `Connected to ${ping.shopName || "Shopify"}. Tap Refresh status.`
+          : ping.error || "Saved, but Shopify ping failed.",
       },
       { headers: noStore }
     );

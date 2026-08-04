@@ -1431,5 +1431,7 @@ export async function saveShopifyConfig(
   if (dedicated.ok) {
     g().lastPersistOk = true;
   }
+  (saved as ShopifySiteConfig & { _persistDetail?: string })._persistDetail =
+    dedicated.detail;
   return saved;
 }

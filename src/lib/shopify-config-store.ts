@@ -14,15 +14,6 @@ function blobConfigured() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 }
 
-function githubToken() {
-  return (
-    process.env.GITHUB_TOKEN?.trim() ||
-    process.env.GH_TOKEN?.trim() ||
-    process.env.GH_STORAGE_TOKEN?.trim() ||
-    ""
-  );
-}
-
 function normalizeConfig(
   input: ShopifySiteConfig | null | undefined
 ): ShopifySiteConfig | null {
@@ -76,7 +67,6 @@ async function saveRedisShopify(config: ShopifySiteConfig): Promise<boolean> {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN!;
   const payload = JSON.stringify(config);
   try {
-    // Upstash REST command form
     const res = await fetch(base, {
       method: "POST",
       headers: {
@@ -86,18 +76,19 @@ async function saveRedisShopify(config: ShopifySiteConfig): Promise<boolean> {
       body: JSON.stringify(["SET", REDIS_SHOPIFY_KEY, payload]),
       cache: "no-store",
     });
-    if (res.ok) return true;
-
-    // Fallback path style: /set/{key}
+    if (res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { result?: string };
+      if (json.result === "OK" || res.status === 200) return true;
+    }
+  } catch {
+    // continue
+  }
+  try {
     const res2 = await fetch(
-      `${base}/set/${encodeURIComponent(REDIS_SHOPIFY_KEY)}`,
+      `${base}/set/${encodeURIComponent(REDIS_SHOPIFY_KEY)}/${encodeURIComponent(payload)}`,
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       }
     );
@@ -108,27 +99,64 @@ async function saveRedisShopify(config: ShopifySiteConfig): Promise<boolean> {
 }
 
 async function loadBlobShopify(): Promise<ShopifySiteConfig | null> {
-  if (!blobConfigured()) return null;
   const known =
     process.env.BBA_SHOPIFY_BLOB_URL?.trim() ||
     (globalThis as typeof globalThis & { __bba_shopify_blob_url?: string })
       .__bba_shopify_blob_url;
-  if (!known) return null;
-  try {
-    const res = await fetch(
-      `${known}${known.includes("?") ? "&" : "?"}cache=0`,
-      { cache: "no-store" }
-    );
-    if (!res.ok) return null;
-    return normalizeConfig((await res.json()) as ShopifySiteConfig);
-  } catch {
-    return null;
+  if (known) {
+    try {
+      const res = await fetch(
+        `${known}${known.includes("?") ? "&" : "?"}cache=0`,
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        return normalizeConfig((await res.json()) as ShopifySiteConfig);
+      }
+    } catch {
+      // continue
+    }
   }
+
+  // Try listing via blob API pathname guess if token exists
+  if (!blobConfigured()) return null;
+  return null;
 }
 
 async function saveBlobShopify(config: ShopifySiteConfig): Promise<boolean> {
   if (!blobConfigured()) return false;
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN!;
+  const body = JSON.stringify(config);
+
+  // Style A: vercel-storage host with overwrite headers
+  try {
+    const res = await fetch(
+      `https://blob.vercel-storage.com/${BLOB_SHOPIFY_PATH}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${blobToken}`,
+          "Content-Type": "application/json",
+          "x-vercel-blob-access": "public",
+          "x-vercel-blob-allow-overwrite": "true",
+        },
+        body,
+        cache: "no-store",
+      }
+    );
+    if (res.ok) {
+      const json = (await res.json()) as { url?: string };
+      if (json.url) {
+        (
+          globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
+        ).__bba_shopify_blob_url = json.url;
+      }
+      return true;
+    }
+  } catch {
+    // continue
+  }
+
+  // Style B: query-param legacy
   try {
     const res = await fetch(
       `https://blob.vercel-storage.com/${BLOB_SHOPIFY_PATH}?access=public&addRandomSuffix=false&allowOverwrite=true`,
@@ -138,27 +166,55 @@ async function saveBlobShopify(config: ShopifySiteConfig): Promise<boolean> {
           Authorization: `Bearer ${blobToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(config),
+        body,
         cache: "no-store",
       }
     );
-    if (!res.ok) return false;
-    const json = (await res.json()) as { url?: string };
-    if (json.url) {
-      (
-        globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
-      ).__bba_shopify_blob_url = json.url;
+    if (res.ok) {
+      const json = (await res.json()) as { url?: string };
+      if (json.url) {
+        (
+          globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
+        ).__bba_shopify_blob_url = json.url;
+      }
+      return true;
     }
-    return true;
   } catch {
-    return false;
+    // continue
   }
+
+  // Style C: vercel.com API
+  try {
+    const res = await fetch(
+      `https://vercel.com/api/blob?filename=${encodeURIComponent(BLOB_SHOPIFY_PATH)}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${blobToken}`,
+          "Content-Type": "application/json",
+          "x-vercel-blob-access": "public",
+          "x-vercel-blob-allow-overwrite": "true",
+        },
+        body,
+        cache: "no-store",
+      }
+    );
+    if (res.ok) {
+      const json = (await res.json()) as { url?: string };
+      if (json.url) {
+        (
+          globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
+        ).__bba_shopify_blob_url = json.url;
+      }
+      return true;
+    }
+  } catch {
+    // continue
+  }
+
+  return false;
 }
 
-/**
- * Load Shopify keys from a small dedicated durable slot (not the full catalog).
- * This avoids large-store write failures wiping / missing checkout credentials.
- */
 export async function loadDurableShopifyConfig(): Promise<ShopifySiteConfig | null> {
   const [redis, blob] = await Promise.all([
     loadRedisShopify(),
@@ -183,21 +239,26 @@ export async function loadDurableShopifyConfig(): Promise<ShopifySiteConfig | nu
 
 export async function saveDurableShopifyConfig(
   input: ShopifySiteConfig
-): Promise<{ ok: boolean; config: ShopifySiteConfig | null }> {
+): Promise<{ ok: boolean; config: ShopifySiteConfig | null; detail: string }> {
   const config = normalizeConfig({
     ...input,
     updatedAt: new Date().toISOString(),
   });
-  if (!config) return { ok: false, config: null };
+  if (!config) return { ok: false, config: null, detail: "invalid_config" };
 
-  const results = await Promise.all([
-    saveRedisShopify(config),
-    saveBlobShopify(config),
-  ]);
-  // If neither redis nor blob is configured, treat as local-only success when
-  // caller also keeps it in the main store — but report false so Ops warns.
-  if (!redisConfigured() && !blobConfigured() && !githubToken()) {
-    return { ok: false, config };
+  const redisOk = await saveRedisShopify(config);
+  const blobOk = await saveBlobShopify(config);
+  const configured = redisConfigured() || blobConfigured();
+  if (!configured) {
+    return {
+      ok: false,
+      config,
+      detail: "no_redis_or_blob",
+    };
   }
-  return { ok: results.some(Boolean), config };
+  return {
+    ok: redisOk || blobOk,
+    config,
+    detail: `redis=${redisOk},blob=${blobOk}`,
+  };
 }

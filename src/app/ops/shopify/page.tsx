@@ -64,7 +64,10 @@ export default function OpsShopifyPage() {
   const [storeDomain, setStoreDomain] = useState(
     "ballards-bowling.myshopify.com"
   );
-  const [clientId, setClientId] = useState("");
+  // Shopify app Client ID (NOT website login username)
+  const [clientId, setClientId] = useState(
+    "9f9509ec93dde1cab442c14b7176ad08"
+  );
   const [clientSecret, setClientSecret] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [apiVersion, setApiVersion] = useState("2025-01");
