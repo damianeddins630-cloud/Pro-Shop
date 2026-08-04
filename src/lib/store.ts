@@ -575,17 +575,36 @@ export async function updateUser(
     if (patch.roleId) {
       const targetRole = data.roles.find((r) => r.id === patch.roleId);
       if (!targetRole) throw new Error("Role not found");
+      if (isOwnerRole(targetRole) && current.id !== OWNER_USER_ID) {
+        throw new Error("Only the Website Owner account can hold that role");
+      }
       if (roleRank(targetRole) >= actorRank) {
         throw new Error("You cannot assign a role at or above your own rank");
       }
       // Cannot demote/change users who currently outrank you
       const currentRole = data.roles.find((r) => r.id === current.roleId);
-      if (roleRank(currentRole) >= actorRank && current.id !== opts?.actorUserId) {
+      if (
+        roleRank(currentRole) >= actorRank &&
+        current.id !== opts?.actorUserId
+      ) {
         throw new Error("You cannot change a user at or above your own rank");
       }
     }
 
-    data.users[idx] = { ...current, ...patch, id };
+    const nextRoleId = patch.roleId || current.roleId;
+    data.users[idx] = {
+      ...current,
+      ...patch,
+      id,
+      roleId: nextRoleId,
+      // Keep legacy role field in sync for older session cookies
+      role:
+        nextRoleId === OWNER_ROLE_ID || isOwnerRole(
+          data.roles.find((r) => r.id === nextRoleId)
+        )
+          ? "admin"
+          : "customer",
+    };
     updated = data.users[idx];
   });
   return updated;

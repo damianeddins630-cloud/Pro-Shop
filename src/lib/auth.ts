@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import type { Permission, PublicUser, SessionPayload, User } from "./types";
-import { getRoleById, resolveUserRole } from "./store";
+import { findUserById, getRoleById, resolveUserRole } from "./store";
 
 const COOKIE_NAME = "bba_session";
 const secret = new TextEncoder().encode(
@@ -83,18 +83,38 @@ export async function getSession(): Promise<SessionPayload | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret);
+    const userId = String(payload.userId || "");
+
+    // Always use the live user record so Ops role changes apply immediately
+    // (JWT alone can keep a stale roleId until the next login).
+    if (userId) {
+      const liveUser = await findUserById(userId);
+      if (liveUser) {
+        const role = await resolveUserRole(liveUser);
+        return {
+          userId: liveUser.id,
+          roleId: role.id,
+          username: liveUser.username,
+          email: liveUser.email,
+          permissions: role.permissions,
+        };
+      }
+    }
+
+    // Fallback for edge cases where the user row is temporarily missing
     let roleId = String(payload.roleId || "");
     const legacyRole = String(payload.role || "");
     if (!roleId || roleId === "admin" || roleId === "customer") {
       if (legacyRole === "admin" || roleId === "admin") roleId = "role_admin";
-      else if (legacyRole === "customer" || roleId === "customer") roleId = "role_customer";
+      else if (legacyRole === "customer" || roleId === "customer") {
+        roleId = "role_customer";
+      }
     }
 
     let permissions = Array.isArray(payload.permissions)
       ? (payload.permissions as Permission[])
       : [];
 
-    // Always refresh permissions from live role data
     const role = roleId ? await getRoleById(roleId) : null;
     if (role) {
       permissions = role.permissions;
@@ -108,7 +128,7 @@ export async function getSession(): Promise<SessionPayload | null> {
     }
 
     return {
-      userId: String(payload.userId),
+      userId,
       roleId: roleId || "role_customer",
       username: String(payload.username),
       email: String(payload.email),

@@ -11,29 +11,32 @@ import {
 import { useEditMode } from "@/lib/edit-mode";
 
 export default function OpsUsersPage() {
-  const { user: me } = useEditMode();
+  const { user: me, refreshUser } = useEditMode();
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [actorRank, setActorRank] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [uRes, rRes] = await Promise.all([
-      fetch("/api/users", { cache: "no-store" }),
-      fetch("/api/roles", { cache: "no-store" }),
+      fetch("/api/users", { cache: "no-store", credentials: "same-origin" }),
+      fetch("/api/roles", { cache: "no-store", credentials: "same-origin" }),
     ]);
-    const uData = await uRes.json();
-    const rData = await rRes.json();
+    const uData = await uRes.json().catch(() => ({}));
+    const rData = await rRes.json().catch(() => ({}));
     if (!uRes.ok) {
       setError(uData.error || "Could not load users");
+      setUsers([]);
       setLoading(false);
       return;
     }
-    setUsers(uData.users || []);
-    setRoles(rData.roles || []);
+    setUsers(Array.isArray(uData.users) ? uData.users : []);
+    setRoles(Array.isArray(rData.roles) ? rData.roles : []);
     setActorRank(Number(uData.actorRank ?? rData.actorRank) || 0);
+    setError("");
     setLoading(false);
   }, []);
 
@@ -42,25 +45,70 @@ export default function OpsUsersPage() {
   }, [load]);
 
   const assignableRoles = useMemo(
-    () => roles.filter((r) => canAssignRole(actorRank, r)),
+    () => roles.filter((r) => canAssignRole(actorRank, r) && !isOwnerRole(r)),
     [roles, actorRank]
   );
 
   async function assignRole(userId: string, roleId: string) {
+    const previous = users.find((u) => u.id === userId);
+    if (!previous || previous.roleId === roleId) return;
+
     setError("");
     setMessage("");
-    const res = await fetch("/api/users", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, roleId }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Could not update role");
-      return;
+    setSavingId(userId);
+
+    // Optimistic UI so the dropdown doesn't snap back while saving
+    setUsers((list) =>
+      list.map((u) => {
+        if (u.id !== userId) return u;
+        const role = roles.find((r) => r.id === roleId);
+        return {
+          ...u,
+          roleId,
+          roleName: role?.name || u.roleName,
+          permissions: role?.permissions || u.permissions,
+        };
+      })
+    );
+
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ userId, roleId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Revert
+        setUsers((list) =>
+          list.map((u) => (u.id === userId ? previous : u))
+        );
+        setError(data.error || "Could not update role");
+        return;
+      }
+      if (Array.isArray(data.users)) {
+        setUsers(data.users);
+      } else if (data.user) {
+        setUsers((list) =>
+          list.map((u) => (u.id === data.user.id ? { ...u, ...data.user } : u))
+        );
+      } else {
+        await load();
+      }
+      setMessage(
+        `Saved ${data.user?.username || "user"} as ${data.user?.roleName || "updated role"}.`
+      );
+      // Refresh current session permissions if you edited yourself
+      if (userId === me?.id) {
+        await refreshUser();
+      }
+    } catch {
+      setUsers((list) => list.map((u) => (u.id === userId ? previous : u)));
+      setError("Could not update role — check your connection and try again.");
+    } finally {
+      setSavingId(null);
     }
-    setMessage("User role updated");
-    load();
   }
 
   if (loading) return <p className="text-mist">Loading users...</p>;
@@ -70,8 +118,8 @@ export default function OpsUsersPage() {
       <h2 className="display text-4xl">Users & accounts</h2>
       <p className="mt-1 text-sm text-mist">
         Every account: when it was made, name, email, role, and whether they ordered.
-        You can only assign roles below your rank ({actorRank}). The Website Owner
-        account cannot be demoted.
+        Role changes save immediately and apply the next time that user loads a page
+        (no re-login needed). Website Owner stays locked.
       </p>
       {(message || error) && (
         <p className={`mt-4 text-sm ${error ? "text-red-300" : "text-emerald-300"}`}>
@@ -139,9 +187,9 @@ export default function OpsUsersPage() {
                       <select
                         className="field !py-2"
                         value={u.roleId}
+                        disabled={savingId === u.id}
                         onChange={(e) => assignRole(u.id, e.target.value)}
                       >
-                        {/* Keep current option visible even if not assignable list */}
                         {!assignableRoles.some((r) => r.id === u.roleId) &&
                           currentRole && (
                             <option value={currentRole.id}>
@@ -153,11 +201,13 @@ export default function OpsUsersPage() {
                             {r.name} · rank {roleRank(r)}
                           </option>
                         ))}
-                        {/* Never offer Website Owner unless already owner */}
                         {u.roleId === OWNER_ROLE_ID && (
                           <option value={OWNER_ROLE_ID}>Website Owner</option>
                         )}
                       </select>
+                    )}
+                    {savingId === u.id && (
+                      <span className="ml-2 text-xs text-mist">Saving...</span>
                     )}
                   </td>
                 </tr>
@@ -166,6 +216,9 @@ export default function OpsUsersPage() {
           </tbody>
         </table>
       </div>
+      {!users.length && (
+        <p className="mt-4 text-mist">No users found.</p>
+      )}
     </div>
   );
 }
