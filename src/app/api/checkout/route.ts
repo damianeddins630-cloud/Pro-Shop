@@ -20,12 +20,14 @@ import {
 } from "@/lib/shopify";
 import { effectivePrice } from "@/lib/pricing";
 
+export const dynamic = "force-dynamic";
+
 const schema = z.object({
   items: z
     .array(
       z.object({
-        productId: z.string(),
-        quantity: z.number().int().positive(),
+        productId: z.string().min(1),
+        quantity: z.number().int().positive().max(999),
       })
     )
     .min(1),
@@ -33,13 +35,19 @@ const schema = z.object({
 });
 
 export async function GET() {
-  return NextResponse.json({ shopify: shopifyStatus() });
+  return NextResponse.json(
+    { shopify: shopifyStatus() },
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  );
 }
 
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Please log in to checkout" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Please log in to checkout", code: "LOGIN_REQUIRED" },
+      { status: 401 }
+    );
   }
 
   try {
@@ -50,11 +58,20 @@ export async function POST(req: Request) {
     for (const item of body.items) {
       const product = await getProduct(item.productId);
       if (!product || !product.active) {
-        return NextResponse.json({ error: "Product unavailable" }, { status: 400 });
+        return NextResponse.json(
+          {
+            error: `Product unavailable: ${item.productId}`,
+            code: "PRODUCT_UNAVAILABLE",
+          },
+          { status: 400 }
+        );
       }
       if (product.stock < item.quantity) {
         return NextResponse.json(
-          { error: `Not enough stock for ${product.name}` },
+          {
+            error: `Not enough stock for ${product.name} (have ${product.stock}, need ${item.quantity})`,
+            code: "OUT_OF_STOCK",
+          },
           { status: 400 }
         );
       }
@@ -72,6 +89,8 @@ export async function POST(req: Request) {
       subtotal += unitPrice * item.quantity;
     }
 
+    subtotal = Math.round(subtotal * 100) / 100;
+
     let discountAmount = 0;
     let total = subtotal;
     let appliedCode: string | undefined;
@@ -83,7 +102,10 @@ export async function POST(req: Request) {
         const reason =
           (await getCouponRedeemBlockReason(body.couponCode)) ||
           "Coupon not found or inactive";
-        return NextResponse.json({ error: reason }, { status: 400 });
+        return NextResponse.json(
+          { error: reason, code: "COUPON_INVALID" },
+          { status: 400 }
+        );
       }
       const applied = applyCouponToTotal(subtotal, coupon);
       discountAmount = applied.discountAmount;
@@ -97,7 +119,7 @@ export async function POST(req: Request) {
       req.headers.get("origin") ||
       "http://localhost:3000";
 
-    // Free / fully discounted orders complete on this website (no Shopify)
+    // Free / fully discounted orders complete on this website (no Shopify popup)
     if (total <= 0) {
       await reduceStock(body.items);
       if (appliedCode) await recordCouponUse(appliedCode);
@@ -120,81 +142,31 @@ export async function POST(req: Request) {
         ok: true,
         provider: "local",
         free: true,
+        orderId: order.id,
         order,
         products,
         updatedAt: await getInventoryUpdatedAt(),
         message: appliedCode
-          ? `Order is free with coupon ${appliedCode}${couponNote ? ` (${couponNote})` : ""}.`
-          : "Order placed for free.",
+          ? `Free order recorded with coupon ${appliedCode}${couponNote ? ` (${couponNote})` : ""}. No Shopify payment needed.`
+          : "Free order recorded on this website.",
       });
     }
 
-    // Shopify checkout: website keeps catalog; Shopify only collects payment.
-    // Inventory is reduced after successful payment (verified webhook / confirm).
-    if (isShopifyConfigured()) {
-      const order = await createOrder({
-        userId: session.userId,
-        username: session.username,
-        email: session.email,
-        items: lineItems,
-        subtotal,
-        discountAmount,
-        couponCode: appliedCode,
-        total,
-        status: "awaiting_payment",
-        paymentProvider: "shopify",
-        inventoryApplied: false,
-      });
-
-      const returnUrl = `${origin}/order/success?orderId=${order.id}`;
-
-      try {
-        const shopify = await createShopifyCheckout({
-          email: session.email,
-          username: session.username,
-          localOrderId: order.id,
-          items: lineItems,
-          returnUrl,
-          discountAmount,
-          couponCode: appliedCode,
-        });
-
-        const updated = await updateOrder(order.id, {
-          shopifyDraftOrderId: shopify.draftOrderId,
-          shopifyInvoiceUrl: shopify.invoiceUrl,
-        });
-
-        return NextResponse.json({
-          ok: true,
-          provider: "shopify",
-          orderId: order.id,
-          order: updated || order,
-          checkoutUrl: shopify.invoiceUrl,
-          returnUrl,
-          message:
-            "Continue to Shopify to pay. Website inventory updates after payment succeeds.",
-        });
-      } catch (e) {
-        await updateOrder(order.id, { status: "cancelled" });
-        throw e;
-      }
-    }
-
-    // On Vercel / production, do not pretend paid checkout works without Shopify.
-    if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+    // Paid checkout REQUIRES Shopify — never silently place a paid local order on Vercel.
+    if (!isShopifyConfigured()) {
+      const status = shopifyStatus();
       return NextResponse.json(
         {
           error:
-            "Shopify checkout is not connected yet. Add SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN in Vercel, then redeploy.",
-          shopify: shopifyStatus(),
+            "Shopify payment is not connected on this server. Add SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN in Vercel project pro-shop-lemon, then Redeploy.",
+          code: "SHOPIFY_NOT_CONFIGURED",
+          shopify: status,
         },
         { status: 503 }
       );
     }
 
-    // Local/dev fallback only
-    await reduceStock(body.items);
-    if (appliedCode) await recordCouponUse(appliedCode);
+    // 1) Record website order first so Ops always has a row even if Shopify fails
     const order = await createOrder({
       userId: session.userId,
       username: session.username,
@@ -204,24 +176,65 @@ export async function POST(req: Request) {
       discountAmount,
       couponCode: appliedCode,
       total,
-      status: "placed",
-      paymentProvider: "local",
-      inventoryApplied: true,
+      status: "awaiting_payment",
+      paymentProvider: "shopify",
+      inventoryApplied: false,
     });
 
-    const products = await listProducts({ includeInactive: true });
-    return NextResponse.json({
-      ok: true,
-      provider: "local",
-      order,
-      products,
-      updatedAt: await getInventoryUpdatedAt(),
-      message: appliedCode
-        ? `Order placed with coupon ${appliedCode}. Inventory updated.`
-        : "Order placed locally (Shopify not connected). Inventory updated.",
-    });
+    const returnUrl = `${origin}/order/success?orderId=${order.id}`;
+
+    try {
+      // 2) Create Shopify Draft Order → invoice / payment URL
+      const shopify = await createShopifyCheckout({
+        email: session.email,
+        username: session.username,
+        localOrderId: order.id,
+        items: lineItems,
+        returnUrl,
+        discountAmount,
+        couponCode: appliedCode,
+      });
+
+      const updated = await updateOrder(order.id, {
+        shopifyDraftOrderId: shopify.draftOrderId,
+        shopifyInvoiceUrl: shopify.invoiceUrl,
+      });
+
+      // 3) Client must redirect to checkoutUrl (Shopify hosted payment)
+      return NextResponse.json({
+        ok: true,
+        provider: "shopify",
+        orderId: order.id,
+        order: updated || order,
+        checkoutUrl: shopify.invoiceUrl,
+        returnUrl,
+        message:
+          "Redirecting to Shopify to collect payment. Inventory updates after payment succeeds.",
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Shopify checkout failed";
+      await updateOrder(order.id, { status: "cancelled" });
+      return NextResponse.json(
+        {
+          error: message,
+          code: "SHOPIFY_DRAFT_FAILED",
+          orderId: order.id,
+          shopify: shopifyStatus(),
+        },
+        { status: 502 }
+      );
+    }
   } catch (e) {
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid cart payload", code: "INVALID_CART", details: e.issues },
+        { status: 400 }
+      );
+    }
     const message = e instanceof Error ? e.message : "Checkout failed";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      { error: message, code: "CHECKOUT_FAILED" },
+      { status: 400 }
+    );
   }
 }

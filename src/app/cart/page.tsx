@@ -22,6 +22,15 @@ type AppliedCoupon = {
   total: number;
 };
 
+type ShopifyClientStatus = {
+  configured: boolean;
+  webhookConfigured?: boolean;
+  checkoutReady?: boolean;
+  storeDomain?: string | null;
+  missing?: string[];
+  hints?: string[];
+};
+
 export default function CartPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useEditMode();
@@ -30,11 +39,13 @@ export default function CartPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [shopifyReady, setShopifyReady] = useState(false);
+  const [shopify, setShopify] = useState<ShopifyClientStatus | null>(null);
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
   const [couponError, setCouponError] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+
+  const shopifyReady = Boolean(shopify?.configured);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -52,16 +63,29 @@ export default function CartPage() {
         setProducts(pickNewestProducts([]));
       }
     };
+    const loadShopify = async () => {
+      try {
+        const res = await fetch("/api/shopify/status", { cache: "no-store" });
+        const d = await res.json();
+        setShopify(d.shopify || { configured: false });
+      } catch {
+        try {
+          const res = await fetch("/api/checkout", { cache: "no-store" });
+          const d = await res.json();
+          setShopify(d.shopify || { configured: false });
+        } catch {
+          setShopify({ configured: false });
+        }
+      }
+    };
     const onRefresh = () => {
       void loadProducts();
+      void loadShopify();
     };
     void loadProducts();
+    void loadShopify();
     window.addEventListener("bba-inventory", onRefresh);
     window.addEventListener("focus", onRefresh);
-    fetch("/api/checkout")
-      .then((r) => r.json())
-      .then((d) => setShopifyReady(Boolean(d.shopify?.configured)))
-      .catch(() => setShopifyReady(false));
     return () => {
       window.removeEventListener("bba-inventory", onRefresh);
       window.removeEventListener("focus", onRefresh);
@@ -80,7 +104,6 @@ export default function CartPage() {
 
   const subtotal = useMemo(() => total(products), [total, products]);
 
-  // Keep redeemed coupon totals in sync if cart quantities change
   useEffect(() => {
     if (!coupon) return;
     void (async () => {
@@ -155,14 +178,21 @@ export default function CartPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           items,
           couponCode: coupon?.code || undefined,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Checkout failed");
+        if (data.shopify) setShopify(data.shopify);
+        setError(
+          data.error ||
+            (res.status === 503
+              ? "Shopify payment is not connected yet."
+              : "Checkout failed")
+        );
         setLoading(false);
         return;
       }
@@ -172,24 +202,34 @@ export default function CartPage() {
         setProducts(data.products);
       }
 
+      // Paid path: leave this site and open Shopify payment page
       if (data.provider === "shopify" && data.checkoutUrl) {
         clear();
         setCoupon(null);
-        window.location.href = data.checkoutUrl as string;
+        window.location.assign(String(data.checkoutUrl));
         return;
       }
 
+      // Free / local path — keep a visible order record message
       clear();
       setCoupon(null);
-      setMessage(data.message || "Order placed!");
+      setMessage(
+        data.message ||
+          (data.orderId
+            ? `Order ${data.orderId} recorded.`
+            : "Order placed!")
+      );
       setLoading(false);
     } catch {
-      setError("Checkout failed");
+      setError("Checkout failed — check your connection and try again.");
       setLoading(false);
     }
   }
 
   const due = coupon ? coupon.total : subtotal;
+  const paidCheckoutBlocked = due > 0 && !shopifyReady;
+  const checkoutDisabled = loading || authLoading || paidCheckoutBlocked;
+
   const checkoutLabel = !user
     ? "Login to checkout"
     : loading
@@ -198,7 +238,7 @@ export default function CartPage() {
         ? "Place free order"
         : shopifyReady
           ? "Pay with Shopify"
-          : "Place order";
+          : "Shopify not connected";
 
   return (
     <section className="site-shell section-pad pt-24">
@@ -209,6 +249,31 @@ export default function CartPage() {
           <h1 className="display text-5xl">Your Cart</h1>
         </div>
       </div>
+
+      {paidCheckoutBlocked && (
+        <div className="mb-6 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
+          <p className="font-semibold text-amber-200">
+            Shopify payment is not connected — checkout cannot open a payment page yet.
+          </p>
+          <p className="mt-2 text-amber-100/90">
+            In Vercel project <strong>pro-shop-lemon</strong>, add{" "}
+            <code className="text-amber-50">SHOPIFY_STORE_DOMAIN</code>,{" "}
+            <code className="text-amber-50">SHOPIFY_ADMIN_ACCESS_TOKEN</code>, and{" "}
+            <code className="text-amber-50">SHOPIFY_WEBHOOK_SECRET</code>, then Redeploy.
+          </p>
+          {shopify?.missing?.length ? (
+            <p className="mt-2 text-amber-100/80">
+              Missing: {shopify.missing.join(", ")}
+            </p>
+          ) : null}
+          <p className="mt-2">
+            Status:{" "}
+            <Link href="/api/shopify/status" className="underline text-amber-50">
+              /api/shopify/status
+            </Link>
+          </p>
+        </div>
+      )}
 
       {count === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
@@ -321,20 +386,28 @@ export default function CartPage() {
             </div>
 
             <p className="mt-4 text-sm text-mist">
-              Login required to buy. Shop and cart stay on this website.{" "}
+              Login required to buy. Catalog and cart stay on this website.{" "}
               {due <= 0
-                ? "Free coupon orders complete on this site — no payment needed."
+                ? "This is a free coupon order — it records on the website with no Shopify payment page."
                 : shopifyReady
-                  ? "Payment is collected securely by Shopify, then you return here."
-                  : "Shopify payments are not connected yet — orders save on the site only."}
+                  ? "Pay with Shopify opens Shopify’s secure payment page (card / Shop Pay / Apple Pay / Google Pay)."
+                  : "Paid checkout is blocked until Shopify env vars are set on Vercel."}
             </p>
+            {shopifyReady && shopify?.storeDomain && (
+              <p className="mt-2 text-xs text-emerald-300">
+                Shopify ready · {shopify.storeDomain}
+                {!shopify.webhookConfigured
+                  ? " · webhook secret still missing (inventory after pay needs it)"
+                  : ""}
+              </p>
+            )}
             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
             {message && <p className="mt-3 text-sm text-emerald-300">{message}</p>}
             <button
               type="button"
-              disabled={loading || authLoading}
-              onClick={checkout}
-              className="btn btn-primary mt-6 w-full"
+              disabled={checkoutDisabled}
+              onClick={() => void checkout()}
+              className="btn btn-primary mt-6 w-full disabled:cursor-not-allowed disabled:opacity-50"
             >
               {checkoutLabel}
             </button>

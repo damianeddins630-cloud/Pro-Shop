@@ -1,6 +1,18 @@
 import type { OrderItem } from "@/lib/types";
 
-const API_VERSION = process.env.SHOPIFY_API_VERSION || "2025-01";
+/** Read env and strip accidental quotes/whitespace from Vercel paste. */
+function env(name: string): string {
+  let v = (process.env[name] || "").trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
+const API_VERSION = env("SHOPIFY_API_VERSION") || "2025-01";
 
 export type ShopifyCheckoutResult = {
   invoiceUrl: string;
@@ -8,40 +20,79 @@ export type ShopifyCheckoutResult = {
   draftOrderName?: string;
 };
 
+export type ShopifyStatus = {
+  configured: boolean;
+  webhookConfigured: boolean;
+  checkoutReady: boolean;
+  storeDomain: string | null;
+  apiVersion: string;
+  missing: string[];
+  hints: string[];
+};
+
+function storeDomainRaw() {
+  return env("SHOPIFY_STORE_DOMAIN")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+}
+
+function adminToken() {
+  return env("SHOPIFY_ADMIN_ACCESS_TOKEN");
+}
+
 export function isShopifyConfigured() {
-  return Boolean(
-    process.env.SHOPIFY_STORE_DOMAIN?.trim() &&
-      process.env.SHOPIFY_ADMIN_ACCESS_TOKEN?.trim()
-  );
+  return Boolean(storeDomainRaw() && adminToken());
 }
 
 export function isShopifyWebhookConfigured() {
-  return Boolean(process.env.SHOPIFY_WEBHOOK_SECRET?.trim());
+  return Boolean(env("SHOPIFY_WEBHOOK_SECRET"));
 }
 
-export function shopifyStatus() {
+export function shopifyStatus(): ShopifyStatus {
+  const missing: string[] = [];
+  const hints: string[] = [];
+
+  if (!storeDomainRaw()) missing.push("SHOPIFY_STORE_DOMAIN");
+  if (!adminToken()) missing.push("SHOPIFY_ADMIN_ACCESS_TOKEN");
+  if (!env("SHOPIFY_WEBHOOK_SECRET")) missing.push("SHOPIFY_WEBHOOK_SECRET");
+  if (!env("NEXT_PUBLIC_SITE_URL")) {
+    hints.push(
+      "Set NEXT_PUBLIC_SITE_URL to https://pro-shop-lemon.vercel.app so return links work."
+    );
+  }
+  if (missing.includes("SHOPIFY_STORE_DOMAIN") || missing.includes("SHOPIFY_ADMIN_ACCESS_TOKEN")) {
+    hints.push(
+      "Add Shopify vars on the Vercel project pro-shop-lemon (Production), then Redeploy with cache off."
+    );
+  }
+  if (missing.includes("SHOPIFY_WEBHOOK_SECRET")) {
+    hints.push(
+      "Webhook topic orders/paid → https://pro-shop-lemon.vercel.app/api/shopify/webhook"
+    );
+  }
+
+  const configured = isShopifyConfigured();
   return {
-    configured: isShopifyConfigured(),
+    configured,
     webhookConfigured: isShopifyWebhookConfigured(),
-    checkoutReady: isShopifyConfigured(),
-    storeDomain: process.env.SHOPIFY_STORE_DOMAIN?.trim() || null,
+    checkoutReady: configured,
+    storeDomain: storeDomainRaw() || null,
     apiVersion: API_VERSION,
+    missing,
+    hints,
   };
-}
-
-function storeDomain() {
-  const raw = process.env.SHOPIFY_STORE_DOMAIN?.trim() || "";
-  return raw.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
 async function adminGraphql<T>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
-  const domain = storeDomain();
-  const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN?.trim();
+  const domain = storeDomainRaw();
+  const token = adminToken();
   if (!domain || !token) {
-    throw new Error("Shopify is not configured");
+    throw new Error(
+      "Shopify is not configured. Set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN in Vercel."
+    );
   }
 
   const res = await fetch(
@@ -72,10 +123,55 @@ async function adminGraphql<T>(
   return json.data as T;
 }
 
+async function fetchDraftInvoiceUrl(draftOrderId: string): Promise<string | null> {
+  const data = await adminGraphql<{
+    draftOrder: { id: string; invoiceUrl: string | null; status: string } | null;
+  }>(
+    `query DraftInvoice($id: ID!) {
+      draftOrder(id: $id) {
+        id
+        invoiceUrl
+        status
+      }
+    }`,
+    { id: draftOrderId }
+  );
+  return data.draftOrder?.invoiceUrl || null;
+}
+
+/** Some stores only mint invoiceUrl after invoice send. */
+async function sendDraftInvoice(draftOrderId: string): Promise<string | null> {
+  const data = await adminGraphql<{
+    draftOrderInvoiceSend: {
+      draftOrder: { id: string; invoiceUrl: string | null } | null;
+      userErrors: { message: string }[];
+    };
+  }>(
+    `mutation SendInvoice($id: ID!) {
+      draftOrderInvoiceSend(id: $id) {
+        draftOrder {
+          id
+          invoiceUrl
+        }
+        userErrors {
+          message
+        }
+      }
+    }`,
+    { id: draftOrderId }
+  );
+
+  if (data.draftOrderInvoiceSend.userErrors?.length) {
+    throw new Error(
+      data.draftOrderInvoiceSend.userErrors.map((e) => e.message).join("; ")
+    );
+  }
+  return data.draftOrderInvoiceSend.draftOrder?.invoiceUrl || null;
+}
+
 /**
- * Create a Shopify draft order from website cart lines.
- * Shoppers browse/cart on this site; payment happens on Shopify's secure invoice URL.
- * Inventory stays on the website until payment is confirmed.
+ * Create a Shopify draft order from website cart lines and return the
+ * hosted invoice / payment URL (Shop Pay, Apple Pay, card, etc.).
  */
 export async function createShopifyCheckout(input: {
   email: string;
@@ -83,10 +179,16 @@ export async function createShopifyCheckout(input: {
   localOrderId: string;
   items: OrderItem[];
   returnUrl: string;
-  /** Website coupon discount already computed in dollars */
   discountAmount?: number;
   couponCode?: string;
 }): Promise<ShopifyCheckoutResult> {
+  if (!input.items.length) {
+    throw new Error("Cart is empty");
+  }
+  if (!input.email?.includes("@")) {
+    throw new Error("A valid customer email is required for Shopify checkout");
+  }
+
   const mutation = `
     mutation draftOrderCreate($input: DraftOrderInput!) {
       draftOrderCreate(input: $input) {
@@ -94,6 +196,7 @@ export async function createShopifyCheckout(input: {
           id
           name
           invoiceUrl
+          status
         }
         userErrors {
           field
@@ -104,17 +207,17 @@ export async function createShopifyCheckout(input: {
   `;
 
   const lineItems = input.items.map((item) => ({
-    title: item.name,
+    title: item.name.slice(0, 255),
     quantity: item.quantity,
-    originalUnitPrice: item.price.toFixed(2),
+    originalUnitPrice: Number(item.price).toFixed(2),
     customAttributes: [
-      { key: "website_product_id", value: item.productId },
+      { key: "website_product_id", value: String(item.productId) },
       { key: "website_order_id", value: input.localOrderId },
     ],
   }));
 
   const draftInput: Record<string, unknown> = {
-    email: input.email,
+    email: input.email.trim().toLowerCase(),
     note: `Ballard's website order ${input.localOrderId} for ${input.username}. Return: ${input.returnUrl}`,
     tags: ["ballards-website", `bba:${input.localOrderId}`],
     customAttributes: [
@@ -123,14 +226,14 @@ export async function createShopifyCheckout(input: {
       { key: "return_url", value: input.returnUrl },
     ],
     lineItems,
-    // Website coupons are applied below — do not also allow Shopify discount codes
+    // Website coupons applied below — do not also allow Shopify discount codes
     allowDiscountCodesInCheckout: false,
   };
 
   const discount = Number(input.discountAmount || 0);
-  if (discount > 0) {
+  if (discount > 0.009) {
     draftInput.appliedDiscount = {
-      title: input.couponCode?.trim() || "Website coupon",
+      title: (input.couponCode?.trim() || "Website coupon").slice(0, 255),
       description: input.couponCode
         ? `Website coupon ${input.couponCode}`
         : "Website discount",
@@ -145,6 +248,7 @@ export async function createShopifyCheckout(input: {
         id: string;
         name: string;
         invoiceUrl: string | null;
+        status: string;
       } | null;
       userErrors: { field: string[] | null; message: string }[];
     };
@@ -152,14 +256,30 @@ export async function createShopifyCheckout(input: {
 
   const payload = data.draftOrderCreate;
   if (payload.userErrors?.length) {
-    throw new Error(payload.userErrors.map((e) => e.message).join("; "));
+    throw new Error(
+      `Shopify draft order error: ${payload.userErrors.map((e) => e.message).join("; ")}`
+    );
   }
-  if (!payload.draftOrder?.invoiceUrl) {
-    throw new Error("Shopify did not return a payment link");
+  if (!payload.draftOrder?.id) {
+    throw new Error("Shopify did not create a draft order");
+  }
+
+  let invoiceUrl = payload.draftOrder.invoiceUrl;
+  if (!invoiceUrl) {
+    invoiceUrl = await fetchDraftInvoiceUrl(payload.draftOrder.id);
+  }
+  if (!invoiceUrl) {
+    // Force Shopify to mint the customer payment / invoice link
+    invoiceUrl = await sendDraftInvoice(payload.draftOrder.id);
+  }
+  if (!invoiceUrl) {
+    throw new Error(
+      "Shopify created the draft order but did not return a payment link. Check the custom app has write_draft_orders and the store can invoice customers."
+    );
   }
 
   return {
-    invoiceUrl: payload.draftOrder.invoiceUrl,
+    invoiceUrl,
     draftOrderId: payload.draftOrder.id,
     draftOrderName: payload.draftOrder.name,
   };
@@ -202,6 +322,31 @@ export async function isShopifyDraftOrderPaid(
     return false;
   } catch {
     return false;
+  }
+}
+
+/** Lightweight Admin API probe used by /api/shopify/status */
+export async function pingShopifyAdmin(): Promise<{
+  ok: boolean;
+  shopName?: string;
+  error?: string;
+}> {
+  if (!isShopifyConfigured()) {
+    return { ok: false, error: "Shopify env vars are missing" };
+  }
+  try {
+    const data = await adminGraphql<{ shop: { name: string; myshopifyDomain: string } }>(
+      `query { shop { name myshopifyDomain } }`
+    );
+    return {
+      ok: true,
+      shopName: data.shop?.name || data.shop?.myshopifyDomain,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Shopify Admin API ping failed",
+    };
   }
 }
 

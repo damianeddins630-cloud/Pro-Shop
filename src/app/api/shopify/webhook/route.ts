@@ -7,8 +7,19 @@ import {
 } from "@/lib/store";
 import { draftOrderGidFromNumericId } from "@/lib/shopify";
 
+function webhookSecret() {
+  let v = (process.env.SHOPIFY_WEBHOOK_SECRET || "").trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
 function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET?.trim();
+  const secret = webhookSecret();
   if (!secret || !hmacHeader) return false;
   const digest = createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
   try {
@@ -41,7 +52,7 @@ export async function POST(req: Request) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
   const topic = (req.headers.get("x-shopify-topic") || "").toLowerCase();
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET?.trim();
+  const secret = webhookSecret();
 
   // Production must verify signatures — never accept unsigned webhooks on Vercel.
   if (!secret) {

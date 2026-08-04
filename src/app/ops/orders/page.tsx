@@ -74,17 +74,40 @@ export default function OpsOrdersPage() {
 
   return (
     <div>
-      <h2 className="display text-4xl">Orders</h2>
-      <p className="mt-1 text-sm text-mist">
-        Update status so members can track their order: Pending (no payment), Processing
-        (not received yet), Completed (they have the ball).
-      </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="display text-4xl">Orders</h2>
+          <p className="mt-1 text-sm text-mist">
+            Website order records. Shopify payment orders start as Pending, then move to
+            Processing after the paid webhook. Free coupon orders complete immediately.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-chalk">
+            {orders.length} order{orders.length === 1 ? "" : "s"}
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost text-sm"
+            onClick={() => {
+              setLoading(true);
+              setError("");
+              void load();
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
       {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
 
       <div className="mt-6 space-y-3">
         {orders.length === 0 ? (
           <p className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-mist">
-            No orders yet.
+            No orders recorded yet. After a customer checks out, a row appears here —
+            even when payment is still awaiting on Shopify. If paid checkout is blocked,
+            open <code className="text-chalk">/api/shopify/status</code> and connect
+            Shopify on Vercel project pro-shop-lemon.
           </p>
         ) : (
           orders.map((order) => {
@@ -101,8 +124,13 @@ export default function OpsOrdersPage() {
                       {order.email})
                     </p>
                     <h3 className="display mt-1 text-3xl">${order.total.toFixed(2)}</h3>
-                    <p className="text-xs capitalize text-mist">
-                      {order.paymentProvider || "local"} payment
+                    <p className="text-xs text-mist">
+                      ID {order.id.slice(0, 8)}… ·{" "}
+                      <span className="capitalize">
+                        {order.paymentProvider || "local"}
+                      </span>{" "}
+                      payment
+                      {order.shopifyInvoiceUrl ? " · Shopify link saved" : ""}
                       {order.couponCode
                         ? ` · coupon ${order.couponCode}${
                             order.discountAmount
