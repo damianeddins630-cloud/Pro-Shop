@@ -477,11 +477,19 @@ export async function getStore(): Promise<StoreData> {
         merged.coupons,
         store.data.coupons
       );
+      store.data.shopifyConfig = {
+        ...(merged.shopifyConfig || {}),
+        ...(store.data.shopifyConfig || {}),
+      };
       return store.data;
     }
     if (store.data) {
       merged.users = mergeUsersPreferLocal(store.data.users, merged.users);
       merged.orders = mergeByIdPreferLocal(store.data.orders, merged.orders);
+      merged.shopifyConfig = {
+        ...(merged.shopifyConfig || {}),
+        ...(store.data.shopifyConfig || {}),
+      };
     }
     store.data = merged;
     return merged;

@@ -46,6 +46,32 @@ function storeTs(data: StoreData | null | undefined) {
   return Date.parse(String(data?.updatedAt || "")) || 0;
 }
 
+function mergeShopifyConfig(
+  a: StoreData["shopifyConfig"] | undefined,
+  b: StoreData["shopifyConfig"] | undefined
+): StoreData["shopifyConfig"] | undefined {
+  if (!a && !b) return undefined;
+  const left = a || {};
+  const right = b || {};
+  // Prefer non-empty secret fields from either side so a newer catalog
+  // write cannot wipe Ops-saved Shopify keys.
+  return {
+    ...left,
+    ...right,
+    storeDomain: right.storeDomain || left.storeDomain,
+    clientId: right.clientId || left.clientId,
+    clientSecret: right.clientSecret || left.clientSecret,
+    webhookSecret: right.webhookSecret || left.webhookSecret,
+    adminAccessToken: right.adminAccessToken || left.adminAccessToken,
+    apiVersion: right.apiVersion || left.apiVersion,
+    updatedAt:
+      (right.updatedAt || "") > (left.updatedAt || "")
+        ? right.updatedAt
+        : left.updatedAt,
+    updatedBy: right.updatedBy || left.updatedBy,
+  };
+}
+
 /** Union account-critical collections; keep catalog from the newer store. */
 function mergeDurableCopies(
   primary: StoreData,
@@ -58,7 +84,14 @@ function mergeDurableCopies(
     orders: mergeById<Order>(secondary.orders, primary.orders),
     roles: mergeById<Role>(secondary.roles, primary.roles),
     coupons: mergeById<Coupon>(secondary.coupons, primary.coupons),
-    subscribers: mergeById<Subscriber>(secondary.subscribers, primary.subscribers),
+    subscribers: mergeById<Subscriber>(
+      secondary.subscribers,
+      primary.subscribers
+    ),
+    shopifyConfig: mergeShopifyConfig(
+      secondary.shopifyConfig,
+      primary.shopifyConfig
+    ),
   };
 }
 

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
-import { getShopifyConfig, saveShopifyConfig } from "@/lib/store";
+import {
+  getShopifyConfig,
+  saveShopifyConfig,
+  storePersistStatus,
+} from "@/lib/store";
 import {
   loadShopifyRuntimeConfig,
   pingShopifyAdmin,
@@ -102,10 +106,11 @@ export async function PUT(req: Request) {
     await loadShopifyRuntimeConfig();
     const ping = await pingShopifyAdmin();
     const status = shopifyStatus();
+    const persist = storePersistStatus();
 
     return NextResponse.json(
       {
-        ok: Boolean(ping.ok),
+        ok: Boolean(ping.ok) && persist.lastPersistOk,
         saved: {
           storeDomain: saved.storeDomain,
           clientId: saved.clientId,
@@ -114,9 +119,12 @@ export async function PUT(req: Request) {
         },
         status,
         adminApi: ping,
-        message: ping.ok
-          ? `Connected to ${ping.shopName || "Shopify"}.`
-          : ping.error || "Saved, but Shopify ping failed.",
+        persist,
+        message: !persist.lastPersistOk
+          ? "Saved on this server, but durable storage write failed. Add the same Shopify keys in Vercel Environment Variables so every page load keeps them."
+          : ping.ok
+            ? `Connected to ${ping.shopName || "Shopify"}.`
+            : ping.error || "Saved, but Shopify ping failed.",
       },
       { headers: noStore }
     );
