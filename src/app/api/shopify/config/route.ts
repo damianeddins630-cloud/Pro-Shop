@@ -120,10 +120,10 @@ export async function PUT(req: Request) {
         status,
         adminApi: ping,
         persist,
-        message: !persist.lastPersistOk
-          ? "Saved on this server, but durable storage write failed. Add the same Shopify keys in Vercel Environment Variables so every page load keeps them."
-          : ping.ok
-            ? `Connected to ${ping.shopName || "Shopify"}.`
+        message: ping.ok
+          ? `Connected to ${ping.shopName || "Shopify"}. Tap Refresh if the page still looks old.`
+          : !persist.lastPersistOk
+            ? "Saved, but storage write may have failed. Try Save Connect again."
             : ping.error || "Saved, but Shopify ping failed.",
       },
       { headers: noStore }

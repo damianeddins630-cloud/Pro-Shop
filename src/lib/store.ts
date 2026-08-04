@@ -1373,35 +1373,63 @@ export function userHasPermission(permissions: Permission[], needed: Permission)
 }
 
 export async function getShopifyConfig(): Promise<ShopifySiteConfig | null> {
+  const { loadDurableShopifyConfig } = await import("./shopify-config-store");
+  const dedicated = await loadDurableShopifyConfig();
   const data = await getStore();
-  return data.shopifyConfig || null;
+  const fromStore = data.shopifyConfig || null;
+  if (!dedicated && !fromStore) return null;
+  return {
+    ...(fromStore || {}),
+    ...(dedicated || {}),
+    storeDomain: dedicated?.storeDomain || fromStore?.storeDomain,
+    clientId: dedicated?.clientId || fromStore?.clientId,
+    clientSecret: dedicated?.clientSecret || fromStore?.clientSecret,
+    webhookSecret: dedicated?.webhookSecret || fromStore?.webhookSecret,
+    adminAccessToken:
+      dedicated?.adminAccessToken || fromStore?.adminAccessToken,
+    apiVersion: dedicated?.apiVersion || fromStore?.apiVersion || "2025-01",
+    updatedAt:
+      (dedicated?.updatedAt || "") > (fromStore?.updatedAt || "")
+        ? dedicated?.updatedAt
+        : fromStore?.updatedAt,
+    updatedBy: dedicated?.updatedBy || fromStore?.updatedBy,
+  };
 }
 
 export async function saveShopifyConfig(
   input: ShopifySiteConfig,
   opts?: { updatedBy?: string }
 ) {
-  let saved: ShopifySiteConfig | null = null;
+  const prev = (await getShopifyConfig()) || {};
+  const saved: ShopifySiteConfig = {
+    storeDomain: (input.storeDomain ?? prev.storeDomain ?? "")
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, "")
+      .trim(),
+    clientId: (input.clientId ?? prev.clientId ?? "").trim(),
+    clientSecret: (input.clientSecret ?? prev.clientSecret ?? "").trim(),
+    webhookSecret: (input.webhookSecret ?? prev.webhookSecret ?? "").trim(),
+    adminAccessToken: (
+      input.adminAccessToken ??
+      prev.adminAccessToken ??
+      ""
+    ).trim(),
+    apiVersion: (input.apiVersion ?? prev.apiVersion ?? "2025-01").trim(),
+    updatedAt: new Date().toISOString(),
+    updatedBy: opts?.updatedBy || prev.updatedBy,
+  };
+
+  // Keep a copy on the main store...
   await mutate((data) => {
-    const prev = data.shopifyConfig || {};
-    saved = {
-      storeDomain: (input.storeDomain ?? prev.storeDomain ?? "")
-        .replace(/^https?:\/\//, "")
-        .replace(/\/$/, "")
-        .trim(),
-      clientId: (input.clientId ?? prev.clientId ?? "").trim(),
-      clientSecret: (input.clientSecret ?? prev.clientSecret ?? "").trim(),
-      webhookSecret: (input.webhookSecret ?? prev.webhookSecret ?? "").trim(),
-      adminAccessToken: (
-        input.adminAccessToken ??
-        prev.adminAccessToken ??
-        ""
-      ).trim(),
-      apiVersion: (input.apiVersion ?? prev.apiVersion ?? "2025-01").trim(),
-      updatedAt: new Date().toISOString(),
-      updatedBy: opts?.updatedBy || prev.updatedBy,
-    };
     data.shopifyConfig = saved;
   });
-  return saved!;
+
+  // ...and also on a small dedicated durable key so large catalog writes
+  // cannot drop checkout credentials.
+  const { saveDurableShopifyConfig } = await import("./shopify-config-store");
+  const dedicated = await saveDurableShopifyConfig(saved);
+  if (dedicated.ok) {
+    g().lastPersistOk = true;
+  }
+  return saved;
 }

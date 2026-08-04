@@ -214,12 +214,14 @@ export default function OpsShopifyPage() {
                 />
               </label>
               <label className="block text-sm md:col-span-2">
-                <span className="label">Client ID</span>
+                <span className="label">
+                  Client ID (from Shopify app Credentials — not your login username)
+                </span>
                 <input
                   className="field mt-1"
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                  placeholder="your Shopify app Client ID"
+                  placeholder="9f9509ec93dde1cab442c14b7176ad08"
                 />
               </label>
               <label className="block text-sm">
@@ -231,7 +233,9 @@ export default function OpsShopifyPage() {
                   type="password"
                   value={clientSecret}
                   onChange={(e) => setClientSecret(e.target.value)}
-                  placeholder={hasSavedSecret ? "••••••••" : "shpss_..."}
+                  placeholder={
+                    hasSavedSecret ? "••••••••" : "shpss_9274b7e0..."
+                  }
                 />
               </label>
               <label className="block text-sm">
