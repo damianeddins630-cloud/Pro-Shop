@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
 import {
+  persistFailedResponse,
+  requireDurablePersistOrLocal,
+  withPersistMeta,
+} from "@/lib/persist-guard";
+import { deleteShopifyDraftOrder } from "@/lib/shopify";
+import {
+  cancelAllOpenShopifyCheckouts,
   createProduct,
   getInventoryUpdatedAt,
   listProducts,
@@ -11,6 +18,18 @@ import {
 export const dynamic = "force-dynamic";
 
 const noStore = { "Cache-Control": "no-store, max-age=0" };
+
+async function voidStaleShopifyInvoices() {
+  try {
+    const cancelled = await cancelAllOpenShopifyCheckouts();
+    await Promise.all(
+      cancelled.map((o) => deleteShopifyDraftOrder(o.shopifyDraftOrderId))
+    );
+    return cancelled.length;
+  } catch {
+    return 0;
+  }
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -37,7 +56,6 @@ export async function GET(req: Request) {
   return NextResponse.json(
     {
       products,
-      // Real catalog timestamp — NOT "now" (that was breaking shop sync)
       updatedAt: await getInventoryUpdatedAt(),
     },
     { headers: noStore }
@@ -90,19 +108,21 @@ export async function POST(req: Request) {
       active: body.active ?? true,
       shopifyVariantId: body.shopifyVariantId,
     });
+
+    if (!requireDurablePersistOrLocal()) {
+      return persistFailedResponse("Product create");
+    }
+
+    const voided = await voidStaleShopifyInvoices();
     const products = await listProducts({ includeInactive: true });
-    const updatedAt = await getInventoryUpdatedAt();
-    const persist = storePersistStatus();
     return NextResponse.json(
-      {
+      withPersistMeta({
         product,
         products,
-        updatedAt,
-        persist,
-        warning: persist.githubWriteConfigured
-          ? undefined
-          : "Saved on this server. Add GITHUB_TOKEN in Vercel so every visitor sees shop updates (or open shop in this same browser).",
-      },
+        updatedAt: await getInventoryUpdatedAt(),
+        voidedUnpaidCheckouts: voided,
+        message: "Product saved durably — live for every shopper.",
+      }),
       { status: 201, headers: noStore }
     );
   } catch (e) {

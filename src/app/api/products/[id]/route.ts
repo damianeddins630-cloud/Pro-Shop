@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
 import {
+  persistFailedResponse,
+  requireDurablePersistOrLocal,
+  withPersistMeta,
+} from "@/lib/persist-guard";
+import { deleteShopifyDraftOrder } from "@/lib/shopify";
+import {
+  cancelAllOpenShopifyCheckouts,
   deleteProduct,
   getInventoryUpdatedAt,
   getProduct,
@@ -15,6 +22,18 @@ export const dynamic = "force-dynamic";
 const noStore = { "Cache-Control": "no-store, max-age=0" };
 
 type Params = { params: Promise<{ id: string }> };
+
+async function voidStaleShopifyInvoices() {
+  try {
+    const cancelled = await cancelAllOpenShopifyCheckouts();
+    await Promise.all(
+      cancelled.map((o) => deleteShopifyDraftOrder(o.shopifyDraftOrderId))
+    );
+    return cancelled.length;
+  } catch {
+    return 0;
+  }
+}
 
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
@@ -48,18 +67,34 @@ export async function PUT(req: Request, { params }: Params) {
   const { id } = await params;
   try {
     const body = patchSchema.parse(await req.json());
+    const before = await getProduct(id);
     const product = await updateProduct(id, body);
     if (!product) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    if (!requireDurablePersistOrLocal()) {
+      return persistFailedResponse("Product update");
+    }
+
+    const priceChanged =
+      before &&
+      (body.price !== undefined ||
+        body.discountPercent !== undefined ||
+        body.stock !== undefined ||
+        body.active !== undefined);
+    const voided = priceChanged ? await voidStaleShopifyInvoices() : 0;
+
     const products = await listProducts({ includeInactive: true });
     return NextResponse.json(
-      {
+      withPersistMeta({
         product,
         products,
         updatedAt: await getInventoryUpdatedAt(),
-        persist: storePersistStatus(),
-      },
+        voidedUnpaidCheckouts: voided,
+        message:
+          "Price/discount/stock saved durably. Shopify will charge these website amounts on the next Pay click.",
+      }),
       { headers: noStore }
     );
   } catch (e) {
@@ -78,14 +113,18 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!ok) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (!requireDurablePersistOrLocal()) {
+    return persistFailedResponse("Product delete");
+  }
+  await voidStaleShopifyInvoices();
   const products = await listProducts({ includeInactive: true });
   return NextResponse.json(
-    {
+    withPersistMeta({
       ok: true,
       products,
       updatedAt: await getInventoryUpdatedAt(),
       persist: storePersistStatus(),
-    },
+    }),
     { headers: noStore }
   );
 }

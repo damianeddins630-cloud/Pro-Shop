@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
+import {
+  persistFailedResponse,
+  requireDurablePersistOrLocal,
+  withPersistMeta,
+} from "@/lib/persist-guard";
 import { createCoupon, listCoupons } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +57,11 @@ export async function POST(req: Request) {
       active: body.active ?? true,
       maxUses: body.maxUses,
     });
+    if (!requireDurablePersistOrLocal()) {
+      return persistFailedResponse("Coupon create");
+    }
     return NextResponse.json(
-      { coupon: result.coupon, coupons: result.coupons },
+      withPersistMeta({ coupon: result.coupon, coupons: result.coupons }),
       { status: 201, headers: noStore }
     );
   } catch (e) {

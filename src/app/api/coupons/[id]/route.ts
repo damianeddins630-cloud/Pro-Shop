@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
+import {
+  persistFailedResponse,
+  requireDurablePersistOrLocal,
+  withPersistMeta,
+} from "@/lib/persist-guard";
 import { deleteCoupon, updateCoupon } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +40,11 @@ export async function PUT(req: Request, { params }: Params) {
     if (!result) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    if (!requireDurablePersistOrLocal()) {
+      return persistFailedResponse("Coupon update");
+    }
     return NextResponse.json(
-      { coupon: result.coupon, coupons: result.coupons },
+      withPersistMeta({ coupon: result.coupon, coupons: result.coupons }),
       { headers: noStore }
     );
   } catch (e) {
@@ -60,8 +68,15 @@ export async function DELETE(_req: Request, { params }: Params) {
     if (!result.ok) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    if (!requireDurablePersistOrLocal()) {
+      return persistFailedResponse("Coupon delete");
+    }
     return NextResponse.json(
-      { ok: true, removedCode: result.removedCode, coupons: result.coupons },
+      withPersistMeta({
+        ok: true,
+        removedCode: result.removedCode,
+        coupons: result.coupons,
+      }),
       { headers: noStore }
     );
   } catch (e) {

@@ -27,6 +27,7 @@ export default function OpsInventoryPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [persistWarning, setPersistWarning] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/products?admin=1&t=${Date.now()}`, {
@@ -35,7 +36,14 @@ export default function OpsInventoryPage() {
     const data = await res.json();
     const list = data.products || [];
     setProducts(list);
-    saveLocalInventory(list, data.updatedAt);
+    if (data.persist?.lastPersistOk === false) {
+      setPersistWarning(
+        `Durable save is broken (${data.persist.lastPersistDetail || "unknown"}). Fixes will not stick for shoppers until Redis/Blob/GITHUB_TOKEN works.`
+      );
+    } else {
+      setPersistWarning("");
+      saveLocalInventory(list, data.updatedAt);
+    }
     setLoading(false);
   }, []);
 
@@ -74,6 +82,17 @@ export default function OpsInventoryPage() {
     const data = await res.json();
     if (!res.ok) {
       setError(data.error || "Save failed");
+      if (data.persist?.lastPersistDetail) {
+        setPersistWarning(String(data.persist.lastPersistDetail));
+      }
+      return;
+    }
+    if (data.savedDurably === false || data.persist?.lastPersistOk === false) {
+      setError(
+        data.error ||
+          "Save did not stick in durable storage — shoppers may still see the old price."
+      );
+      setPersistWarning(String(data.persist?.lastPersistDetail || ""));
       return;
     }
     const next = Array.isArray(data.products)
@@ -83,8 +102,13 @@ export default function OpsInventoryPage() {
         : products;
     setProducts(next);
     saveLocalInventory(next, data.updatedAt);
+    setPersistWarning("");
     setMessage(
-      `${editingId ? "Updated" : "Added"} "${payload.name}" — live on the shop.`
+      `${editingId ? "Updated" : "Added"} "${payload.name}" — saved for every shopper. Shopify will charge this website price on the next Pay click${
+        data.voidedUnpaidCheckouts
+          ? ` (${data.voidedUnpaidCheckouts} old unpaid invoice${data.voidedUnpaidCheckouts === 1 ? "" : "s"} voided)`
+          : ""
+      }.`
     );
     setForm(empty);
     setEditingId(null);
@@ -114,6 +138,19 @@ export default function OpsInventoryPage() {
 
   return (
     <div>
+      {persistWarning ? (
+        <div className="mb-4 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          <p className="font-semibold text-amber-200">Storage warning</p>
+          <p className="mt-1">{persistWarning}</p>
+          <p className="mt-2">
+            Run{" "}
+            <Link href="/api/persist/self-test" className="underline text-amber-50">
+              /api/persist/self-test
+            </Link>{" "}
+            while logged into Ops, then fix the failing backend in Vercel env vars.
+          </p>
+        </div>
+      ) : null}
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="display text-4xl">Inventory</h2>

@@ -24,8 +24,9 @@ import seedJson from "@/data/seed.json";
 import {
   durableStoreConfigured,
   durableWriteConfigured,
+  getLastPersistResult,
   loadDurableStore,
-  saveDurableStore,
+  saveDurableStoreDetailed,
 } from "./durable-store";
 import { githubWriteConfigured } from "./github-store";
 import {
@@ -55,6 +56,7 @@ type GlobalStore = {
   data: StoreData | null;
   ready: Promise<StoreData> | null;
   lastPersistOk: boolean;
+  lastPersistDetail: string;
 };
 
 function storeUpdatedAtMs(data: StoreData | null | undefined) {
@@ -160,7 +162,15 @@ async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
 function g(): GlobalStore {
   const root = globalThis as typeof globalThis & { [GLOBAL_KEY]?: GlobalStore };
   if (!root[GLOBAL_KEY]) {
-    root[GLOBAL_KEY] = { data: null, ready: null, lastPersistOk: true };
+    root[GLOBAL_KEY] = {
+      data: null,
+      ready: null,
+      lastPersistOk: true,
+      lastPersistDetail: "ready",
+    };
+  }
+  if (root[GLOBAL_KEY] && root[GLOBAL_KEY].lastPersistDetail == null) {
+    root[GLOBAL_KEY].lastPersistDetail = "ready";
   }
   return root[GLOBAL_KEY]!;
 }
@@ -429,25 +439,48 @@ async function persist(data: StoreData) {
   }
 
   if (durableStoreConfigured()) {
-    const durableOk = await saveDurableStore(data);
-    // On Vercel, /tmp success alone is not enough — accounts must hit durable storage
+    const durable = await saveDurableStoreDetailed(data);
+    store.lastPersistDetail = durable.detail;
+    // On Vercel, /tmp success alone is not enough — business data must hit durable storage
     if (process.env.VERCEL) {
-      ok = durableOk;
+      ok = durable.ok;
     } else {
-      ok = durableOk || ok;
+      ok = durable.ok || ok;
     }
+  } else {
+    store.lastPersistDetail = "no durable backend configured";
   }
 
   store.lastPersistOk = ok;
+  return ok;
 }
 
 export function storePersistStatus() {
+  const last = getLastPersistResult();
   return {
     durableConfigured: durableStoreConfigured(),
     durableWriteConfigured: durableWriteConfigured(),
     githubWriteConfigured: githubWriteConfigured(),
     lastPersistOk: g().lastPersistOk,
+    lastPersistDetail: g().lastPersistDetail || last.detail,
+    backends: {
+      redis: last.redis,
+      blob: last.blob,
+      github: last.github,
+    },
   };
+}
+
+/** True when the latest mutate() actually landed in Redis/Blob/GitHub (or local non-Vercel disk). */
+export function lastPersistSucceeded() {
+  return g().lastPersistOk;
+}
+
+/** Drop dirty in-memory catalog after a failed durable write so this instance can't lie. */
+export function discardMemoryStore() {
+  const store = g();
+  store.data = null;
+  store.ready = null;
 }
 
 export async function getStore(): Promise<StoreData> {
@@ -772,20 +805,26 @@ export async function getProduct(id: string) {
 }
 
 /**
- * Checkout / charge path: force a durable catalog read so website price and
- * discount edits apply instantly when Shopify is asked to collect payment.
+ * Checkout / charge path: pick the newest catalog copy (durable vs memory)
+ * so website price and discount edits apply when Shopify collects payment.
  */
 export async function getFreshProductForCheckout(id: string) {
+  const memory = await getProduct(id);
+  let remoteProduct: Product | null = null;
+  let remoteTs = 0;
   try {
     const remote = await loadDurableStore();
-    if (remote?.products?.length) {
-      const product = remote.products.find((p) => p.id === id || p.slug === id);
-      if (product) return normalizeProduct(product);
-    }
+    remoteTs = storeUpdatedAtMs(remote);
+    const hit = remote?.products?.find((p) => p.id === id || p.slug === id);
+    if (hit) remoteProduct = normalizeProduct(hit);
   } catch {
-    // fall through to memory store
+    // ignore
   }
-  return getProduct(id);
+  const memTs = storeUpdatedAtMs(g().data);
+  if (remoteProduct && memory) {
+    return memTs >= remoteTs ? memory : remoteProduct;
+  }
+  return remoteProduct || memory;
 }
 
 export async function getFreshCouponForCheckout(code: string) {
@@ -796,9 +835,13 @@ export async function getFreshCouponForCheckout(code: string) {
     if (Array.isArray(remote?.coupons)) {
       ensureCoupons(remote);
       const found = remote.coupons.find(
-        (c) => c.active !== false && codesMatch(c.code, key)
+        (c) =>
+          c.active !== false &&
+          codesMatch(c.code, key) &&
+          couponHasUsesLeft(c)
       );
       if (found) return normalizeCoupon(found);
+      // Durable had coupons list but code missing/exhausted — don't fall back to stale memory
       return null;
     }
   } catch {
@@ -1309,6 +1352,22 @@ export async function cancelOpenShopifyCheckoutsForUser(
     data.orders = (data.orders || []).map((o) => {
       if (o.userId !== userId) return o;
       if (exceptOrderId && o.id === exceptOrderId) return o;
+      if (o.status !== "awaiting_payment") return o;
+      if (o.paymentProvider !== "shopify") return o;
+      if (o.inventoryApplied) return o;
+      const next = { ...o, status: "cancelled" as OrderStatus };
+      cancelled.push(next);
+      return next;
+    });
+  });
+  return cancelled;
+}
+
+/** After Ops price/discount/stock edits — void every unpaid Shopify invoice. */
+export async function cancelAllOpenShopifyCheckouts() {
+  const cancelled: Order[] = [];
+  await mutate((data) => {
+    data.orders = (data.orders || []).map((o) => {
       if (o.status !== "awaiting_payment") return o;
       if (o.paymentProvider !== "shopify") return o;
       if (o.inventoryApplied) return o;
