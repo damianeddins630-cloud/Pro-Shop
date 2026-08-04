@@ -56,7 +56,8 @@ Project → **Settings → Environment Variables** (Production):
 AUTH_SECRET=long-random-secret
 NEXT_PUBLIC_SITE_URL=https://YOUR-DOMAIN
 
-# Durable inventory for Vercel (so Ops edits stick for everyone)
+# REQUIRED so accounts, inventory, and role changes survive on Vercel
+# Create a GitHub Personal Access Token with "repo" scope
 GITHUB_TOKEN=ghp_xxx
 GITHUB_REPO=damianeddins630-cloud/Pro-Shop
 GITHUB_BRANCH=main
@@ -67,6 +68,8 @@ SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_...
 SHOPIFY_API_VERSION=2025-01
 SHOPIFY_WEBHOOK_SECRET=...   # optional but recommended
 ```
+
+**Without `GITHUB_TOKEN`, new customer accounts can disappear** after a new server starts (Vercel’s disk is temporary). This token is required for a live shop.
 
 Do **not** add a Storefront API token. This site does not use it.
 

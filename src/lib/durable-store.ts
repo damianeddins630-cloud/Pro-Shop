@@ -48,9 +48,10 @@ export async function loadDurableStore(): Promise<StoreData | null> {
     }
   }
 
-  // GitHub live-store (public read — this is what keeps the shop in sync)
+  // GitHub live-store (public read — keeps shop + accounts in sync)
   const fromGh = await loadGithubStore();
-  if (fromGh?.products?.length) return fromGh;
+  // Accept GitHub store even when products are empty — users/orders still matter
+  if (fromGh) return fromGh;
 
   if (blobConfigured()) {
     const url =
@@ -68,7 +69,7 @@ export async function loadDurableStore(): Promise<StoreData | null> {
     }
   }
 
-  return fromGh;
+  return null;
 }
 
 /** Persist full store JSON to available backends. */

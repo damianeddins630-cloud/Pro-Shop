@@ -66,6 +66,91 @@ function touchUpdatedAt(data: StoreData) {
   data.updatedAt = new Date().toISOString();
 }
 
+/** Union-merge by id. Local wins on conflicts so in-progress edits stick. */
+function mergeByIdPreferLocal<T extends { id: string }>(
+  remote: T[] | undefined,
+  local: T[] | undefined
+): T[] {
+  const map = new Map<string, T>();
+  for (const item of remote || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  for (const item of local || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  return Array.from(map.values());
+}
+
+/**
+ * Users must never be lost across serverless instances.
+ * Merge by id AND by email/username so duplicates collapse safely.
+ */
+function mergeUsersPreferLocal(
+  remote: User[] | undefined,
+  local: User[] | undefined
+): User[] {
+  const byId = new Map<string, User>();
+  const emailToId = new Map<string, string>();
+  const usernameToId = new Map<string, string>();
+
+  const put = (u: User, preferLocal: boolean) => {
+    if (!u?.id) return;
+    const email = (u.email || "").toLowerCase();
+    const username = (u.username || "").toLowerCase();
+    const existingId =
+      byId.has(u.id)
+        ? u.id
+        : emailToId.get(email) || usernameToId.get(username);
+    if (existingId && existingId !== u.id) {
+      // Same person under different ids — keep preferred copy
+      if (preferLocal || !byId.has(existingId)) {
+        byId.delete(existingId);
+        byId.set(u.id, u);
+        if (email) emailToId.set(email, u.id);
+        if (username) usernameToId.set(username, u.id);
+      }
+      return;
+    }
+    if (!byId.has(u.id) || preferLocal) {
+      byId.set(u.id, u);
+      if (email) emailToId.set(email, u.id);
+      if (username) usernameToId.set(username, u.id);
+    }
+  };
+
+  for (const u of remote || []) put(u, false);
+  for (const u of local || []) put(u, true);
+  return Array.from(byId.values());
+}
+
+/**
+ * Before writing, pull remote and merge account-critical collections.
+ * Catalog collections (products/deals/etc.) stay as the local mutation result
+ * so deletes in Ops are not undone by a stale remote copy.
+ */
+async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
+  let remote: StoreData | null = null;
+  try {
+    remote = await loadDurableStore();
+  } catch {
+    remote = null;
+  }
+  if (!remote) return local;
+
+  local.users = mergeUsersPreferLocal(remote.users, local.users);
+  local.orders = mergeByIdPreferLocal(remote.orders, local.orders);
+  local.subscribers = mergeByIdPreferLocal(
+    remote.subscribers,
+    local.subscribers
+  );
+  local.roles = mergeByIdPreferLocal(remote.roles, local.roles);
+  local.coupons = mergeByIdPreferLocal(remote.coupons, local.coupons);
+
+  ensureCoupons(local);
+  ensureRoleRanks(local);
+  return local;
+}
+
 function g(): GlobalStore {
   const root = globalThis as typeof globalThis & { [GLOBAL_KEY]?: GlobalStore };
   if (!root[GLOBAL_KEY]) {
@@ -306,7 +391,13 @@ async function loadFromDisk(): Promise<StoreData> {
 async function persist(data: StoreData) {
   const store = g();
   let ok = true;
+
+  // Merge remote first so a product/inventory save cannot erase new accounts
+  await reconcileWithRemote(data);
+  await ensureAdmin(data);
   touchUpdatedAt(data);
+  store.data = data;
+
   const payload = JSON.stringify(
     { version: 2, ...data, updatedAt: data.updatedAt },
     null,
@@ -364,9 +455,21 @@ export async function getStore(): Promise<StoreData> {
     await ensureAdmin(merged);
     const remoteTs = storeUpdatedAtMs(merged);
     const memTs = storeUpdatedAtMs(store.data);
-    // Keep in-memory copy only when this instance just saved something newer
+    // Keep in-memory copy when this instance just saved something newer,
+    // but still union-merge users/orders so accounts never disappear.
     if (store.data && memTs > remoteTs) {
+      store.data.users = mergeUsersPreferLocal(merged.users, store.data.users);
+      store.data.orders = mergeByIdPreferLocal(merged.orders, store.data.orders);
+      store.data.roles = mergeByIdPreferLocal(merged.roles, store.data.roles);
+      store.data.coupons = mergeByIdPreferLocal(
+        merged.coupons,
+        store.data.coupons
+      );
       return store.data;
+    }
+    if (store.data) {
+      merged.users = mergeUsersPreferLocal(store.data.users, merged.users);
+      merged.orders = mergeByIdPreferLocal(store.data.orders, merged.orders);
     }
     store.data = merged;
     return merged;
@@ -761,33 +864,43 @@ export async function createUser(input: {
   dateOfBirth: string;
   roleId?: string;
 }) {
-  const data = await getStore();
   const email = input.email.trim().toLowerCase();
   const username = input.username.trim();
-  if (data.users.some((u) => u.email.toLowerCase() === email)) {
-    throw new Error("Email already registered");
-  }
-  if (data.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
-    throw new Error("Username already taken");
-  }
-  const customer =
-    data.roles.find((r) => r.id === "role_customer") ||
-    data.roles.find((r) => r.name.toLowerCase() === "customer");
-  const user: User = {
-    id: randomUUID(),
-    email,
-    username,
-    passwordHash: await bcrypt.hash(input.password, 10),
-    phoneNumber: input.phoneNumber,
-    dateOfBirth: input.dateOfBirth,
-    roleId: input.roleId || customer?.id || "role_customer",
-    role: "customer",
-    createdAt: new Date().toISOString(),
-  };
-  await mutate((d) => {
-    d.users.push(user);
+  const passwordHash = await bcrypt.hash(input.password, 10);
+  let created: User | null = null;
+
+  // Entire create happens inside mutate + reconcile so registration
+  // cannot be wiped by a concurrent inventory/ops save.
+  await mutate((data) => {
+    ensureRoleRanks(data);
+    data.users = data.users || [];
+    if (data.users.some((u) => u.email.toLowerCase() === email)) {
+      throw new Error("Email already registered");
+    }
+    if (
+      data.users.some((u) => u.username.toLowerCase() === username.toLowerCase())
+    ) {
+      throw new Error("Username already taken");
+    }
+    const customer =
+      data.roles.find((r) => r.id === CUSTOMER_ROLE_ID) ||
+      data.roles.find((r) => r.name.toLowerCase() === "customer");
+    created = {
+      id: randomUUID(),
+      email,
+      username,
+      passwordHash,
+      phoneNumber: input.phoneNumber,
+      dateOfBirth: input.dateOfBirth,
+      roleId: input.roleId || customer?.id || CUSTOMER_ROLE_ID,
+      role: "customer",
+      createdAt: new Date().toISOString(),
+    };
+    data.users.push(created);
   });
-  return user;
+
+  if (!created) throw new Error("Registration failed");
+  return created;
 }
 
 export async function addSubscriber(input: Omit<Subscriber, "id" | "createdAt">) {

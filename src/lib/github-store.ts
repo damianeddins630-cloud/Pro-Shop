@@ -79,30 +79,37 @@ async function currentSha(): Promise<string | null> {
 export async function saveGithubStore(data: StoreData): Promise<boolean> {
   const t = token();
   if (!t) return false;
-  try {
-    const sha = await currentSha();
-    const payload = {
-      message: `chore: sync live inventory (${new Date().toISOString()})`,
-      content: Buffer.from(JSON.stringify(data)).toString("base64"),
-      branch: branch(),
-      ...(sha ? { sha } : {}),
-    };
-    const res = await fetch(
-      `https://api.github.com/repos/${repo()}/contents/${STORE_PATH}`,
-      {
-        method: "PUT",
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${t}`,
-          "Content-Type": "application/json",
-          "User-Agent": "ballards-pro-shop",
-        },
-        body: JSON.stringify(payload),
-        cache: "no-store",
-      }
-    );
-    return res.ok;
-  } catch {
-    return false;
+
+  // Retry on SHA conflicts so concurrent writes don't silently drop accounts
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const sha = await currentSha();
+      const payload = {
+        message: `chore: sync live store (${new Date().toISOString()})`,
+        content: Buffer.from(JSON.stringify(data)).toString("base64"),
+        branch: branch(),
+        ...(sha ? { sha } : {}),
+      };
+      const res = await fetch(
+        `https://api.github.com/repos/${repo()}/contents/${STORE_PATH}`,
+        {
+          method: "PUT",
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${t}`,
+            "Content-Type": "application/json",
+            "User-Agent": "ballards-pro-shop",
+          },
+          body: JSON.stringify(payload),
+          cache: "no-store",
+        }
+      );
+      if (res.ok) return true;
+      // 409 = someone else wrote first; refresh SHA and retry
+      if (res.status !== 409 && res.status !== 422) return false;
+    } catch {
+      return false;
+    }
   }
+  return false;
 }
