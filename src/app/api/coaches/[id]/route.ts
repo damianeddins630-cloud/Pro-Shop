@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 import { deleteCoach, updateCoach } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -11,8 +11,12 @@ const schema = z.object({
   email: z.string().optional(),
 });
 
+async function requireCoachEditor() {
+  return requireAnyPermission("manage_coaches", "edit_pages", "manage_roles");
+}
+
 export async function PUT(req: Request, { params }: Params) {
-  const session = await requireAdmin();
+  const session = await requireCoachEditor();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   try {
@@ -29,7 +33,7 @@ export async function PUT(req: Request, { params }: Params) {
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
-  const session = await requireAdmin();
+  const session = await requireCoachEditor();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const ok = await deleteCoach(id);

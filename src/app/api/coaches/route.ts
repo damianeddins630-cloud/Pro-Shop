@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 import { createCoach, listCoaches } from "@/lib/store";
 
 export async function GET() {
@@ -14,7 +14,11 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const session = await requireAdmin();
+  const session = await requireAnyPermission(
+    "manage_coaches",
+    "edit_pages",
+    "manage_roles"
+  );
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = schema.parse(await req.json());

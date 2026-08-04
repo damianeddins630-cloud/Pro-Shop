@@ -5,7 +5,6 @@ Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, Op
 ## Owner login
 
 - Username: `CV_damian`
-- Password: `Archer6!9`
 - Operations: `/ops`
 
 ## Architecture (important)
@@ -26,7 +25,7 @@ Flow:
 1. Customer browses/carts on this website
 2. Checkout creates a **Shopify Draft Order** from the cart
 3. Customer pays on Shopify
-4. Website marks the order paid and reduces its own inventory
+4. Shopify `orders/paid` webhook marks the order paid and reduces website inventory
 
 No Storefront API token is required.
 
@@ -41,23 +40,22 @@ No Storefront API token is required.
    - `read_orders`
 3. Install the app and copy the **Admin API access token** (`shpat_...`)
 4. Note your store domain: `your-store.myshopify.com`
-5. Optional but recommended webhook:
+5. Create webhook (required for inventory):
    - Topic: `orders/paid`
    - URL: `https://YOUR-DOMAIN/api/shopify/webhook`
-   - Copy the webhook signing secret
+   - Copy the webhook signing secret into `SHOPIFY_WEBHOOK_SECRET`
 
 Keep this custom app — it is required for Draft Order checkout.
 
 ### 2) Vercel environment variables
 
-Project → **Settings → Environment Variables** (Production):
+Project → **Settings → Environment Variables** (Production) for **pro-shop-lemon** (this Pro Shop repo):
 
 ```
 AUTH_SECRET=long-random-secret
-NEXT_PUBLIC_SITE_URL=https://YOUR-DOMAIN
+NEXT_PUBLIC_SITE_URL=https://pro-shop-lemon.vercel.app
 
 # REQUIRED so accounts, inventory, and role changes survive on Vercel
-# Create a GitHub Personal Access Token with "repo" scope
 GITHUB_TOKEN=ghp_xxx
 GITHUB_REPO=damianeddins630-cloud/Pro-Shop
 GITHUB_BRANCH=main
@@ -66,16 +64,20 @@ GITHUB_BRANCH=main
 SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_...
 SHOPIFY_API_VERSION=2025-01
-SHOPIFY_WEBHOOK_SECRET=...   # optional but recommended
+SHOPIFY_WEBHOOK_SECRET=...   # required for inventory after payment
 ```
 
-**Without `GITHUB_TOKEN`, new customer accounts can disappear** after a new server starts (Vercel’s disk is temporary). This token is required for a live shop.
+**Without `GITHUB_TOKEN`, new customer accounts can disappear** after a new server starts (Vercel’s disk is temporary).
 
 Do **not** add a Storefront API token. This site does not use it.
 
 ### 3) Redeploy
 
-After saving env vars, redeploy Production. Cart checkout becomes **Pay with Shopify**.
+After saving env vars, redeploy Production (cache off). Then check:
+
+`https://YOUR-DOMAIN/api/health`
+
+You want `shopify.configured: true` and `shopify.webhookConfigured: true`.
 
 Buying requires login / create account.
 
@@ -91,7 +93,7 @@ npm run dev
 1. Import GitHub repo `damianeddins630-cloud/Pro-Shop`
 2. Framework: **Next.js**
 3. Deploy from **`main`**
-4. Set env vars above
+4. Set env vars above on the **pro-shop-lemon** project (not City View Lanes)
 5. Turn OFF Vercel Deployment Protection / Authentication so customers can use the site
 6. Health check: `https://YOUR-DOMAIN/api/health`
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 import { deleteDeal, updateDeal } from "@/lib/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -14,7 +14,7 @@ const schema = z.object({
 });
 
 export async function PUT(req: Request, { params }: Params) {
-  const session = await requireAdmin();
+  const session = await requireAnyPermission("manage_deals", "edit_pages");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -33,7 +33,7 @@ export async function PUT(req: Request, { params }: Params) {
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
-  const session = await requireAdmin();
+  const session = await requireAnyPermission("manage_deals", "edit_pages");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

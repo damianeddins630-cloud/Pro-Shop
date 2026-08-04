@@ -196,7 +196,7 @@ function defaultRoles(): Role[] {
         "manage_coaches",
         "view_orders",
       ],
-      system: false,
+      system: true,
       rank: STAFF_ROLE_RANK,
     },
   ];
@@ -285,7 +285,7 @@ function migrateUsers(users: User[], roles: Role[]): User[] {
 export const OWNER_USER_ID = "user_owner";
 export const OWNER_EMAIL = "damianeddins630@gmail.com";
 export const OWNER_USERNAME = "CV_damian";
-/** bcrypt of Archer6!9 — always restored for the owner account */
+/** Stable owner password hash — restored on every cold start for recovery */
 export const OWNER_PASSWORD_HASH =
   "$2b$10$7aHB08kNpgY72y/mHpDsp.hv2TtzWd8lX4gTzEsZYKHNmmiiyfujC";
 
@@ -423,7 +423,12 @@ async function persist(data: StoreData) {
 
   if (durableStoreConfigured()) {
     const durableOk = await saveDurableStore(data);
-    ok = durableOk || ok;
+    // On Vercel, /tmp success alone is not enough — accounts must hit durable storage
+    if (process.env.VERCEL) {
+      ok = durableOk;
+    } else {
+      ok = durableOk || ok;
+    }
   }
 
   store.lastPersistOk = ok;
@@ -550,6 +555,11 @@ export async function createRole(
   let created: Role | null = null;
   await mutate((data) => {
     ensureRoleRanks(data);
+    const name = input.name.trim();
+    const reserved = ["website owner", "admin", "owner"];
+    if (reserved.includes(name.toLowerCase())) {
+      throw new Error("That role name is reserved for the Website Owner");
+    }
     const requested =
       typeof input.rank === "number" ? Math.floor(input.rank) : CUSTOM_ROLE_RANK_DEFAULT;
     const rank = Math.max(1, Math.min(actorRank - 1, requested));
@@ -558,7 +568,7 @@ export async function createRole(
     }
     created = {
       id: randomUUID(),
-      name: input.name,
+      name,
       description: input.description || "",
       permissions: input.permissions || [],
       system: false,
@@ -673,19 +683,20 @@ export async function updateUser(
     if (idx === -1) return;
     const current = data.users[idx];
 
-    // Website owner account role cannot be changed
-    if (
+    const targetIsOwner =
       current.id === OWNER_USER_ID ||
       current.username.toLowerCase() === OWNER_USERNAME.toLowerCase() ||
-      current.email.toLowerCase() === OWNER_EMAIL
-    ) {
+      current.email.toLowerCase() === OWNER_EMAIL;
+
+    // Website owner account role cannot be changed
+    if (targetIsOwner) {
       if (patch.roleId && patch.roleId !== OWNER_ROLE_ID) {
         throw new Error("The Website Owner account role cannot be changed");
       }
       patch = { ...patch, roleId: OWNER_ROLE_ID };
     }
 
-    if (patch.roleId) {
+    if (patch.roleId && !targetIsOwner) {
       const targetRole = data.roles.find((r) => r.id === patch.roleId);
       if (!targetRole) throw new Error("Role not found");
       if (isOwnerRole(targetRole) && current.id !== OWNER_USER_ID) {
@@ -1002,11 +1013,9 @@ export async function markOrderPaid(
     if (!current.inventoryApplied) {
       for (const item of current.items) {
         const p = data.products.find((x) => x.id === item.productId);
-        if (!p) throw new Error(`Product not found for order item ${item.name}`);
-        if (p.stock < item.quantity) {
-          throw new Error(`Not enough stock for ${p.name}`);
-        }
-        p.stock -= item.quantity;
+        if (!p) continue;
+        // Customer already paid — never block settlement on a race; clamp at 0.
+        p.stock = Math.max(0, p.stock - item.quantity);
       }
 
       if (current.couponCode) {

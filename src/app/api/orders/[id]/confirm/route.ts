@@ -6,12 +6,14 @@ import {
   listProducts,
   markOrderPaid,
 } from "@/lib/store";
+import { isShopifyDraftOrderPaid } from "@/lib/shopify";
 
 type Params = { params: Promise<{ id: string }> };
 
 /**
  * Confirm a Shopify-paid order when the shopper returns to /order/success.
- * Idempotent backup if the Shopify webhook is delayed.
+ * Idempotent backup if the Shopify webhook is delayed — only settles after
+ * Shopify Admin API confirms the draft order was paid.
  */
 export async function POST(_req: Request, { params }: Params) {
   const session = await getSession();
@@ -32,8 +34,25 @@ export async function POST(_req: Request, { params }: Params) {
   }
 
   try {
-    // Only advance Shopify checkouts that were waiting on payment
     if (order.paymentProvider === "shopify" && order.status === "awaiting_payment") {
+      const draftId = order.shopifyDraftOrderId;
+      if (!draftId) {
+        return NextResponse.json(
+          { error: "Order is missing Shopify draft reference", awaiting: true },
+          { status: 409 }
+        );
+      }
+
+      const paidOnShopify = await isShopifyDraftOrderPaid(draftId);
+      if (!paidOnShopify) {
+        return NextResponse.json({
+          ok: true,
+          awaiting: true,
+          order,
+          message: "Payment not confirmed on Shopify yet. Inventory is unchanged.",
+        });
+      }
+
       const paid = await markOrderPaid(order.id, "processing");
       return NextResponse.json({
         ok: true,

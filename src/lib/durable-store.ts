@@ -1,4 +1,4 @@
-import type { StoreData } from "@/lib/types";
+import type { StoreData, User, Order, Role, Coupon, Subscriber } from "@/lib/types";
 import {
   githubWriteConfigured,
   loadGithubStore,
@@ -28,48 +28,95 @@ export function durableWriteConfigured() {
   return redisConfigured() || blobConfigured() || githubWriteConfigured();
 }
 
+function mergeById<T extends { id: string }>(
+  a: T[] | undefined,
+  b: T[] | undefined
+): T[] {
+  const map = new Map<string, T>();
+  for (const item of a || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  for (const item of b || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  return Array.from(map.values());
+}
+
+function storeTs(data: StoreData | null | undefined) {
+  return Date.parse(String(data?.updatedAt || "")) || 0;
+}
+
+/** Union account-critical collections; keep catalog from the newer store. */
+function mergeDurableCopies(
+  primary: StoreData,
+  secondary: StoreData | null
+): StoreData {
+  if (!secondary) return primary;
+  return {
+    ...primary,
+    users: mergeById<User>(secondary.users, primary.users),
+    orders: mergeById<Order>(secondary.orders, primary.orders),
+    roles: mergeById<Role>(secondary.roles, primary.roles),
+    coupons: mergeById<Coupon>(secondary.coupons, primary.coupons),
+    subscribers: mergeById<Subscriber>(secondary.subscribers, primary.subscribers),
+  };
+}
+
+async function loadRedisStore(): Promise<StoreData | null> {
+  if (!redisConfigured()) return null;
+  const base = process.env.UPSTASH_REDIS_REST_URL!.replace(/\/$/, "");
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN!;
+  try {
+    const res = await fetch(`${base}/get/${encodeURIComponent(REDIS_KEY)}`, {
+      headers: { Authorization: `Bearer ${redisToken}` },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { result?: string | null };
+      if (json.result) return JSON.parse(json.result) as StoreData;
+    }
+  } catch {
+    // continue
+  }
+  return null;
+}
+
+async function loadBlobStore(): Promise<StoreData | null> {
+  if (!blobConfigured()) return null;
+  const url =
+    process.env.BBA_STORE_BLOB_URL?.trim() ||
+    (globalThis as typeof globalThis & { __bba_blob_url?: string }).__bba_blob_url;
+  if (!url) return null;
+  try {
+    const res = await fetch(`${url}${url.includes("?") ? "&" : "?"}cache=0`, {
+      cache: "no-store",
+    });
+    if (res.ok) return (await res.json()) as StoreData;
+  } catch {
+    // continue
+  }
+  return null;
+}
+
 /** Load full store JSON from GitHub / Upstash / Blob. */
 export async function loadDurableStore(): Promise<StoreData | null> {
-  // Prefer Redis when configured (fastest)
-  if (redisConfigured()) {
-    const base = process.env.UPSTASH_REDIS_REST_URL!.replace(/\/$/, "");
-    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN!;
-    try {
-      const res = await fetch(`${base}/get/${encodeURIComponent(REDIS_KEY)}`, {
-        headers: { Authorization: `Bearer ${redisToken}` },
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const json = (await res.json()) as { result?: string | null };
-        if (json.result) return JSON.parse(json.result) as StoreData;
-      }
-    } catch {
-      // continue
-    }
+  const [redis, github, blob] = await Promise.all([
+    loadRedisStore(),
+    loadGithubStore(),
+    loadBlobStore(),
+  ]);
+
+  const copies = [redis, github, blob].filter(Boolean) as StoreData[];
+  if (!copies.length) return null;
+
+  // Newest catalog wins; users/orders/roles are always unioned so accounts
+  // cannot vanish when Redis is stale relative to GitHub (or vice versa).
+  copies.sort((a, b) => storeTs(b) - storeTs(a));
+  let merged = copies[0];
+  for (let i = 1; i < copies.length; i++) {
+    merged = mergeDurableCopies(merged, copies[i]);
   }
-
-  // GitHub live-store (public read — keeps shop + accounts in sync)
-  const fromGh = await loadGithubStore();
-  // Accept GitHub store even when products are empty — users/orders still matter
-  if (fromGh) return fromGh;
-
-  if (blobConfigured()) {
-    const url =
-      process.env.BBA_STORE_BLOB_URL?.trim() ||
-      (globalThis as typeof globalThis & { __bba_blob_url?: string }).__bba_blob_url;
-    if (url) {
-      try {
-        const res = await fetch(`${url}${url.includes("?") ? "&" : "?"}cache=0`, {
-          cache: "no-store",
-        });
-        if (res.ok) return (await res.json()) as StoreData;
-      } catch {
-        // continue
-      }
-    }
-  }
-
-  return null;
+  return merged;
 }
 
 /** Persist full store JSON to available backends. */

@@ -3,10 +3,9 @@ import { createHmac, timingSafeEqual } from "crypto";
 import {
   findOrderById,
   findOrderByShopifyDraftId,
-  getInventoryUpdatedAt,
-  listProducts,
   markOrderPaid,
 } from "@/lib/store";
+import { draftOrderGidFromNumericId } from "@/lib/shopify";
 
 function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET?.trim();
@@ -21,6 +20,19 @@ function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
   }
 }
 
+function looksPaid(topic: string, financialStatus: string) {
+  if (topic === "orders/paid") return true;
+  if (financialStatus === "paid" || financialStatus === "partially_paid") {
+    return (
+      !topic ||
+      topic === "orders/updated" ||
+      topic === "orders/create" ||
+      topic === "orders/fulfilled"
+    );
+  }
+  return false;
+}
+
 /**
  * Shopify webhook: after payment succeeds, apply website inventory + mark order paid.
  * Configure topic `orders/paid` → https://YOUR-DOMAIN/api/shopify/webhook
@@ -28,11 +40,18 @@ function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
 export async function POST(req: Request) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
+  const topic = (req.headers.get("x-shopify-topic") || "").toLowerCase();
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET?.trim();
 
-  // If a webhook secret is configured, require a valid signature.
-  // If not configured yet, still accept (so first connect is easier) but prefer setting one.
-  if (secret && !verifyShopifyHmac(rawBody, hmac)) {
+  // Production must verify signatures — never accept unsigned webhooks on Vercel.
+  if (!secret) {
+    if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "SHOPIFY_WEBHOOK_SECRET is not configured" },
+        { status: 503 }
+      );
+    }
+  } else if (!verifyShopifyHmac(rawBody, hmac)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -40,11 +59,21 @@ export async function POST(req: Request) {
     const payload = JSON.parse(rawBody) as {
       id?: number | string;
       admin_graphql_api_id?: string;
+      draft_order_id?: number | string | null;
       note?: string;
       note_attributes?: { name: string; value: string }[];
       tags?: string;
       financial_status?: string;
     };
+
+    const financial = (payload.financial_status || "").toLowerCase();
+    if (!looksPaid(topic, financial)) {
+      return NextResponse.json({
+        ok: true,
+        matched: false,
+        reason: "not_paid",
+      });
+    }
 
     const fromNote =
       payload.note_attributes?.find((a) => a.name === "website_order_id")?.value ||
@@ -59,8 +88,9 @@ export async function POST(req: Request) {
     const localId = fromNote || fromTags;
     let order = localId ? await findOrderById(localId) : null;
 
-    if (!order && payload.admin_graphql_api_id) {
-      order = await findOrderByShopifyDraftId(payload.admin_graphql_api_id);
+    if (!order && payload.draft_order_id) {
+      const gid = draftOrderGidFromNumericId(payload.draft_order_id);
+      if (gid) order = await findOrderByShopifyDraftId(gid);
     }
 
     if (!order) {
@@ -74,8 +104,6 @@ export async function POST(req: Request) {
       orderId: order.id,
       status: paid?.status,
       inventoryApplied: paid?.inventoryApplied,
-      products: await listProducts({ includeInactive: true }),
-      updatedAt: await getInventoryUpdatedAt(),
     });
   } catch (e) {
     return NextResponse.json(

@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     }
 
     // Shopify checkout: website keeps catalog; Shopify only collects payment.
-    // Inventory is reduced after successful payment (webhook / return page).
+    // Inventory is reduced after successful payment (verified webhook / confirm).
     if (isShopifyConfigured()) {
       const order = await createOrder({
         userId: session.userId,
@@ -155,6 +155,8 @@ export async function POST(req: Request) {
           localOrderId: order.id,
           items: lineItems,
           returnUrl,
+          discountAmount,
+          couponCode: appliedCode,
         });
 
         const updated = await updateOrder(order.id, {
@@ -178,7 +180,19 @@ export async function POST(req: Request) {
       }
     }
 
-    // Local fallback when Shopify env vars are not set yet
+    // On Vercel / production, do not pretend paid checkout works without Shopify.
+    if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        {
+          error:
+            "Shopify checkout is not connected yet. Add SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN in Vercel, then redeploy.",
+          shopify: shopifyStatus(),
+        },
+        { status: 503 }
+      );
+    }
+
+    // Local/dev fallback only
     await reduceStock(body.items);
     if (appliedCode) await recordCouponUse(appliedCode);
     const order = await createOrder({
@@ -204,7 +218,7 @@ export async function POST(req: Request) {
       updatedAt: await getInventoryUpdatedAt(),
       message: appliedCode
         ? `Order placed with coupon ${appliedCode}. Inventory updated.`
-        : "Order placed locally (Shopify not connected yet). Inventory updated.",
+        : "Order placed locally (Shopify not connected). Inventory updated.",
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Checkout failed";

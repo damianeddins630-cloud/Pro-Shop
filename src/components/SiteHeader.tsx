@@ -29,7 +29,9 @@ export function SiteHeader() {
     can("manage_users") ||
     can("manage_deals") ||
     can("manage_sponsors") ||
-    can("view_orders");
+    can("view_orders") ||
+    can("manage_orders") ||
+    can("edit_pages");
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/85 backdrop-blur-xl">

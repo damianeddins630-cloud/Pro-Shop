@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAnyPermission } from "@/lib/auth";
 
 const MAX_BYTES = 2_500_000;
 
 export async function POST(req: Request) {
-  const session = await requireAdmin();
+  const session = await requireAnyPermission(
+    "manage_inventory",
+    "manage_deals",
+    "manage_sponsors",
+    "manage_coaches",
+    "edit_pages"
+  );
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

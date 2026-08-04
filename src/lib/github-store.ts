@@ -76,17 +76,49 @@ async function currentSha(): Promise<string | null> {
   }
 }
 
+function mergeById<T extends { id: string }>(
+  remote: T[] | undefined,
+  local: T[] | undefined
+): T[] {
+  const map = new Map<string, T>();
+  for (const item of remote || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  for (const item of local || []) {
+    if (item?.id) map.set(item.id, item);
+  }
+  return Array.from(map.values());
+}
+
+/** On conflict, keep our catalog write but never drop remote accounts/orders. */
+function mergeAfterConflict(local: StoreData, remote: StoreData): StoreData {
+  return {
+    ...local,
+    users: mergeById(remote.users, local.users),
+    orders: mergeById(remote.orders, local.orders),
+    roles: mergeById(remote.roles, local.roles),
+    coupons: mergeById(remote.coupons, local.coupons),
+    subscribers: mergeById(remote.subscribers, local.subscribers),
+  };
+}
+
 export async function saveGithubStore(data: StoreData): Promise<boolean> {
   const t = token();
   if (!t) return false;
 
+  let next = data;
+
   // Retry on SHA conflicts so concurrent writes don't silently drop accounts
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      if (attempt > 0) {
+        const remote = await loadGithubStore();
+        if (remote) next = mergeAfterConflict(next, remote);
+      }
       const sha = await currentSha();
       const payload = {
         message: `chore: sync live store (${new Date().toISOString()})`,
-        content: Buffer.from(JSON.stringify(data)).toString("base64"),
+        content: Buffer.from(JSON.stringify(next)).toString("base64"),
         branch: branch(),
         ...(sha ? { sha } : {}),
       };
@@ -105,7 +137,7 @@ export async function saveGithubStore(data: StoreData): Promise<boolean> {
         }
       );
       if (res.ok) return true;
-      // 409 = someone else wrote first; refresh SHA and retry
+      // 409 = someone else wrote first; reload, merge, retry
       if (res.status !== 409 && res.status !== 422) return false;
     } catch {
       return false;

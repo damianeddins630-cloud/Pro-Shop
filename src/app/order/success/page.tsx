@@ -10,11 +10,13 @@ function SuccessInner() {
   const params = useSearchParams();
   const orderId = params.get("orderId");
   const [order, setOrder] = useState<Order | null>(null);
-  const [message, setMessage] = useState("Confirming your order...");
+  const [message, setMessage] = useState("Checking your payment...");
 
   useEffect(() => {
     if (!orderId) {
-      setMessage("Thanks — your Shopify payment is complete.");
+      setMessage(
+        "If you paid on Shopify, your order will appear under your account once payment is confirmed."
+      );
       return;
     }
 
@@ -22,7 +24,6 @@ function SuccessInner() {
 
     async function settle() {
       try {
-        // Backup path: if webhook is slow, apply inventory when shopper returns
         const confirmRes = await fetch(`/api/orders/${orderId}/confirm`, {
           method: "POST",
         });
@@ -34,15 +35,21 @@ function SuccessInner() {
         ) {
           saveLocalInventory(confirmData.products as Product[], confirmData.updatedAt);
         }
-        if (!cancelled && confirmData.order) {
+        if (!cancelled && confirmData.order && !confirmData.awaiting) {
           setOrder(confirmData.order as Order);
           setMessage(
             "Payment received. Your order is saved on this website and inventory was updated."
           );
           return;
         }
+        if (!cancelled && confirmData.awaiting) {
+          setOrder((confirmData.order as Order) || null);
+          setMessage(
+            "Waiting for Shopify to confirm payment. This usually finishes within a minute — check Previous orders shortly."
+          );
+        }
       } catch {
-        // fall through to load order list
+        // fall through
       }
 
       try {
@@ -51,15 +58,25 @@ function SuccessInner() {
         const found = (data.orders || []).find((o: Order) => o.id === orderId);
         if (!cancelled) {
           setOrder(found || null);
-          setMessage(
-            found
-              ? "Your order is saved on your website account under Previous orders."
-              : "Thanks — your Shopify payment is complete."
-          );
+          if (found?.status === "awaiting_payment") {
+            setMessage(
+              "Order saved — waiting for Shopify payment confirmation. Inventory updates after payment clears."
+            );
+          } else if (found) {
+            setMessage(
+              "Your order is saved on your website account under Previous orders."
+            );
+          } else {
+            setMessage(
+              "Thanks. If payment completed on Shopify, your order will show in your account shortly."
+            );
+          }
         }
       } catch {
         if (!cancelled) {
-          setMessage("Thanks — your Shopify payment is complete.");
+          setMessage(
+            "Thanks. If payment completed on Shopify, your order will show in your account shortly."
+          );
         }
       }
     }

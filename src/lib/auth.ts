@@ -2,17 +2,23 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import type { Permission, PublicUser, SessionPayload, User } from "./types";
-import {
-  findUserById,
-  findUserByLogin,
-  getRoleById,
-  resolveUserRole,
-} from "./store";
+import { findUserById, findUserByLogin, resolveUserRole } from "./store";
 
 const COOKIE_NAME = "bba_session";
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "ballards-bowling-academy-dev-secret-change-me"
-);
+const DEFAULT_DEV_SECRET = "ballards-bowling-academy-dev-secret-change-me";
+const authSecret = process.env.AUTH_SECRET?.trim() || DEFAULT_DEV_SECRET;
+const secret = new TextEncoder().encode(authSecret);
+
+function assertAuthSecret() {
+  if (
+    (process.env.VERCEL || process.env.NODE_ENV === "production") &&
+    authSecret === DEFAULT_DEV_SECRET
+  ) {
+    throw new Error(
+      "AUTH_SECRET is not set in Vercel. Add a long random AUTH_SECRET, then redeploy."
+    );
+  }
+}
 
 export async function toPublicUser(
   user: User,
@@ -44,6 +50,7 @@ export async function verifyPassword(password: string, hash: string) {
 }
 
 export async function createSession(payload: SessionPayload) {
+  assertAuthSecret();
   const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -108,39 +115,8 @@ export async function getSession(): Promise<SessionPayload | null> {
       };
     }
 
-    // Fallback for edge cases where the user row is temporarily missing
-    let roleId = String(payload.roleId || "");
-    const legacyRole = String(payload.role || "");
-    if (!roleId || roleId === "admin" || roleId === "customer") {
-      if (legacyRole === "admin" || roleId === "admin") roleId = "role_admin";
-      else if (legacyRole === "customer" || roleId === "customer") {
-        roleId = "role_customer";
-      }
-    }
-
-    let permissions = Array.isArray(payload.permissions)
-      ? (payload.permissions as Permission[])
-      : [];
-
-    const role = roleId ? await getRoleById(roleId) : null;
-    if (role) {
-      permissions = role.permissions;
-      roleId = role.id;
-    } else if (legacyRole === "admin") {
-      const adminRole = await getRoleById("role_admin");
-      if (adminRole) {
-        permissions = adminRole.permissions;
-        roleId = adminRole.id;
-      }
-    }
-
-    return {
-      userId,
-      roleId: roleId || "role_customer",
-      username: String(payload.username),
-      email: String(payload.email),
-      permissions,
-    };
+    // User row missing from store — force re-login instead of trusting stale JWT perms
+    return null;
   } catch {
     return null;
   }
@@ -160,12 +136,15 @@ export async function requireAnyPermission(...needed: Permission[]) {
   return null;
 }
 
-/** Back-compat helper: full owner/admin access */
+/** Back-compat helper: elevated ops access (prefer requireAnyPermission with real perms). */
 export async function requireAdmin() {
   return requireAnyPermission(
     "manage_roles",
     "manage_users",
     "manage_inventory",
+    "manage_deals",
+    "manage_sponsors",
+    "manage_coaches",
     "edit_pages"
   );
 }

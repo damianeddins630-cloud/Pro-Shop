@@ -8,16 +8,36 @@ export async function GET() {
   try {
     const [products, users] = await Promise.all([listProducts(), listUsers()]);
     const persist = storePersistStatus();
+    const shopify = shopifyStatus();
+
+    const authSecretSet = Boolean(process.env.AUTH_SECRET?.trim());
+
+    let warning: string | null = null;
+    if (!authSecretSet && (process.env.VERCEL || process.env.NODE_ENV === "production")) {
+      warning =
+        "AUTH_SECRET is not set in Vercel — login will fail until you add a long random AUTH_SECRET and redeploy.";
+    } else if (!persist.durableWriteConfigured) {
+      warning =
+        "GITHUB_TOKEN (or Upstash/Blob) is not set — new accounts may disappear after deploy/restart. Add GITHUB_TOKEN in Vercel.";
+    } else if (!persist.lastPersistOk) {
+      warning =
+        "Last save to durable storage failed. Check GITHUB_TOKEN / Redis / Blob credentials.";
+    } else if (!shopify.configured) {
+      warning =
+        "Shopify is not connected — paid checkout is disabled until SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN are set.";
+    } else if (!shopify.webhookConfigured) {
+      warning =
+        "SHOPIFY_WEBHOOK_SECRET is missing — paid Shopify orders will not update website inventory until the webhook is configured.";
+    }
+
     return NextResponse.json({
       ok: true,
       vercel: Boolean(process.env.VERCEL),
       productCount: products.length,
       userCount: users.length,
-      shopify: shopifyStatus(),
+      shopify,
       persist,
-      warning: persist.durableWriteConfigured
-        ? null
-        : "GITHUB_TOKEN (or Upstash/Blob) is not set — new accounts may disappear after deploy/restart. Add GITHUB_TOKEN in Vercel.",
+      warning,
       time: new Date().toISOString(),
     });
   } catch (e) {
