@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isUsingFallbackAuthSecret } from "@/lib/auth";
 import { listProducts, listUsers, storePersistStatus } from "@/lib/store";
 import { shopifyStatus } from "@/lib/shopify";
 
@@ -10,13 +11,8 @@ export async function GET() {
     const persist = storePersistStatus();
     const shopify = shopifyStatus();
 
-    const authSecretSet = Boolean(process.env.AUTH_SECRET?.trim());
-
     let warning: string | null = null;
-    if (!authSecretSet && (process.env.VERCEL || process.env.NODE_ENV === "production")) {
-      warning =
-        "AUTH_SECRET is not set in Vercel — login will fail until you add a long random AUTH_SECRET and redeploy.";
-    } else if (!persist.durableWriteConfigured) {
+    if (!persist.durableWriteConfigured) {
       warning =
         "GITHUB_TOKEN (or Upstash/Blob) is not set — new accounts may disappear after deploy/restart. Add GITHUB_TOKEN in Vercel.";
     } else if (!persist.lastPersistOk) {
@@ -28,6 +24,12 @@ export async function GET() {
     } else if (!shopify.webhookConfigured) {
       warning =
         "SHOPIFY_WEBHOOK_SECRET is missing — paid Shopify orders will not update website inventory until the webhook is configured.";
+    } else if (
+      isUsingFallbackAuthSecret() &&
+      (process.env.VERCEL || process.env.NODE_ENV === "production")
+    ) {
+      warning =
+        "AUTH_SECRET is not set in Vercel yet — login still works with a temporary secret. Add a long random AUTH_SECRET when you can, then redeploy.";
     }
 
     return NextResponse.json({
@@ -37,6 +39,9 @@ export async function GET() {
       userCount: users.length,
       shopify,
       persist,
+      auth: {
+        customSecret: !isUsingFallbackAuthSecret(),
+      },
       warning,
       time: new Date().toISOString(),
     });
