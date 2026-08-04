@@ -28,6 +28,11 @@ const nav: { href: string; label: string; perms: Permission[] }[] = [
     perms: ["manage_sponsors", "edit_pages"],
   },
   { href: "/ops/orders", label: "Orders", perms: ["view_orders", "manage_orders"] },
+  {
+    href: "/ops/shopify",
+    label: "Shopify",
+    perms: ["manage_inventory", "manage_orders", "manage_roles", "manage_users"],
+  },
   { href: "/ops/roles", label: "Roles", perms: ["manage_roles"] },
   {
     href: "/ops/users",

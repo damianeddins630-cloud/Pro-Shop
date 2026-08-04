@@ -42,6 +42,12 @@ const cards: {
     perms: ["view_orders", "manage_orders"],
   },
   {
+    href: "/ops/shopify",
+    title: "Shopify",
+    text: "Connect Shopify payment checkout. Status + step-by-step setup.",
+    perms: ["manage_inventory", "manage_orders", "manage_roles", "manage_users"],
+  },
+  {
     href: "/ops/roles",
     title: "Roles",
     text: "Create, edit, and remove roles and permissions.",
@@ -67,11 +73,11 @@ export default function OpsHomePage() {
         if (typeof d.warning === "string" && d.warning) setPersistWarning(d.warning);
         if (d.shopify && !d.shopify.configured) {
           setShopifyWarning(
-            "Shopify checkout is not connected yet. Add SHOPIFY_STORE_DOMAIN, SHOPIFY_ADMIN_ACCESS_TOKEN, and SHOPIFY_WEBHOOK_SECRET in Vercel, then redeploy."
+            "Shopify is not connected yet. Open Ops → Shopify and follow the 4 steps (add keys in Vercel pro-shop-lemon, then redeploy)."
           );
         } else if (d.shopify?.configured && !d.shopify?.webhookConfigured) {
           setShopifyWarning(
-            "Shopify checkout is ready, but SHOPIFY_WEBHOOK_SECRET is missing — paid orders will not update inventory until the webhook is set."
+            "Shopify checkout is ready, but SHOPIFY_WEBHOOK_SECRET is missing — open Ops → Shopify to finish webhook setup."
           );
         }
       })
@@ -99,7 +105,10 @@ export default function OpsHomePage() {
       )}
       {shopifyWarning && (
         <p className="mt-4 max-w-3xl rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
-          {shopifyWarning}
+          {shopifyWarning}{" "}
+          <Link href="/ops/shopify" className="underline text-amber-50">
+            Open Shopify setup
+          </Link>
         </p>
       )}
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
