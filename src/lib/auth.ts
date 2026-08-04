@@ -2,7 +2,12 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import type { Permission, PublicUser, SessionPayload, User } from "./types";
-import { findUserById, getRoleById, resolveUserRole } from "./store";
+import {
+  findUserById,
+  findUserByLogin,
+  getRoleById,
+  resolveUserRole,
+} from "./store";
 
 const COOKIE_NAME = "bba_session";
 const secret = new TextEncoder().encode(
@@ -87,18 +92,20 @@ export async function getSession(): Promise<SessionPayload | null> {
 
     // Always use the live user record so Ops role changes apply immediately
     // (JWT alone can keep a stale roleId until the next login).
-    if (userId) {
-      const liveUser = await findUserById(userId);
-      if (liveUser) {
-        const role = await resolveUserRole(liveUser);
-        return {
-          userId: liveUser.id,
-          roleId: role.id,
-          username: liveUser.username,
-          email: liveUser.email,
-          permissions: role.permissions,
-        };
-      }
+    // Also resolve by email/username when the cookie still has an old user id.
+    const liveUser =
+      (userId ? await findUserById(userId) : null) ||
+      (await findUserByLogin(String(payload.email || ""))) ||
+      (await findUserByLogin(String(payload.username || "")));
+    if (liveUser) {
+      const role = await resolveUserRole(liveUser);
+      return {
+        userId: liveUser.id,
+        roleId: role.id,
+        username: liveUser.username,
+        email: liveUser.email,
+        permissions: role.permissions,
+      };
     }
 
     // Fallback for edge cases where the user row is temporarily missing

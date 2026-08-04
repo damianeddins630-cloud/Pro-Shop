@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useEditMode } from "@/lib/edit-mode";
 
 const cards = [
@@ -43,6 +44,16 @@ const cards = [
 
 export default function OpsHomePage() {
   const { user } = useEditMode();
+  const [persistWarning, setPersistWarning] = useState("");
+
+  useEffect(() => {
+    fetch("/api/health", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d.warning === "string" && d.warning) setPersistWarning(d.warning);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div>
@@ -50,6 +61,11 @@ export default function OpsHomePage() {
       <p className="mt-2 max-w-2xl text-mist">
         This is Operations Home Base. Pick a section to manage the pro shop.
       </p>
+      {persistWarning && (
+        <p className="mt-4 max-w-3xl rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+          {persistWarning}
+        </p>
+      )}
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <Link

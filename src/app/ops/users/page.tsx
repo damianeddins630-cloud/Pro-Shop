@@ -17,6 +17,7 @@ export default function OpsUsersPage() {
   const [actorRank, setActorRank] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -28,14 +29,21 @@ export default function OpsUsersPage() {
     const uData = await uRes.json().catch(() => ({}));
     const rData = await rRes.json().catch(() => ({}));
     if (!uRes.ok) {
-      setError(uData.error || "Could not load users");
+      setError(
+        uData.error ||
+          (uRes.status === 401
+            ? "Sign in as Website Owner to view accounts."
+            : "Could not load users")
+      );
       setUsers([]);
+      setWarning("");
       setLoading(false);
       return;
     }
     setUsers(Array.isArray(uData.users) ? uData.users : []);
     setRoles(Array.isArray(rData.roles) ? rData.roles : []);
     setActorRank(Number(uData.actorRank ?? rData.actorRank) || 0);
+    setWarning(typeof uData.warning === "string" ? uData.warning : "");
     setError("");
     setLoading(false);
   }, []);
@@ -57,7 +65,6 @@ export default function OpsUsersPage() {
     setMessage("");
     setSavingId(userId);
 
-    // Optimistic UI so the dropdown doesn't snap back while saving
     setUsers((list) =>
       list.map((u) => {
         if (u.id !== userId) return u;
@@ -80,29 +87,20 @@ export default function OpsUsersPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // Revert
-        setUsers((list) =>
-          list.map((u) => (u.id === userId ? previous : u))
-        );
+        setUsers((list) => list.map((u) => (u.id === userId ? previous : u)));
         setError(data.error || "Could not update role");
         return;
       }
-      if (Array.isArray(data.users)) {
-        setUsers(data.users);
-      } else if (data.user) {
+      if (Array.isArray(data.users)) setUsers(data.users);
+      else if (data.user) {
         setUsers((list) =>
           list.map((u) => (u.id === data.user.id ? { ...u, ...data.user } : u))
         );
-      } else {
-        await load();
-      }
+      } else await load();
       setMessage(
         `Saved ${data.user?.username || "user"} as ${data.user?.roleName || "updated role"}.`
       );
-      // Refresh current session permissions if you edited yourself
-      if (userId === me?.id) {
-        await refreshUser();
-      }
+      if (userId === me?.id) await refreshUser();
     } catch {
       setUsers((list) => list.map((u) => (u.id === userId ? previous : u)));
       setError("Could not update role — check your connection and try again.");
@@ -115,12 +113,35 @@ export default function OpsUsersPage() {
 
   return (
     <div>
-      <h2 className="display text-4xl">Users & accounts</h2>
-      <p className="mt-1 text-sm text-mist">
-        Every account: when it was made, name, email, role, and whether they ordered.
-        Role changes save immediately and apply the next time that user loads a page
-        (no re-login needed). Website Owner stays locked.
-      </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="display text-4xl">Users & accounts</h2>
+          <p className="mt-1 text-sm text-mist">
+            Every account on this website. Role changes save immediately.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-chalk">
+            {users.length} account{users.length === 1 ? "" : "s"}
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost text-sm"
+            onClick={() => {
+              setLoading(true);
+              void load();
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {warning && (
+        <p className="mt-4 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+          {warning}
+        </p>
+      )}
       {(message || error) && (
         <p className={`mt-4 text-sm ${error ? "text-red-300" : "text-emerald-300"}`}>
           {error || message}
@@ -216,8 +237,12 @@ export default function OpsUsersPage() {
           </tbody>
         </table>
       </div>
-      {!users.length && (
-        <p className="mt-4 text-mist">No users found.</p>
+      {!users.length && !error && (
+        <p className="mt-4 text-mist">
+          No accounts found in the live store yet. The Website Owner account
+          should always appear here — tap Refresh. New customer accounts show up
+          after they register (and only stay if GITHUB_TOKEN is set in Vercel).
+        </p>
       )}
     </div>
   );

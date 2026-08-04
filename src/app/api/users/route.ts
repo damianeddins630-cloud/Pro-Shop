@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requirePermission, toPublicUser } from "@/lib/auth";
-import { listAllOrders, listRoles, listUsers, updateUser } from "@/lib/store";
+import { requireAnyPermission, toPublicUser } from "@/lib/auth";
+import {
+  listAllOrders,
+  listRoles,
+  listUsers,
+  storePersistStatus,
+  updateUser,
+} from "@/lib/store";
 import { actorRankFromSession } from "@/lib/role-rank";
 
 export const dynamic = "force-dynamic";
@@ -10,32 +16,67 @@ const noStore = { "Cache-Control": "no-store, max-age=0" };
 
 async function publicUsersList() {
   const [users, orders] = await Promise.all([listUsers(), listAllOrders()]);
-  return Promise.all(
-    users.map((u) => {
+  const publicUsers: Awaited<ReturnType<typeof toPublicUser>>[] = [];
+
+  for (const u of users) {
+    try {
       const userOrders = orders.filter((o) => o.userId === u.id);
       const last = userOrders[0];
-      return toPublicUser(u, {
-        hasOrdered: userOrders.length > 0,
-        orderCount: userOrders.length,
-        lastOrderAt: last?.createdAt,
+      publicUsers.push(
+        await toPublicUser(u, {
+          hasOrdered: userOrders.length > 0,
+          orderCount: userOrders.length,
+          lastOrderAt: last?.createdAt,
+        })
+      );
+    } catch {
+      // Never let one bad row blank the whole accounts table
+      publicUsers.push({
+        id: u.id,
+        email: u.email,
+        username: u.username,
+        phoneNumber: u.phoneNumber || "",
+        dateOfBirth: u.dateOfBirth || "",
+        roleId: u.roleId || "role_customer",
+        roleName: "Unknown",
+        permissions: [],
+        createdAt: u.createdAt,
+        hasOrdered: false,
+        orderCount: 0,
       });
-    })
-  );
+    }
+  }
+
+  return publicUsers;
 }
 
 export async function GET() {
-  const session = await requirePermission("manage_users");
+  const session = await requireAnyPermission("manage_users", "manage_roles");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roles = await listRoles();
-  return NextResponse.json(
-    {
-      users: await publicUsersList(),
-      actorRank: actorRankFromSession(session, roles),
-    },
-    { headers: noStore }
-  );
+  try {
+    const roles = await listRoles();
+    const users = await publicUsersList();
+    const persist = storePersistStatus();
+    return NextResponse.json(
+      {
+        users,
+        userCount: users.length,
+        actorRank: actorRankFromSession(session, roles),
+        persist,
+        warning: persist.durableWriteConfigured
+          ? null
+          : "GITHUB_TOKEN is not set in Vercel. New accounts will disappear after restart. Add GITHUB_TOKEN (repo scope), then redeploy.",
+      },
+      { headers: noStore }
+    );
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Could not load users" },
+      { status: 500 }
+    );
+  }
 }
 
 const schema = z.object({
@@ -44,7 +85,7 @@ const schema = z.object({
 });
 
 export async function PUT(req: Request) {
-  const session = await requirePermission("manage_users");
+  const session = await requireAnyPermission("manage_users", "manage_roles");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

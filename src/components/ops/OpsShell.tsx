@@ -29,7 +29,11 @@ const nav: { href: string; label: string; perms: Permission[] }[] = [
   },
   { href: "/ops/orders", label: "Orders", perms: ["view_orders", "manage_orders"] },
   { href: "/ops/roles", label: "Roles", perms: ["manage_roles"] },
-  { href: "/ops/users", label: "Users", perms: ["manage_users"] },
+  {
+    href: "/ops/users",
+    label: "Users",
+    perms: ["manage_users", "manage_roles"],
+  },
 ];
 
 function canSee(

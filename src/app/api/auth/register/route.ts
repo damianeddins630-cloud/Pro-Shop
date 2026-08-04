@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createUser } from "@/lib/store";
+import { createUser, storePersistStatus } from "@/lib/store";
 import { createSessionForUser, toPublicUser } from "@/lib/auth";
 
 const schema = z.object({
@@ -13,12 +13,28 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
+    if (process.env.VERCEL && !storePersistStatus().durableWriteConfigured) {
+      return NextResponse.json(
+        {
+          error:
+            "Account saving is not set up yet (missing GITHUB_TOKEN in Vercel). Please contact the site owner.",
+        },
+        { status: 503 }
+      );
+    }
     const body = schema.parse(await req.json());
     const user = await createUser(body);
     await createSessionForUser(user);
-    return NextResponse.json({ user: await toPublicUser(user) });
+    return NextResponse.json(
+      { user: await toPublicUser(user) },
+      { status: 201 }
+    );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Registration failed";
-    return NextResponse.json({ error: message }, { status: 400 });
+    const missingPersist = message.toLowerCase().includes("github_token");
+    return NextResponse.json(
+      { error: message },
+      { status: missingPersist ? 503 : 400 }
+    );
   }
 }

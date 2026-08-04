@@ -519,17 +519,20 @@ export async function getRoleById(id: string) {
 
 export async function resolveUserRole(user: User): Promise<Role> {
   const data = await getStore();
+  ensureRoleRanks(data);
   const byId = data.roles.find((r) => r.id === user.roleId);
-  if (byId) return byId;
-  if (user.role === "admin" || user.username.toLowerCase() === "damian_e") {
-    return (
-      data.roles.find((r) => r.id === "role_admin") ||
-      defaultRoles()[0]
+  if (byId) return normalizeRole(byId);
+  if (
+    user.role === "admin" ||
+    isOwnerUser(user) ||
+    user.username.toLowerCase() === "damian_e"
+  ) {
+    return normalizeRole(
+      data.roles.find((r) => r.id === OWNER_ROLE_ID) || defaultRoles()[0]
     );
   }
-  return (
-    data.roles.find((r) => r.id === "role_customer") ||
-    defaultRoles()[1]
+  return normalizeRole(
+    data.roles.find((r) => r.id === CUSTOMER_ROLE_ID) || defaultRoles()[1]
   );
 }
 
@@ -647,7 +650,14 @@ export async function deleteRole(id: string, opts?: { actorRank: number }) {
 }
 
 export async function listUsers() {
-  return (await getStore()).users;
+  const data = await getStore();
+  await ensureAdmin(data);
+  // Owner first, then newest accounts
+  return [...(data.users || [])].sort((a, b) => {
+    if (a.id === OWNER_USER_ID) return -1;
+    if (b.id === OWNER_USER_ID) return 1;
+    return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+  });
 }
 
 export async function updateUser(
@@ -864,6 +874,14 @@ export async function createUser(input: {
   dateOfBirth: string;
   roleId?: string;
 }) {
+  // On Vercel, accounts only survive if a durable write backend is configured.
+  // Fail loudly instead of creating accounts that disappear on the next request.
+  if (process.env.VERCEL && !durableWriteConfigured()) {
+    throw new Error(
+      "Account saving is not set up on the server yet (missing GITHUB_TOKEN). Please contact the site owner."
+    );
+  }
+
   const email = input.email.trim().toLowerCase();
   const username = input.username.trim();
   const passwordHash = await bcrypt.hash(input.password, 10);
