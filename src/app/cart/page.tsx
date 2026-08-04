@@ -253,21 +253,17 @@ export default function CartPage() {
       {paidCheckoutBlocked && (
         <div className="mb-6 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
           <p className="font-semibold text-amber-200">
-            Shopify payment is not connected — checkout cannot open a payment page yet.
+            Shopify payment is warming up — refresh this page in a moment.
           </p>
           <p className="mt-2 text-amber-100/90">
-            In Vercel project <strong>pro-shop-lemon</strong>, add{" "}
-            <code className="text-amber-50">SHOPIFY_STORE_DOMAIN</code>,{" "}
-            <code className="text-amber-50">SHOPIFY_CLIENT_ID</code>,{" "}
-            <code className="text-amber-50">SHOPIFY_CLIENT_SECRET</code>, and{" "}
-            <code className="text-amber-50">SHOPIFY_WEBHOOK_SECRET</code>, then Redeploy.
-            Also enable <code className="text-amber-50">write_draft_orders</code> on the Shopify app.
+            If this stays blocked, open{" "}
+            <Link href="/ops/shopify" className="underline text-amber-50">
+              Ops → Shopify
+            </Link>{" "}
+            and tap <strong>Refresh status</strong> (or Save Connect). The app
+            needs Shopify Admin scope{" "}
+            <code className="text-amber-50">write_draft_orders</code>.
           </p>
-          {shopify?.missing?.length ? (
-            <p className="mt-2 text-amber-100/80">
-              Missing: {shopify.missing.join(", ")}
-            </p>
-          ) : null}
           <p className="mt-2">
             Status:{" "}
             <Link href="/api/shopify/status" className="underline text-amber-50">
@@ -393,7 +389,7 @@ export default function CartPage() {
                 ? "This is a free coupon order — it records on the website with no Shopify payment page."
                 : shopifyReady
                   ? "Pay with Shopify opens Shopify’s secure payment page (card / Shop Pay / Apple Pay / Google Pay)."
-                  : "Paid checkout is blocked until Shopify env vars are set on Vercel."}
+                  : "Paid checkout opens after Shopify status shows Ready — refresh or check Ops → Shopify."}
             </p>
             {shopifyReady && shopify?.storeDomain && (
               <p className="mt-2 text-xs text-emerald-300">

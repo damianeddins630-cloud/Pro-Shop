@@ -156,12 +156,13 @@ export async function POST(req: Request) {
     }
 
     // Paid checkout REQUIRES Shopify — never silently place a paid local order on Vercel.
+    await loadShopifyRuntimeConfig();
     if (!isShopifyConfigured()) {
       const status = shopifyStatus();
       return NextResponse.json(
         {
           error:
-            "Shopify payment is not connected on this server. Add SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID, and SHOPIFY_CLIENT_SECRET in Vercel project pro-shop-lemon, then Redeploy.",
+            "Shopify payment is not connected yet. Open Ops → Shopify, tap Refresh status or Save Connect, then try checkout again.",
           code: "SHOPIFY_NOT_CONFIGURED",
           shopify: status,
         },
