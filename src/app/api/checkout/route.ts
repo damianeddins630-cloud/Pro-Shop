@@ -92,19 +92,15 @@ export async function POST(req: Request) {
       couponNote = couponLabel(coupon);
     }
 
-    // Always take stock when an order is placed, and always create an order record
-    await reduceStock(body.items);
-    if (appliedCode) {
-      await recordCouponUse(appliedCode);
-    }
-
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
       req.headers.get("origin") ||
       "http://localhost:3000";
 
-    // Free / fully discounted orders skip Shopify and complete on-site
+    // Free / fully discounted orders complete on this website (no Shopify)
     if (total <= 0) {
+      await reduceStock(body.items);
+      if (appliedCode) await recordCouponUse(appliedCode);
       const order = await createOrder({
         userId: session.userId,
         username: session.username,
@@ -116,6 +112,7 @@ export async function POST(req: Request) {
         total: 0,
         status: "completed",
         paymentProvider: "local",
+        inventoryApplied: true,
       });
 
       const products = await listProducts({ includeInactive: true });
@@ -132,6 +129,8 @@ export async function POST(req: Request) {
       });
     }
 
+    // Shopify checkout: website keeps catalog; Shopify only collects payment.
+    // Inventory is reduced after successful payment (webhook / return page).
     if (isShopifyConfigured()) {
       const order = await createOrder({
         userId: session.userId,
@@ -144,6 +143,7 @@ export async function POST(req: Request) {
         total,
         status: "awaiting_payment",
         paymentProvider: "shopify",
+        inventoryApplied: false,
       });
 
       const returnUrl = `${origin}/order/success?orderId=${order.id}`;
@@ -157,23 +157,20 @@ export async function POST(req: Request) {
           returnUrl,
         });
 
-        await updateOrder(order.id, {
+        const updated = await updateOrder(order.id, {
           shopifyDraftOrderId: shopify.draftOrderId,
           shopifyInvoiceUrl: shopify.invoiceUrl,
         });
 
-        const products = await listProducts({ includeInactive: true });
         return NextResponse.json({
           ok: true,
           provider: "shopify",
           orderId: order.id,
-          order,
-          products,
-          updatedAt: await getInventoryUpdatedAt(),
+          order: updated || order,
           checkoutUrl: shopify.invoiceUrl,
           returnUrl,
           message:
-            "Order saved. Continue to Shopify to pay. Stock was reduced from inventory.",
+            "Continue to Shopify to pay. Website inventory updates after payment succeeds.",
         });
       } catch (e) {
         await updateOrder(order.id, { status: "cancelled" });
@@ -181,6 +178,9 @@ export async function POST(req: Request) {
       }
     }
 
+    // Local fallback when Shopify env vars are not set yet
+    await reduceStock(body.items);
+    if (appliedCode) await recordCouponUse(appliedCode);
     const order = await createOrder({
       userId: session.userId,
       username: session.username,
@@ -192,6 +192,7 @@ export async function POST(req: Request) {
       total,
       status: "placed",
       paymentProvider: "local",
+      inventoryApplied: true,
     });
 
     const products = await listProducts({ includeInactive: true });
@@ -203,7 +204,7 @@ export async function POST(req: Request) {
       updatedAt: await getInventoryUpdatedAt(),
       message: appliedCode
         ? `Order placed with coupon ${appliedCode}. Inventory updated.`
-        : "Order placed. Inventory stock updated and order added to Operations.",
+        : "Order placed locally (Shopify not connected yet). Inventory updated.",
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Checkout failed";

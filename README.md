@@ -1,6 +1,6 @@
 # Ballard's Bowling Academy Pro Shop
 
-Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, admin tools, and Shopify payments.
+Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, Operations admin, and Shopify **checkout-only** payments.
 
 ## Owner login
 
@@ -8,46 +8,73 @@ Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, ad
 - Password: `Archer6!9`
 - Operations: `/ops`
 
-## How shopping + Shopify works
+## Architecture (important)
 
-1. Customers browse products and use the cart **on this website**
-2. At checkout they click **Pay with Shopify**
-3. Shopify collects the money on its secure payment page
-4. The order is saved on this website (Profile → Previous orders)
-5. After paying they can return to `/order/success`
+**Your website is the source of truth.**
 
-## Connect Shopify (required to take real payments)
+| Managed on this website | Managed by Shopify |
+|---|---|
+| Products, prices, inventory, images | Checkout / payment page |
+| Categories, deals, coupons, sponsors | Card / Shop Pay / Apple Pay / Google Pay |
+| Ops admin for employees | Taxes & shipping at checkout |
+| Order records on the site | Payment processing |
 
-In Shopify Admin:
+Shopify does **not** own your product catalog. Employees should manage products only in **Operations (`/ops`)**.
+
+Flow:
+
+1. Customer browses/carts on this website
+2. Checkout creates a **Shopify Draft Order** from the cart
+3. Customer pays on Shopify
+4. Website marks the order paid and reduces its own inventory
+
+No Storefront API token is required.
+
+## Connect Shopify (take real payments)
+
+### 1) Shopify Admin custom app
 
 1. **Settings → Apps and sales channels → Develop apps → Create an app**
-2. Configure Admin API scopes:
+2. Admin API scopes:
    - `write_draft_orders`
    - `read_draft_orders`
    - `read_orders`
-3. Install the app and copy the **Admin API access token**
-4. Optional webhook: topic `orders/paid` → `https://YOUR-DOMAIN/api/shopify/webhook`
+3. Install the app and copy the **Admin API access token** (`shpat_...`)
+4. Note your store domain: `your-store.myshopify.com`
+5. Optional but recommended webhook:
+   - Topic: `orders/paid`
+   - URL: `https://YOUR-DOMAIN/api/shopify/webhook`
+   - Copy the webhook signing secret
 
-In Vercel → Project → Settings → Environment Variables, add:
+Keep this custom app — it is required for Draft Order checkout.
+
+### 2) Vercel environment variables
+
+Project → **Settings → Environment Variables** (Production):
 
 ```
-AUTH_SECRET=...
+AUTH_SECRET=long-random-secret
 NEXT_PUBLIC_SITE_URL=https://YOUR-DOMAIN
 
-# Required so inventory add/edit/delete shows on the shop for everyone
-GITHUB_TOKEN=ghp_xxx   # GitHub PAT with repo scope
+# Durable inventory for Vercel (so Ops edits stick for everyone)
+GITHUB_TOKEN=ghp_xxx
 GITHUB_REPO=damianeddins630-cloud/Pro-Shop
 GITHUB_BRANCH=main
 
+# Shopify checkout-only
 SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_...
 SHOPIFY_API_VERSION=2025-01
 SHOPIFY_WEBHOOK_SECRET=...   # optional but recommended
 ```
 
-Redeploy after saving env vars. Cart button becomes **Pay with Shopify** when configured.
+Do **not** add a Storefront API token. This site does not use it.
 
-Buying requires login or create account (`Login to buy` on products).
+### 3) Redeploy
+
+After saving env vars, redeploy Production. Cart checkout becomes **Pay with Shopify**.
+
+Buying requires login / create account.
 
 ## Local
 
@@ -56,13 +83,15 @@ npm install
 npm run dev
 ```
 
-## Vercel (important)
+## Vercel checklist
 
 1. Import GitHub repo `damianeddins630-cloud/Pro-Shop`
-2. Framework: **Next.js** (auto)
-3. Root directory: `.` (repo root)
+2. Framework: **Next.js**
+3. Deploy from **`main`**
 4. Set env vars above
-5. **Settings → Deployment Protection → turn OFF Vercel Authentication**
-6. Deploy production from branch **`main`**
+5. Turn OFF Vercel Deployment Protection / Authentication so customers can use the site
+6. Health check: `https://YOUR-DOMAIN/api/health`
 
-Health check: `https://YOUR-DOMAIN/api/health` should return `{ "ok": true, ... }`.
+## Future note
+
+`live-store.json` (+ GitHub durable writes) works for this shop today. A real database (PostgreSQL) can come later if many staff edit inventory at once — not required to launch Shopify payments.

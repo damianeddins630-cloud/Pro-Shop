@@ -169,6 +169,8 @@ export interface Order {
   shopifyDraftOrderId?: string;
   shopifyInvoiceUrl?: string;
   paymentProvider?: "shopify" | "local";
+  /** True once website inventory/coupon usage was applied for this order */
+  inventoryApplied?: boolean;
 }
 
 export type CouponType = "percent" | "fixed" | "free";

@@ -808,6 +808,7 @@ export async function createOrder(input: {
   shopifyDraftOrderId?: string;
   shopifyInvoiceUrl?: string;
   paymentProvider?: "shopify" | "local";
+  inventoryApplied?: boolean;
 }) {
   let created: Order | null = null;
   await mutate((data) => {
@@ -826,11 +827,61 @@ export async function createOrder(input: {
       shopifyDraftOrderId: input.shopifyDraftOrderId,
       shopifyInvoiceUrl: input.shopifyInvoiceUrl,
       paymentProvider: input.paymentProvider || "local",
+      inventoryApplied: Boolean(input.inventoryApplied),
     };
     data.orders = data.orders || [];
     data.orders.unshift(created);
   });
   return created!;
+}
+
+/**
+ * After Shopify (or local) payment succeeds: pull stock + count coupon once.
+ * Safe to call repeatedly — inventory is only applied the first time.
+ */
+export async function markOrderPaid(
+  orderId: string,
+  nextStatus: OrderStatus = "processing"
+): Promise<Order | null> {
+  let updated: Order | null = null;
+  await mutate((data) => {
+    const idx = (data.orders || []).findIndex((o) => o.id === orderId);
+    if (idx === -1) return;
+    const current: Order = { ...data.orders[idx] };
+
+    if (!current.inventoryApplied) {
+      for (const item of current.items) {
+        const p = data.products.find((x) => x.id === item.productId);
+        if (!p) throw new Error(`Product not found for order item ${item.name}`);
+        if (p.stock < item.quantity) {
+          throw new Error(`Not enough stock for ${p.name}`);
+        }
+        p.stock -= item.quantity;
+      }
+
+      if (current.couponCode) {
+        ensureCoupons(data);
+        const cidx = (data.coupons || []).findIndex((c) =>
+          codesMatch(c.code, current.couponCode || "")
+        );
+        if (cidx !== -1) {
+          const coupon = data.coupons![cidx];
+          data.coupons![cidx] = normalizeCoupon({
+            ...coupon,
+            usedCount: couponUsedCount(coupon) + 1,
+          });
+        }
+      }
+      current.inventoryApplied = true;
+    }
+
+    if (current.status === "awaiting_payment" || current.status === "placed") {
+      current.status = nextStatus;
+    }
+    data.orders[idx] = current;
+    updated = current;
+  });
+  return updated;
 }
 
 export async function listCoupons() {

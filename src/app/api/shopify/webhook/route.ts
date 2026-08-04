@@ -3,7 +3,9 @@ import { createHmac, timingSafeEqual } from "crypto";
 import {
   findOrderById,
   findOrderByShopifyDraftId,
-  updateOrder,
+  getInventoryUpdatedAt,
+  listProducts,
+  markOrderPaid,
 } from "@/lib/store";
 
 function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
@@ -20,14 +22,16 @@ function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
 }
 
 /**
- * Shopify webhook: mark website order paid after Shopify collects payment.
- * Configure topic orders/paid (or draft_orders/update) in Shopify admin.
+ * Shopify webhook: after payment succeeds, apply website inventory + mark order paid.
+ * Configure topic `orders/paid` → https://YOUR-DOMAIN/api/shopify/webhook
  */
 export async function POST(req: Request) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET?.trim();
 
+  // If a webhook secret is configured, require a valid signature.
+  // If not configured yet, still accept (so first connect is easier) but prefer setting one.
   if (secret && !verifyShopifyHmac(rawBody, hmac)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
@@ -63,12 +67,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, matched: false });
     }
 
-    // Stock was already reduced when the website order was created
-    if (order.status === "awaiting_payment" || order.status === "placed") {
-      await updateOrder(order.id, { status: "processing" });
-    }
-
-    return NextResponse.json({ ok: true, matched: true, orderId: order.id });
+    const paid = await markOrderPaid(order.id, "processing");
+    return NextResponse.json({
+      ok: true,
+      matched: true,
+      orderId: order.id,
+      status: paid?.status,
+      inventoryApplied: paid?.inventoryApplied,
+      products: await listProducts({ includeInactive: true }),
+      updatedAt: await getInventoryUpdatedAt(),
+    });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Webhook failed" },
