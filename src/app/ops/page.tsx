@@ -73,11 +73,11 @@ export default function OpsHomePage() {
         if (typeof d.warning === "string" && d.warning) setPersistWarning(d.warning);
         if (d.shopify && !d.shopify.configured) {
           setShopifyWarning(
-            "Shopify is not connected yet. Open Ops → Shopify and follow the 4 steps (add keys in Vercel pro-shop-lemon, then redeploy)."
+            "Shopify is not connected — open Ops → Shopify and click Save Connect (or Refresh status)."
           );
         } else if (d.shopify?.configured && !d.shopify?.webhookConfigured) {
           setShopifyWarning(
-            "Shopify checkout is ready, but SHOPIFY_WEBHOOK_SECRET is missing — open Ops → Shopify to finish webhook setup."
+            "Shopify checkout is ready, but the webhook secret is missing — open Ops → Shopify to finish setup."
           );
         }
       })

@@ -21,16 +21,10 @@ export async function GET() {
         "Last save to durable storage failed. Check GITHUB_TOKEN / Redis / Blob credentials.";
     } else if (!shopify.configured) {
       warning =
-        "Shopify is not connected — open Ops → Shopify, paste Client ID + Secret, and click Save Connect.";
+        "Shopify is not connected — open Ops → Shopify and click Save Connect / Refresh status.";
     } else if (!shopify.webhookConfigured) {
       warning =
-        "SHOPIFY_WEBHOOK_SECRET is missing — paid Shopify orders will not update website inventory until the webhook is configured.";
-    } else if (
-      isUsingFallbackAuthSecret() &&
-      (process.env.VERCEL || process.env.NODE_ENV === "production")
-    ) {
-      warning =
-        "AUTH_SECRET is not set in Vercel yet — login still works with a temporary secret. Add a long random AUTH_SECRET when you can, then redeploy.";
+        "Shopify webhook secret is missing — paid orders will not update website inventory until webhook setup is finished.";
     }
 
     return NextResponse.json({

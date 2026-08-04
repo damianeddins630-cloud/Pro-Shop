@@ -34,19 +34,26 @@ export async function GET() {
   }
 
   const saved = await getShopifyConfig();
-  await loadShopifyRuntimeConfig();
+  const runtime = await loadShopifyRuntimeConfig();
   const status = shopifyStatus();
 
   return NextResponse.json(
     {
       config: {
-        storeDomain: saved?.storeDomain || "",
-        clientId: saved?.clientId || "",
-        clientSecretMasked: mask(saved?.clientSecret),
-        webhookSecretMasked: mask(saved?.webhookSecret),
-        apiVersion: saved?.apiVersion || "2025-01",
-        hasClientSecret: Boolean(saved?.clientSecret),
-        hasWebhookSecret: Boolean(saved?.webhookSecret),
+        storeDomain: saved?.storeDomain || runtime.storeDomain || "",
+        clientId: saved?.clientId || runtime.clientId || "",
+        clientSecretMasked: mask(saved?.clientSecret || runtime.clientSecret),
+        webhookSecretMasked: mask(
+          saved?.webhookSecret || runtime.webhookSecret
+        ),
+        apiVersion:
+          saved?.apiVersion || runtime.apiVersion || "2025-01",
+        hasClientSecret: Boolean(
+          saved?.clientSecret || runtime.clientSecret
+        ),
+        hasWebhookSecret: Boolean(
+          saved?.webhookSecret || runtime.webhookSecret
+        ),
         updatedAt: saved?.updatedAt || null,
         updatedBy: saved?.updatedBy || null,
       },
