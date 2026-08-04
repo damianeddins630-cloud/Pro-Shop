@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { pingShopifyAdmin, shopifyStatus } from "@/lib/shopify";
+import {
+  loadShopifyRuntimeConfig,
+  pingShopifyAdmin,
+  shopifyStatus,
+} from "@/lib/shopify";
 import { storePersistStatus } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Public readiness check for Shopify checkout (no secrets returned).
- * Open: https://pro-shop-lemon.vercel.app/api/shopify/status
- */
 export async function GET() {
+  await loadShopifyRuntimeConfig();
   const status = shopifyStatus();
   const persist = storePersistStatus();
   const ping = status.configured ? await pingShopifyAdmin() : null;
@@ -41,8 +42,8 @@ export async function GET() {
         "SHOPIFY_STORE_DOMAIN",
         "SHOPIFY_CLIENT_ID",
         "SHOPIFY_CLIENT_SECRET",
-        "SHOPIFY_API_VERSION",
         "SHOPIFY_WEBHOOK_SECRET",
+        "SHOPIFY_API_VERSION",
         "NEXT_PUBLIC_SITE_URL",
       ],
       important:

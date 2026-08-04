@@ -7,6 +7,7 @@ import {
 } from "@/lib/store";
 import {
   draftOrderGidFromNumericId,
+  loadShopifyRuntimeConfig,
   shopifyWebhookSecret,
 } from "@/lib/shopify";
 
@@ -45,6 +46,7 @@ function looksPaid(topic: string, financialStatus: string) {
  * Configure topic `orders/paid` → https://YOUR-DOMAIN/api/shopify/webhook
  */
 export async function POST(req: Request) {
+  await loadShopifyRuntimeConfig();
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
   const topic = (req.headers.get("x-shopify-topic") || "").toLowerCase();

@@ -10,6 +10,7 @@ type StatusPayload = {
     webhookConfigured?: boolean;
     checkoutReady?: boolean;
     authMode?: string;
+    configSource?: string;
     storeDomain?: string | null;
     missing?: string[];
     hints?: string[];
@@ -55,16 +56,45 @@ function Row({
 export default function OpsShopifyPage() {
   const [data, setData] = useState<StatusPayload | null>(null);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState("");
+
+  const [storeDomain, setStoreDomain] = useState(
+    "ballards-bowling.myshopify.com"
+  );
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [apiVersion, setApiVersion] = useState("2025-01");
+  const [hasSavedSecret, setHasSavedSecret] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/shopify/status", { cache: "no-store" });
-      const json = (await res.json()) as StatusPayload;
-      setData(json);
+      const [statusRes, configRes] = await Promise.all([
+        fetch("/api/shopify/status", { cache: "no-store" }),
+        fetch("/api/shopify/config", {
+          cache: "no-store",
+          credentials: "same-origin",
+        }),
+      ]);
+      const statusJson = (await statusRes.json()) as StatusPayload;
+      setData(statusJson);
+
+      if (configRes.ok) {
+        const configJson = await configRes.json();
+        const c = configJson.config || {};
+        if (c.storeDomain) setStoreDomain(c.storeDomain);
+        if (c.clientId) setClientId(c.clientId);
+        if (c.apiVersion) setApiVersion(c.apiVersion);
+        setHasSavedSecret(Boolean(c.hasClientSecret));
+        // Keep secret fields blank after load so we never echo secrets into the UI
+        setClientSecret("");
+        setWebhookSecret("");
+      }
     } catch {
       setError("Could not load Shopify status.");
     } finally {
@@ -86,6 +116,40 @@ export default function OpsShopifyPage() {
     }
   }
 
+  async function save() {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/shopify/config", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeDomain,
+          clientId,
+          clientSecret: clientSecret || undefined,
+          webhookSecret: webhookSecret || clientSecret || undefined,
+          apiVersion,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || "Could not save Shopify settings");
+        setSaving(false);
+        return;
+      }
+      setMessage(json.message || "Saved.");
+      setHasSavedSecret(true);
+      setClientSecret("");
+      setWebhookSecret("");
+      await load();
+    } catch {
+      setError("Could not save Shopify settings");
+    }
+    setSaving(false);
+  }
+
   const shopify = data?.shopify;
   const ready = Boolean(data?.ok && shopify?.checkoutReady);
   const webhookUrl =
@@ -97,9 +161,8 @@ export default function OpsShopifyPage() {
         <div>
           <h2 className="display text-4xl">Shopify payments</h2>
           <p className="mt-1 max-w-2xl text-sm text-mist">
-            This website owns products and inventory. Shopify only collects payment.
-            I cannot put your Shopify token into Vercel for you — add the keys below,
-            redeploy, then tap Refresh.
+            Paste your Shopify Client ID + Secret here and click Save Connect.
+            No Vercel env vars needed if you save here.
           </p>
         </div>
         <button
@@ -112,7 +175,8 @@ export default function OpsShopifyPage() {
       </div>
 
       {loading && <p className="mt-6 text-mist">Checking Shopify...</p>}
-      {error && <p className="mt-6 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
+      {message && <p className="mt-4 text-sm text-emerald-300">{message}</p>}
 
       {!loading && (
         <>
@@ -125,23 +189,88 @@ export default function OpsShopifyPage() {
           >
             {ready
               ? `Connected${data?.adminApi?.shopName ? ` to ${data.adminApi.shopName}` : ""}. Cart will open Shopify checkout.`
-              : "Not connected yet. Follow the steps below on Vercel project pro-shop-lemon."}
+              : "Not connected yet — fill the form below and click Save Connect."}
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+            <h3 className="display text-3xl text-chalk">Save Shopify keys</h3>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="block text-sm">
+                <span className="label">Store domain</span>
+                <input
+                  className="field mt-1"
+                  value={storeDomain}
+                  onChange={(e) => setStoreDomain(e.target.value)}
+                  placeholder="ballards-bowling.myshopify.com"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="label">API version</span>
+                <input
+                  className="field mt-1"
+                  value={apiVersion}
+                  onChange={(e) => setApiVersion(e.target.value)}
+                  placeholder="2025-01"
+                />
+              </label>
+              <label className="block text-sm md:col-span-2">
+                <span className="label">Client ID</span>
+                <input
+                  className="field mt-1"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="your Shopify app Client ID"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="label">
+                  Client Secret {hasSavedSecret ? "(saved — leave blank to keep)" : ""}
+                </span>
+                <input
+                  className="field mt-1"
+                  type="password"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  placeholder={hasSavedSecret ? "••••••••" : "shpss_..."}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="label">
+                  Webhook secret {hasSavedSecret ? "(optional — defaults to Client Secret)" : ""}
+                </span>
+                <input
+                  className="field mt-1"
+                  type="password"
+                  value={webhookSecret}
+                  onChange={(e) => setWebhookSecret(e.target.value)}
+                  placeholder="same shpss_... secret"
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary mt-5"
+              disabled={saving || !storeDomain.trim() || !clientId.trim()}
+              onClick={() => void save()}
+            >
+              {saving ? "Saving..." : "Save Connect"}
+            </button>
           </div>
 
           <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5">
             <Row
               ok={Boolean(shopify?.configured)}
-              label="Store domain + Admin API token"
+              label="Store + Client credentials"
               detail={
                 shopify?.storeDomain
-                  ? `Store: ${shopify.storeDomain}`
-                  : "Needs SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN"
+                  ? `Store: ${shopify.storeDomain} · source: ${shopify.configSource || "none"}`
+                  : "Needs store domain + Client ID/Secret"
               }
             />
             <Row
               ok={Boolean(shopify?.webhookConfigured)}
               label="Webhook secret"
-              detail="Needs SHOPIFY_WEBHOOK_SECRET so paid orders update inventory"
+              detail="Used to verify paid-order webhooks"
             />
             <Row
               ok={Boolean(data?.adminApi?.ok)}
@@ -151,7 +280,7 @@ export default function OpsShopifyPage() {
                   ? `Reached Shopify Admin API${
                       data.adminApi.shopName ? ` (${data.adminApi.shopName})` : ""
                     }`
-                  : data?.adminApi?.error || "Cannot reach Shopify until env vars are set"
+                  : data?.adminApi?.error || "Cannot reach Shopify until keys are saved"
               }
             />
             <Row
@@ -173,68 +302,24 @@ export default function OpsShopifyPage() {
             </p>
           )}
 
-          <div className="mt-8 space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-mist">
-            <h3 className="display text-3xl text-chalk">Connect in 4 steps</h3>
-            <ol className="list-decimal space-y-3 pl-5">
-              <li>
-                Open{" "}
-                <a
-                  className="text-red underline"
-                  href="https://vercel.com/dashboard"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Vercel Dashboard
-                </a>{" "}
-                → project <strong className="text-chalk">pro-shop-lemon</strong> →{" "}
-                <strong className="text-chalk">Settings → Environment Variables</strong>
-              </li>
-              <li>
-                Add these for Production (+ Preview if shown):
-                <div className="mt-3 space-y-2 rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-xs text-chalk">
-                  <p>SHOPIFY_STORE_DOMAIN = ballards-bowling.myshopify.com</p>
-                  <p>SHOPIFY_CLIENT_ID = (your app Client ID)</p>
-                  <p>SHOPIFY_CLIENT_SECRET = shpss_… (your app Secret)</p>
-                  <p>SHOPIFY_WEBHOOK_SECRET = same shpss_… Secret</p>
-                  <p>SHOPIFY_API_VERSION = 2025-01</p>
-                  <p>NEXT_PUBLIC_SITE_URL = https://pro-shop-lemon.vercel.app</p>
-                </div>
-              </li>
-              <li>
-                In Shopify → your app → Admin API scopes, enable{" "}
-                <strong className="text-chalk">write_draft_orders</strong>,{" "}
-                <strong className="text-chalk">read_draft_orders</strong>, and{" "}
-                <strong className="text-chalk">read_orders</strong>, then save.
-                Create webhook topic <strong className="text-chalk">orders/paid</strong>{" "}
-                to:
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <code className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-chalk">
-                    {webhookUrl}
-                  </code>
-                  <button
-                    type="button"
-                    className="btn btn-ghost text-xs"
-                    onClick={() => void copy(webhookUrl, "webhook")}
-                  >
-                    {copied === "webhook" ? "Copied" : "Copy URL"}
-                  </button>
-                </div>
-              </li>
-              <li>
-                Vercel → <strong className="text-chalk">Deployments → … → Redeploy</strong>{" "}
-                with build cache <strong className="text-chalk">OFF</strong>. Then click
-                Refresh status on this page.
-              </li>
-            </ol>
-            {shopify?.missing?.length ? (
-              <p className="text-amber-200">
-                Still missing on the server: {shopify.missing.join(", ")}
-              </p>
-            ) : null}
+          <div className="mt-8 space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-mist">
+            <h3 className="display text-3xl text-chalk">Webhook URL</h3>
             <p>
-              Do <strong className="text-chalk">not</strong> paste your Admin token in chat.
-              Keep the custom Shopify app — do not migrate products into Shopify.
+              In Shopify, create webhook topic{" "}
+              <strong className="text-chalk">orders/paid</strong> to:
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-chalk">
+                {webhookUrl}
+              </code>
+              <button
+                type="button"
+                className="btn btn-ghost text-xs"
+                onClick={() => void copy(webhookUrl, "webhook")}
+              >
+                {copied === "webhook" ? "Copied" : "Copy URL"}
+              </button>
+            </div>
           </div>
         </>
       )}

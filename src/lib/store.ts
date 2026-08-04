@@ -17,6 +17,7 @@ import type {
   OrderStatus,
   Permission,
   Coupon,
+  ShopifySiteConfig,
 } from "./types";
 import { ALL_PERMISSIONS } from "./types";
 import seedJson from "@/data/seed.json";
@@ -145,6 +146,11 @@ async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
   );
   local.roles = mergeByIdPreferLocal(remote.roles, local.roles);
   local.coupons = mergeByIdPreferLocal(remote.coupons, local.coupons);
+  // Keep Shopify keys from whichever side has them (local wins non-empty fields)
+  local.shopifyConfig = {
+    ...(remote.shopifyConfig || {}),
+    ...(local.shopifyConfig || {}),
+  };
 
   ensureCoupons(local);
   ensureRoleRanks(local);
@@ -362,6 +368,7 @@ function mergeWithSeed(parsed: StoreData): StoreData {
   parsed.coupons = Array.isArray(parsed.coupons)
     ? parsed.coupons
     : seed.coupons || [];
+  parsed.shopifyConfig = parsed.shopifyConfig || seed.shopifyConfig;
   ensureCoupons(parsed);
   return parsed;
 }
@@ -1355,4 +1362,38 @@ export async function deleteText(id: string) {
 
 export function userHasPermission(permissions: Permission[], needed: Permission) {
   return permissions.includes(needed);
+}
+
+export async function getShopifyConfig(): Promise<ShopifySiteConfig | null> {
+  const data = await getStore();
+  return data.shopifyConfig || null;
+}
+
+export async function saveShopifyConfig(
+  input: ShopifySiteConfig,
+  opts?: { updatedBy?: string }
+) {
+  let saved: ShopifySiteConfig | null = null;
+  await mutate((data) => {
+    const prev = data.shopifyConfig || {};
+    saved = {
+      storeDomain: (input.storeDomain ?? prev.storeDomain ?? "")
+        .replace(/^https?:\/\//, "")
+        .replace(/\/$/, "")
+        .trim(),
+      clientId: (input.clientId ?? prev.clientId ?? "").trim(),
+      clientSecret: (input.clientSecret ?? prev.clientSecret ?? "").trim(),
+      webhookSecret: (input.webhookSecret ?? prev.webhookSecret ?? "").trim(),
+      adminAccessToken: (
+        input.adminAccessToken ??
+        prev.adminAccessToken ??
+        ""
+      ).trim(),
+      apiVersion: (input.apiVersion ?? prev.apiVersion ?? "2025-01").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedBy: opts?.updatedBy || prev.updatedBy,
+    };
+    data.shopifyConfig = saved;
+  });
+  return saved!;
 }

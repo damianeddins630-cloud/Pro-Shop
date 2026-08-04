@@ -1,4 +1,5 @@
 import type { OrderItem } from "@/lib/types";
+import { getShopifyConfig } from "@/lib/store";
 
 /** Read env and strip accidental quotes/whitespace from Vercel paste. */
 function env(name: string): string {
@@ -12,7 +13,89 @@ function env(name: string): string {
   return v;
 }
 
-const API_VERSION = env("SHOPIFY_API_VERSION") || "2025-01";
+type RuntimeConfig = {
+  storeDomain: string;
+  clientId: string;
+  clientSecret: string;
+  webhookSecret: string;
+  adminToken: string;
+  apiVersion: string;
+  source: "env" | "ops" | "mixed" | "none";
+};
+
+let runtime: RuntimeConfig = {
+  storeDomain: "",
+  clientId: "",
+  clientSecret: "",
+  webhookSecret: "",
+  adminToken: "",
+  apiVersion: "2025-01",
+  source: "none",
+};
+
+function fromEnv(): RuntimeConfig {
+  return {
+    storeDomain: env("SHOPIFY_STORE_DOMAIN")
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, ""),
+    clientId: env("SHOPIFY_CLIENT_ID") || env("SHOPIFY_API_KEY"),
+    clientSecret:
+      env("SHOPIFY_CLIENT_SECRET") ||
+      env("SHOPIFY_API_SECRET") ||
+      env("SHOPIFY_WEBHOOK_SECRET"),
+    webhookSecret: env("SHOPIFY_WEBHOOK_SECRET"),
+    adminToken: env("SHOPIFY_ADMIN_ACCESS_TOKEN"),
+    apiVersion: env("SHOPIFY_API_VERSION") || "2025-01",
+    source: "env",
+  };
+}
+
+/** Load Shopify keys from Vercel env and/or Ops-saved store config. */
+export async function loadShopifyRuntimeConfig(): Promise<RuntimeConfig> {
+  const base = fromEnv();
+  let stored: Awaited<ReturnType<typeof getShopifyConfig>> = null;
+  try {
+    stored = await getShopifyConfig();
+  } catch {
+    stored = null;
+  }
+
+  const merged: RuntimeConfig = {
+    storeDomain:
+      base.storeDomain ||
+      (stored?.storeDomain || "")
+        .replace(/^https?:\/\//, "")
+        .replace(/\/$/, "")
+        .trim(),
+    clientId: base.clientId || (stored?.clientId || "").trim(),
+    clientSecret: base.clientSecret || (stored?.clientSecret || "").trim(),
+    webhookSecret:
+      base.webhookSecret ||
+      (stored?.webhookSecret || "").trim() ||
+      base.clientSecret ||
+      (stored?.clientSecret || "").trim(),
+    adminToken: base.adminToken || (stored?.adminAccessToken || "").trim(),
+    apiVersion:
+      base.apiVersion || (stored?.apiVersion || "").trim() || "2025-01",
+    source: "none",
+  };
+
+  const envHas =
+    Boolean(base.storeDomain) &&
+    (Boolean(base.adminToken) || Boolean(base.clientId && base.clientSecret));
+  const opsHas =
+    Boolean(stored?.storeDomain) &&
+    (Boolean(stored?.adminAccessToken) ||
+      Boolean(stored?.clientId && stored?.clientSecret));
+
+  if (envHas && opsHas) merged.source = "mixed";
+  else if (envHas) merged.source = "env";
+  else if (opsHas) merged.source = "ops";
+  else merged.source = "none";
+
+  runtime = merged;
+  return runtime;
+}
 
 export type ShopifyCheckoutResult = {
   invoiceUrl: string;
@@ -25,6 +108,7 @@ export type ShopifyStatus = {
   webhookConfigured: boolean;
   checkoutReady: boolean;
   authMode: "admin_token" | "client_credentials" | "none";
+  configSource: RuntimeConfig["source"];
   storeDomain: string | null;
   apiVersion: string;
   missing: string[];
@@ -35,25 +119,19 @@ type TokenCache = { token: string; expiresAtMs: number };
 let tokenCache: TokenCache | null = null;
 
 function storeDomainRaw() {
-  return env("SHOPIFY_STORE_DOMAIN")
-    .replace(/^https?:\/\//, "")
-    .replace(/\/$/, "");
+  return runtime.storeDomain;
 }
 
 function staticAdminToken() {
-  return env("SHOPIFY_ADMIN_ACCESS_TOKEN");
+  return runtime.adminToken;
 }
 
 function clientId() {
-  return env("SHOPIFY_CLIENT_ID") || env("SHOPIFY_API_KEY");
+  return runtime.clientId;
 }
 
 function clientSecret() {
-  return (
-    env("SHOPIFY_CLIENT_SECRET") ||
-    env("SHOPIFY_API_SECRET") ||
-    env("SHOPIFY_WEBHOOK_SECRET")
-  );
+  return runtime.clientSecret;
 }
 
 export function isShopifyConfigured() {
@@ -63,11 +141,11 @@ export function isShopifyConfigured() {
 }
 
 export function isShopifyWebhookConfigured() {
-  return Boolean(env("SHOPIFY_WEBHOOK_SECRET") || clientSecret());
+  return Boolean(runtime.webhookSecret || clientSecret());
 }
 
 export function shopifyWebhookSecret() {
-  return env("SHOPIFY_WEBHOOK_SECRET") || clientSecret();
+  return runtime.webhookSecret || clientSecret();
 }
 
 export function shopifyStatus(): ShopifyStatus {
@@ -91,7 +169,7 @@ export function shopifyStatus(): ShopifyStatus {
   }
   if (!domain || (!hasStatic && !hasClient)) {
     hints.push(
-      "Add Shopify vars on Vercel project pro-shop-lemon (Production), then Redeploy with cache off."
+      "Save Shopify keys in Ops → Shopify (or add them in Vercel env), then Refresh."
     );
   }
   hints.push(
@@ -113,19 +191,16 @@ export function shopifyStatus(): ShopifyStatus {
     webhookConfigured: isShopifyWebhookConfigured(),
     checkoutReady: configured,
     authMode,
+    configSource: runtime.source,
     storeDomain: domain || null,
-    apiVersion: API_VERSION,
+    apiVersion: runtime.apiVersion || "2025-01",
     missing,
     hints,
   };
 }
 
-/**
- * Resolve a usable Admin API token.
- * Prefer a static SHOPIFY_ADMIN_ACCESS_TOKEN; otherwise use Client ID + Secret
- * (client_credentials) and cache until near expiry (~24h tokens).
- */
 async function getAdminAccessToken(): Promise<string> {
+  await loadShopifyRuntimeConfig();
   const staticToken = staticAdminToken();
   if (staticToken) return staticToken;
 
@@ -134,7 +209,7 @@ async function getAdminAccessToken(): Promise<string> {
   const domain = storeDomainRaw();
   if (!id || !secret || !domain) {
     throw new Error(
-      "Shopify is not configured. Set SHOPIFY_STORE_DOMAIN plus SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET (or SHOPIFY_ADMIN_ACCESS_TOKEN) in Vercel."
+      "Shopify is not configured. Save Client ID + Secret in Ops → Shopify (or set Vercel env vars)."
     );
   }
 
@@ -185,14 +260,16 @@ async function adminGraphql<T>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
+  await loadShopifyRuntimeConfig();
   const domain = storeDomainRaw();
   if (!domain) {
-    throw new Error("SHOPIFY_STORE_DOMAIN is not set in Vercel.");
+    throw new Error("SHOPIFY_STORE_DOMAIN is not set.");
   }
   const token = await getAdminAccessToken();
+  const apiVersion = runtime.apiVersion || "2025-01";
 
   const res = await fetch(
-    `https://${domain}/admin/api/${API_VERSION}/graphql.json`,
+    `https://${domain}/admin/api/${apiVersion}/graphql.json`,
     {
       method: "POST",
       headers: {
@@ -206,7 +283,7 @@ async function adminGraphql<T>(
 
   const json = (await res.json()) as {
     data?: T;
-    errors?: { message: string; extensions?: { code?: string; requiredAccess?: string } }[];
+    errors?: { message: string; extensions?: { code?: string } }[];
   };
 
   if (!res.ok || json.errors?.length) {
@@ -215,7 +292,7 @@ async function adminGraphql<T>(
     );
     if (denied) {
       throw new Error(
-        "Shopify app is missing Draft Order permission. In Shopify → custom app → Admin API scopes, enable write_draft_orders and read_draft_orders, save, then try checkout again."
+        "Shopify app is missing Draft Order permission. Enable write_draft_orders and read_draft_orders, save, reinstall if needed, then try again."
       );
     }
     const msg =
@@ -272,10 +349,6 @@ async function sendDraftInvoice(draftOrderId: string): Promise<string | null> {
   return data.draftOrderInvoiceSend.draftOrder?.invoiceUrl || null;
 }
 
-/**
- * Create a Shopify draft order from website cart lines and return the
- * hosted invoice / payment URL (Shop Pay, Apple Pay, card, etc.).
- */
 export async function createShopifyCheckout(input: {
   email: string;
   username: string;
@@ -285,9 +358,7 @@ export async function createShopifyCheckout(input: {
   discountAmount?: number;
   couponCode?: string;
 }): Promise<ShopifyCheckoutResult> {
-  if (!input.items.length) {
-    throw new Error("Cart is empty");
-  }
+  if (!input.items.length) throw new Error("Cart is empty");
   if (!input.email?.includes("@")) {
     throw new Error("A valid customer email is required for Shopify checkout");
   }
@@ -367,15 +438,11 @@ export async function createShopifyCheckout(input: {
   }
 
   let invoiceUrl = payload.draftOrder.invoiceUrl;
-  if (!invoiceUrl) {
-    invoiceUrl = await fetchDraftInvoiceUrl(payload.draftOrder.id);
-  }
-  if (!invoiceUrl) {
-    invoiceUrl = await sendDraftInvoice(payload.draftOrder.id);
-  }
+  if (!invoiceUrl) invoiceUrl = await fetchDraftInvoiceUrl(payload.draftOrder.id);
+  if (!invoiceUrl) invoiceUrl = await sendDraftInvoice(payload.draftOrder.id);
   if (!invoiceUrl) {
     throw new Error(
-      "Shopify created the draft order but did not return a payment link. Confirm write_draft_orders is enabled."
+      "Shopify created the draft order but did not return a payment link."
     );
   }
 
@@ -389,20 +456,8 @@ export async function createShopifyCheckout(input: {
 export async function isShopifyDraftOrderPaid(
   draftOrderGid: string
 ): Promise<boolean> {
+  await loadShopifyRuntimeConfig();
   if (!draftOrderGid || !isShopifyConfigured()) return false;
-
-  const query = `
-    query DraftOrderPayment($id: ID!) {
-      draftOrder(id: $id) {
-        id
-        status
-        order {
-          id
-          displayFinancialStatus
-        }
-      }
-    }
-  `;
 
   try {
     const data = await adminGraphql<{
@@ -411,7 +466,19 @@ export async function isShopifyDraftOrderPaid(
         status: string;
         order: { id: string; displayFinancialStatus: string } | null;
       } | null;
-    }>(query, { id: draftOrderGid });
+    }>(
+      `query DraftOrderPayment($id: ID!) {
+        draftOrder(id: $id) {
+          id
+          status
+          order {
+            id
+            displayFinancialStatus
+          }
+        }
+      }`,
+      { id: draftOrderGid }
+    );
 
     const draft = data.draftOrder;
     if (!draft) return false;
@@ -432,8 +499,9 @@ export async function pingShopifyAdmin(): Promise<{
   canDraftOrders?: boolean;
   error?: string;
 }> {
+  await loadShopifyRuntimeConfig();
   if (!isShopifyConfigured()) {
-    return { ok: false, error: "Shopify env vars are missing" };
+    return { ok: false, error: "Shopify keys are missing" };
   }
   try {
     const domain = storeDomainRaw();
@@ -441,7 +509,6 @@ export async function pingShopifyAdmin(): Promise<{
     const secret = clientSecret();
     let scopes = "";
 
-    // When using client credentials, read scopes from the token response
     if (!staticAdminToken() && id && secret && domain) {
       tokenCache = null;
       const res = await fetch(`https://${domain}/admin/oauth/access_token`, {

@@ -16,6 +16,7 @@ import {
 import {
   createShopifyCheckout,
   isShopifyConfigured,
+  loadShopifyRuntimeConfig,
   shopifyStatus,
 } from "@/lib/shopify";
 import { effectivePrice } from "@/lib/pricing";
@@ -35,6 +36,7 @@ const schema = z.object({
 });
 
 export async function GET() {
+  await loadShopifyRuntimeConfig();
   return NextResponse.json(
     { shopify: shopifyStatus() },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
@@ -51,6 +53,7 @@ export async function POST(req: Request) {
   }
 
   try {
+    await loadShopifyRuntimeConfig();
     const body = schema.parse(await req.json());
     const lineItems = [];
     let subtotal = 0;

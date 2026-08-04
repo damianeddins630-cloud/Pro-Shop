@@ -192,6 +192,18 @@ export interface Coupon {
   system?: boolean;
 }
 
+/** Shopify keys saved from Ops (used when Vercel env vars are not set). */
+export interface ShopifySiteConfig {
+  storeDomain?: string;
+  clientId?: string;
+  clientSecret?: string;
+  webhookSecret?: string;
+  adminAccessToken?: string;
+  apiVersion?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export interface StoreData {
   /** Bumped on every inventory / catalog change so shop can pick the newest copy */
   updatedAt?: string;
@@ -205,6 +217,8 @@ export interface StoreData {
   roles: Role[];
   orders: Order[];
   coupons?: Coupon[];
+  /** Optional Ops-saved Shopify credentials (never commit real secrets to git) */
+  shopifyConfig?: ShopifySiteConfig;
 }
 
 export interface CartItem {
