@@ -162,15 +162,19 @@ async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
 function g(): GlobalStore {
   const root = globalThis as typeof globalThis & { [GLOBAL_KEY]?: GlobalStore };
   if (!root[GLOBAL_KEY]) {
+    // On Vercel, do not claim success until a real durable write lands.
+    const onVercel = Boolean(process.env.VERCEL);
     root[GLOBAL_KEY] = {
       data: null,
       ready: null,
-      lastPersistOk: true,
-      lastPersistDetail: "ready",
+      lastPersistOk: !onVercel,
+      lastPersistDetail: onVercel
+        ? "No durable save verified yet on this instance"
+        : "local-ready",
     };
   }
   if (root[GLOBAL_KEY] && root[GLOBAL_KEY].lastPersistDetail == null) {
-    root[GLOBAL_KEY].lastPersistDetail = "ready";
+    root[GLOBAL_KEY].lastPersistDetail = "unknown";
   }
   return root[GLOBAL_KEY]!;
 }

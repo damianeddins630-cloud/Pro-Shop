@@ -12,12 +12,16 @@ export async function GET() {
     await loadShopifyRuntimeConfig();
     const shopify = shopifyStatus();
 
+    const backends = persist.backends || {};
+    const anyBackendOk = Boolean(
+      backends.redis?.ok || backends.blob?.ok || backends.github?.ok
+    );
     let warning: string | null = null;
     if (!persist.durableWriteConfigured) {
       warning =
         "No durable storage configured — Ops price/stock/account saves will disappear. Add UPSTASH_REDIS_REST_URL + TOKEN (or BLOB / GITHUB_TOKEN) in Vercel.";
-    } else if (!persist.lastPersistOk) {
-      warning = `Last durable save FAILED (${persist.lastPersistDetail || "unknown"}). Price and inventory edits will not stick until Redis/Blob/GitHub writes work.`;
+    } else if (!persist.lastPersistOk || !anyBackendOk) {
+      warning = `Durable storage not verified yet (${persist.lastPersistDetail || "unknown"}). Open Ops → Inventory, save any item, or hit /api/persist/self-test. Until Redis/Blob/GitHub writes succeed, price changes will not stick for shoppers.`;
     } else if (!shopify.configured) {
       warning =
         "Shopify is not connected — open Ops → Shopify and click Save Connect / Refresh status.";
