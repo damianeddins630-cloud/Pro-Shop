@@ -14,7 +14,7 @@ const cards: {
   {
     href: "/ops/inventory",
     title: "Inventory",
-    text: "Add, remove, change prices, discounts, and stock. Connected live to the shop.",
+    text: "Prices, discounts, ball weights, and per-weight stock that powers the vault.",
     perms: ["manage_inventory", "edit_pages"],
   },
   {
@@ -38,7 +38,7 @@ const cards: {
   {
     href: "/ops/orders",
     title: "Orders",
-    text: "Plain order list from every shop purchase.",
+    text: "Fulfillment command center — pipeline, ball vault totals, and processing timeline.",
     perms: ["view_orders", "manage_orders"],
   },
   {

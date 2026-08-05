@@ -68,6 +68,7 @@ const patchSchema = z.object({
       ].sort((a, b) => a - b);
       return cleaned;
     }),
+  weightStock: z.record(z.string(), z.coerce.number().int().min(0)).optional().nullable(),
 });
 
 export async function PUT(req: Request, { params }: Params) {
@@ -79,7 +80,10 @@ export async function PUT(req: Request, { params }: Params) {
   try {
     const body = patchSchema.parse(await req.json());
     const before = await getProduct(id);
-    const product = await updateProduct(id, body);
+    const product = await updateProduct(id, {
+      ...body,
+      weightStock: body.weightStock ?? undefined,
+    });
     if (!product) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

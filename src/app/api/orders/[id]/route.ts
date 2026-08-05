@@ -10,6 +10,7 @@ const schema = z.object({
     "awaiting_payment",
     "placed",
     "processing",
+    "ready",
     "completed",
     "cancelled",
   ]),

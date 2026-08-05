@@ -89,6 +89,7 @@ const createSchema = z.object({
       ].sort((a, b) => a - b);
       return cleaned.length ? cleaned : undefined;
     }),
+  weightStock: z.record(z.string(), z.coerce.number().int().min(0)).optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -119,6 +120,7 @@ export async function POST(req: Request) {
       active: body.active ?? true,
       shopifyVariantId: body.shopifyVariantId,
       weightOptions: body.weightOptions,
+      weightStock: body.weightStock || undefined,
     });
 
     if (!requireDurablePersistOrLocal()) {

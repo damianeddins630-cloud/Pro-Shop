@@ -38,6 +38,12 @@ import {
   OWNER_FREE_COUPON_CODE,
 } from "./coupons";
 import {
+  normalizeWeightOptions,
+  normalizeWeightStock,
+  totalFromWeightStock,
+  weightKey,
+} from "./weights";
+import {
   CUSTOM_ROLE_RANK_DEFAULT,
   CUSTOMER_ROLE_ID,
   CUSTOMER_ROLE_RANK,
@@ -840,25 +846,69 @@ export async function updateUser(
 }
 
 function normalizeProduct(p: Product): Product {
-  const weightOptions = (() => {
-    if (!Array.isArray(p.weightOptions)) return undefined;
-    const cleaned = [
-      ...new Set(
-        p.weightOptions
-          .map((n) => Number(n))
-          .filter((n) => Number.isFinite(n) && n > 0 && n <= 30)
-          .map((n) => Math.round(n * 10) / 10)
-      ),
-    ].sort((a, b) => a - b);
-    return cleaned.length ? cleaned : undefined;
-  })();
+  const weightOptions = normalizeWeightOptions(p.weightOptions);
+  const weightStock = weightOptions?.length
+    ? normalizeWeightStock(p.weightStock, weightOptions)
+    : undefined;
+  const stockFromWeights = weightStock
+    ? totalFromWeightStock(weightStock)
+    : null;
+
   return {
     ...p,
     price: Math.max(0, Number(p.price) || 0),
     discountPercent: Math.min(100, Math.max(0, Number(p.discountPercent) || 0)),
-    stock: Math.max(0, Math.floor(Number(p.stock) || 0)),
+    stock:
+      stockFromWeights != null
+        ? stockFromWeights
+        : Math.max(0, Math.floor(Number(p.stock) || 0)),
     weightOptions,
+    weightStock,
   };
+}
+
+function appendStatusHistory(
+  order: Order,
+  status: OrderStatus,
+  note?: string
+): Order {
+  const at = new Date().toISOString();
+  const history = [...(order.statusHistory || [])];
+  const last = history[history.length - 1];
+  if (!last || last.status !== status) {
+    history.push({ status, at, ...(note ? { note } : {}) });
+  }
+  return { ...order, status, updatedAt: at, statusHistory: history };
+}
+
+function applyLineStockDecrement(
+  product: Product,
+  quantity: number,
+  weight?: number,
+  opts?: { clamp?: boolean }
+) {
+  const clamp = Boolean(opts?.clamp);
+  if (weight != null && product.weightStock) {
+    const key = weightKey(weight);
+    if (Object.prototype.hasOwnProperty.call(product.weightStock, key)) {
+      const have = Math.max(0, Math.floor(Number(product.weightStock[key]) || 0));
+      if (!clamp && have < quantity) {
+        throw new Error(
+          `Not enough stock for ${product.name} (${weight} lb)`
+        );
+      }
+      product.weightStock = {
+        ...product.weightStock,
+        [key]: Math.max(0, have - quantity),
+      };
+      product.stock = totalFromWeightStock(product.weightStock);
+      return;
+    }
+  }
+  if (!clamp && product.stock < quantity) {
+    throw new Error(`Not enough stock for ${product.name}`);
+  }
+  product.stock = Math.max(0, product.stock - quantity);
 }
 
 export async function listProducts(opts?: { includeInactive?: boolean }) {
@@ -947,6 +997,10 @@ export async function updateProduct(id: string, patch: Partial<Product>) {
     // Explicit empty weight list from Ops clears the requirement.
     if (Array.isArray(patch.weightOptions) && patch.weightOptions.length === 0) {
       delete next.weightOptions;
+      delete next.weightStock;
+    }
+    if (patch.weightStock && Object.keys(patch.weightStock).length === 0) {
+      delete next.weightStock;
     }
     data.products[idx] = next;
     updated = next;
@@ -1119,13 +1173,16 @@ export async function addSubscriber(input: Omit<Subscriber, "id" | "createdAt">)
   return created!;
 }
 
-export async function reduceStock(items: { productId: string; quantity: number }[]) {
+export async function reduceStock(
+  items: { productId: string; quantity: number; weight?: number }[]
+) {
   await mutate((data) => {
     for (const item of items) {
       const p = data.products.find((x) => x.id === item.productId);
       if (!p) throw new Error("Product not found");
-      if (p.stock < item.quantity) throw new Error(`Not enough stock for ${p.name}`);
-      p.stock -= item.quantity;
+      applyLineStockDecrement(p, item.quantity, item.weight);
+      data.products[data.products.findIndex((x) => x.id === p.id)] =
+        normalizeProduct(p);
     }
   }, { catalog: true });
 }
@@ -1147,6 +1204,8 @@ export async function createOrder(input: {
 }) {
   let created: Order | null = null;
   await mutate((data) => {
+    const status = input.status || "placed";
+    const createdAt = new Date().toISOString();
     created = {
       id: randomUUID(),
       userId: input.userId,
@@ -1157,8 +1216,10 @@ export async function createOrder(input: {
       subtotal: input.subtotal,
       discountAmount: input.discountAmount,
       couponCode: input.couponCode,
-      status: input.status || "placed",
-      createdAt: new Date().toISOString(),
+      status,
+      createdAt,
+      updatedAt: createdAt,
+      statusHistory: [{ status, at: createdAt, note: "Order created" }],
       shopifyDraftOrderId: input.shopifyDraftOrderId,
       shopifyInvoiceUrl: input.shopifyInvoiceUrl,
       paymentProvider: input.paymentProvider || "local",
@@ -1190,7 +1251,9 @@ export async function markOrderPaid(
         const p = data.products.find((x) => x.id === item.productId);
         if (!p) continue;
         // Customer already paid — never block settlement on a race; clamp at 0.
-        p.stock = Math.max(0, p.stock - item.quantity);
+        applyLineStockDecrement(p, item.quantity, item.weight, { clamp: true });
+        const pidx = data.products.findIndex((x) => x.id === p.id);
+        if (pidx !== -1) data.products[pidx] = normalizeProduct(p);
       }
 
       if (current.couponCode) {
@@ -1215,7 +1278,10 @@ export async function markOrderPaid(
       current.status === "placed" ||
       current.status === "cancelled"
     ) {
-      current.status = nextStatus;
+      Object.assign(
+        current,
+        appendStatusHistory(current, nextStatus, "Payment confirmed")
+      );
     }
     data.orders[idx] = current;
     updated = current;
@@ -1485,7 +1551,11 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   await mutate((data) => {
     const idx = (data.orders || []).findIndex((o) => o.id === id);
     if (idx === -1) return;
-    data.orders[idx] = { ...data.orders[idx], status };
+    data.orders[idx] = appendStatusHistory(
+      data.orders[idx],
+      status,
+      "Updated in Operations"
+    );
     updated = data.orders[idx];
   });
   return updated;

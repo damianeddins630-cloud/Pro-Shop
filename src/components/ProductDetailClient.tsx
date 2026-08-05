@@ -13,6 +13,7 @@ import type { Product } from "@/lib/types";
 import {
   formatWeightLbs,
   productRequiresWeight,
+  stockForWeight,
 } from "@/lib/weights";
 
 export function ProductDetailClient({
@@ -68,15 +69,28 @@ export function ProductDetailClient({
       setSelectedWeight(null);
       return;
     }
-    setSelectedWeight((prev) =>
-      prev != null && options.some((w) => Math.abs(w - prev) < 0.001)
-        ? prev
-        : null
-    );
-  }, [product.id, product.weightOptions]);
+    setSelectedWeight((prev) => {
+      if (
+        prev != null &&
+        options.some((w) => Math.abs(w - prev) < 0.001) &&
+        stockForWeight(product, prev) > 0
+      ) {
+        return prev;
+      }
+      return null;
+    });
+  }, [product]);
 
-  const out = product.stock <= 0;
   const needsWeight = productRequiresWeight(product);
+  const selectedStock =
+    selectedWeight != null
+      ? stockForWeight(product, selectedWeight)
+      : product.stock;
+  const out = needsWeight
+    ? (product.weightOptions || []).every((w) => stockForWeight(product, w) <= 0)
+    : product.stock <= 0;
+  const selectedOut =
+    needsWeight && selectedWeight != null && selectedStock <= 0;
 
   return (
     <section className="site-shell section-pad pt-24">
@@ -101,7 +115,12 @@ export function ProductDetailClient({
             <ProductPrice product={product} size="lg" />
           </div>
           <p className="mt-2 text-sm text-mist">
-            {out ? "Out of stock" : `${product.stock} in stock`} · {product.category}
+            {out
+              ? "Out of stock"
+              : needsWeight && selectedWeight != null
+                ? `${selectedStock} in stock · ${formatWeightLbs(selectedWeight)}`
+                : `${product.stock} in stock`}{" "}
+            · {product.category}
           </p>
           <p className="mt-6 leading-relaxed text-mist">{product.description}</p>
 
@@ -119,17 +138,25 @@ export function ProductDetailClient({
                 aria-label="Ball weight"
               >
                 {(product.weightOptions || []).map((weight) => {
+                  const available = stockForWeight(product, weight);
                   const selected =
                     selectedWeight != null &&
                     Math.abs(selectedWeight - weight) < 0.001;
+                  const soldOut = available <= 0;
                   return (
                     <button
                       key={weight}
                       type="button"
                       role="radio"
                       aria-checked={selected}
+                      disabled={soldOut}
                       onClick={() => setSelectedWeight(weight)}
-                      className={`weight-bubble ${selected ? "is-selected" : ""}`}
+                      className={`weight-bubble ${selected ? "is-selected" : ""} ${soldOut ? "is-soldout" : ""}`}
+                      title={
+                        soldOut
+                          ? "Sold out"
+                          : `${available} in stock`
+                      }
                     >
                       {formatWeightLbs(weight)}
                     </button>
@@ -147,7 +174,7 @@ export function ProductDetailClient({
           <div className="mt-8">
             <AddToCartButton
               productId={product.id}
-              disabled={out}
+              disabled={out || selectedOut}
               requireWeight={needsWeight}
               weight={selectedWeight ?? undefined}
             />

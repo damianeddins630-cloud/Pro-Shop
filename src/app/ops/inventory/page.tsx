@@ -6,10 +6,12 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ProductPrice } from "@/components/ProductPrice";
 import { saveLocalInventory } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
+import { summarizeBallInventory } from "@/lib/inventory-stats";
 import {
   STANDARD_BALL_WEIGHTS,
   formatWeightLbs,
   normalizeWeightOptions,
+  weightKey,
 } from "@/lib/weights";
 
 const empty = {
@@ -24,6 +26,7 @@ const empty = {
   featured: false,
   active: true,
   weightOptions: [] as number[],
+  weightStock: {} as Record<string, string>,
   customWeight: "",
 };
 
@@ -64,12 +67,24 @@ export default function OpsInventoryPage() {
     setMessage("");
     const price = Math.max(0, Number(form.price));
     const discountPercent = Math.min(100, Math.max(0, Number(form.discountPercent)));
-    const stock = Math.max(0, Math.floor(Number(form.stock)));
+    const weightOptions = normalizeWeightOptions(form.weightOptions) || [];
+    const weightStock: Record<string, number> = {};
+    if (weightOptions.length) {
+      for (const w of weightOptions) {
+        const key = weightKey(w);
+        weightStock[key] = Math.max(
+          0,
+          Math.floor(Number(form.weightStock[key] ?? "0") || 0)
+        );
+      }
+    }
+    const stock = weightOptions.length
+      ? Object.values(weightStock).reduce((s, n) => s + n, 0)
+      : Math.max(0, Math.floor(Number(form.stock)));
     if ([price, discountPercent, stock].some((n) => Number.isNaN(n))) {
       setError("Price, discount, and stock must be numbers. $0 is allowed.");
       return;
     }
-    const weightOptions = normalizeWeightOptions(form.weightOptions) || [];
     const payload = {
       name: form.name.trim(),
       description: form.description,
@@ -82,6 +97,7 @@ export default function OpsInventoryPage() {
       featured: form.featured,
       active: form.active,
       weightOptions,
+      weightStock: weightOptions.length ? weightStock : {},
     };
     const res = await fetch(editingId ? `/api/products/${editingId}` : "/api/products", {
       method: editingId ? "PUT" : "POST",
@@ -143,10 +159,43 @@ export default function OpsInventoryPage() {
     }
   }
 
+  const ballSummary = summarizeBallInventory(products);
+
   if (loading) return <p className="text-mist">Loading inventory...</p>;
 
   return (
     <div>
+      <section className="mb-6 rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] via-black/30 to-red/10 p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs tracking-[0.22em] text-red uppercase">Ball vault</p>
+            <h3 className="display mt-1 text-4xl">
+              {ballSummary.totalBalls} balls in stock
+            </h3>
+            <p className="mt-1 text-sm text-mist">
+              {ballSummary.ballSkus} ball SKUs · {ballSummary.accessoryUnits} accessory
+              units · set qty under each weight for exact lb counts
+            </p>
+          </div>
+          <Link href="/ops/orders" className="btn btn-ghost !py-2 text-sm">
+            Open order command →
+          </Link>
+        </div>
+        {ballSummary.byWeight.length ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {ballSummary.byWeight.map((b) => (
+              <div
+                key={b.weight}
+                className="min-w-[4.25rem] rounded-2xl border border-white/15 bg-black/35 px-3 py-2 text-center"
+              >
+                <p className="text-xs text-mist">{b.label}</p>
+                <p className="display text-2xl">{b.stock || "—"}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       {persistWarning ? (
         <div className="mb-4 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
           <p className="font-semibold text-amber-200">Storage warning</p>
@@ -232,11 +281,29 @@ export default function OpsInventoryPage() {
               />
             </div>
             <div>
-              <label className="label">In stock</label>
+              <label className="label">
+                {form.weightOptions.length ? "Total (auto)" : "In stock"}
+              </label>
               <input
                 className="field"
                 inputMode="numeric"
-                value={form.stock}
+                disabled={form.weightOptions.length > 0}
+                value={
+                  form.weightOptions.length
+                    ? String(
+                        form.weightOptions.reduce((sum, w) => {
+                          const key = weightKey(w);
+                          return (
+                            sum +
+                            Math.max(
+                              0,
+                              Math.floor(Number(form.weightStock[key] ?? "0") || 0)
+                            )
+                          );
+                        }, 0)
+                      )
+                    : form.stock
+                }
                 onChange={(e) =>
                   setForm({ ...form, stock: e.target.value.replace(/[^0-9]/g, "") })
                 }
@@ -280,27 +347,35 @@ export default function OpsInventoryPage() {
               <div>
                 <p className="text-sm font-medium text-chalk">Ball weights</p>
                 <p className="mt-1 text-xs text-mist">
-                  Tap to add or remove. When any weight is set, shoppers must
-                  choose a bubble before buying.
+                  Tap weights to offer them. Enter qty under each weight — shoppers
+                  must pick a bubble, and the vault uses these counts.
                 </p>
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   className="text-xs text-red underline"
-                  onClick={() =>
+                  onClick={() => {
+                    const nextStock = { ...form.weightStock };
+                    for (const w of STANDARD_BALL_WEIGHTS) {
+                      const key = weightKey(w);
+                      if (nextStock[key] == null) nextStock[key] = "0";
+                    }
                     setForm({
                       ...form,
                       weightOptions: [...STANDARD_BALL_WEIGHTS],
-                    })
-                  }
+                      weightStock: nextStock,
+                    });
+                  }}
                 >
                   Add 8–16 lb
                 </button>
                 <button
                   type="button"
                   className="text-xs text-mist underline"
-                  onClick={() => setForm({ ...form, weightOptions: [] })}
+                  onClick={() =>
+                    setForm({ ...form, weightOptions: [], weightStock: {} })
+                  }
                 >
                   Clear
                 </button>
@@ -317,12 +392,29 @@ export default function OpsInventoryPage() {
                     type="button"
                     className={`weight-bubble ${on ? "is-selected" : ""}`}
                     onClick={() => {
-                      const next = on
-                        ? form.weightOptions.filter(
+                      const key = weightKey(weight);
+                      if (on) {
+                        const nextStock = { ...form.weightStock };
+                        delete nextStock[key];
+                        setForm({
+                          ...form,
+                          weightOptions: form.weightOptions.filter(
                             (w) => Math.abs(w - weight) >= 0.001
-                          )
-                        : [...form.weightOptions, weight].sort((a, b) => a - b);
-                      setForm({ ...form, weightOptions: next });
+                          ),
+                          weightStock: nextStock,
+                        });
+                      } else {
+                        setForm({
+                          ...form,
+                          weightOptions: [...form.weightOptions, weight].sort(
+                            (a, b) => a - b
+                          ),
+                          weightStock: {
+                            ...form.weightStock,
+                            [key]: form.weightStock[key] ?? "0",
+                          },
+                        });
+                      }
                     }}
                   >
                     {formatWeightLbs(weight)}
@@ -330,6 +422,32 @@ export default function OpsInventoryPage() {
                 );
               })}
             </div>
+            {form.weightOptions.length ? (
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {form.weightOptions.map((weight) => {
+                  const key = weightKey(weight);
+                  return (
+                    <label key={`stock-${key}`} className="block">
+                      <span className="label">{formatWeightLbs(weight)} qty</span>
+                      <input
+                        className="field"
+                        inputMode="numeric"
+                        value={form.weightStock[key] ?? "0"}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            weightStock: {
+                              ...form.weightStock,
+                              [key]: e.target.value.replace(/[^0-9]/g, ""),
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
             {form.weightOptions.some(
               (w) =>
                 !STANDARD_BALL_WEIGHTS.some((s) => Math.abs(s - w) < 0.001)
@@ -347,14 +465,18 @@ export default function OpsInventoryPage() {
                       key={`custom-${weight}`}
                       type="button"
                       className="weight-bubble is-selected"
-                      onClick={() =>
+                      onClick={() => {
+                        const key = weightKey(weight);
+                        const nextStock = { ...form.weightStock };
+                        delete nextStock[key];
                         setForm({
                           ...form,
                           weightOptions: form.weightOptions.filter(
                             (w) => Math.abs(w - weight) >= 0.001
                           ),
-                        })
-                      }
+                          weightStock: nextStock,
+                        });
+                      }}
                       title="Remove custom weight"
                     >
                       {formatWeightLbs(weight)} ×
@@ -382,6 +504,7 @@ export default function OpsInventoryPage() {
                   const n = Number(form.customWeight);
                   if (!Number.isFinite(n) || n <= 0 || n > 30) return;
                   const rounded = Math.round(n * 10) / 10;
+                  const key = weightKey(rounded);
                   if (
                     form.weightOptions.some(
                       (w) => Math.abs(w - rounded) < 0.001
@@ -396,6 +519,10 @@ export default function OpsInventoryPage() {
                     weightOptions: [...form.weightOptions, rounded].sort(
                       (a, b) => a - b
                     ),
+                    weightStock: {
+                      ...form.weightStock,
+                      [key]: form.weightStock[key] ?? "0",
+                    },
                   });
                 }}
               >
@@ -457,7 +584,14 @@ export default function OpsInventoryPage() {
                     Stock {p.stock}
                     {!p.active ? " · hidden" : ""}
                     {p.weightOptions?.length
-                      ? ` · weights ${p.weightOptions.join("/")} lb`
+                      ? ` · ${p.weightOptions
+                          .map((w) => {
+                            const qty = p.weightStock?.[weightKey(w)];
+                            return qty != null
+                              ? `${w}lb×${qty}`
+                              : `${w}lb`;
+                          })
+                          .join(" · ")}`
                       : ""}
                   </p>
                   <div className="mt-2 flex gap-3">
@@ -465,6 +599,14 @@ export default function OpsInventoryPage() {
                       type="button"
                       className="text-xs text-red underline"
                       onClick={() => {
+                        const weightOptions = p.weightOptions || [];
+                        const weightStock: Record<string, string> = {};
+                        for (const w of weightOptions) {
+                          const key = weightKey(w);
+                          weightStock[key] = String(
+                            p.weightStock?.[key] ?? 0
+                          );
+                        }
                         setEditingId(p.id);
                         setForm({
                           name: p.name,
@@ -477,7 +619,8 @@ export default function OpsInventoryPage() {
                           image: p.image,
                           featured: p.featured,
                           active: p.active,
-                          weightOptions: p.weightOptions || [],
+                          weightOptions,
+                          weightStock,
                           customWeight: "",
                         });
                       }}

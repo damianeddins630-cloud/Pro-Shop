@@ -3,6 +3,11 @@ import type { Product } from "./types";
 /** Common house / tournament ball weights (lbs). */
 export const STANDARD_BALL_WEIGHTS = [8, 9, 10, 11, 12, 13, 14, 15, 16] as const;
 
+export function weightKey(weight: number) {
+  const n = Math.round(weight * 10) / 10;
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
 export function normalizeWeightOptions(raw: unknown): number[] | undefined {
   if (raw == null) return undefined;
   const list = Array.isArray(raw) ? raw : [];
@@ -15,6 +20,33 @@ export function normalizeWeightOptions(raw: unknown): number[] | undefined {
     ),
   ].sort((a, b) => a - b);
   return cleaned.length ? cleaned : undefined;
+}
+
+export function normalizeWeightStock(
+  raw: unknown,
+  options?: number[]
+): Record<string, number> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const allowed = options?.length
+    ? new Set(options.map((w) => weightKey(w)))
+    : null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const w = Number(k);
+    if (!Number.isFinite(w) || w <= 0 || w > 30) continue;
+    const key = weightKey(w);
+    if (allowed && !allowed.has(key)) continue;
+    out[key] = Math.max(0, Math.floor(Number(v) || 0));
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+export function totalFromWeightStock(stock?: Record<string, number> | null) {
+  if (!stock) return 0;
+  return Object.values(stock).reduce(
+    (sum, n) => sum + Math.max(0, Math.floor(Number(n) || 0)),
+    0
+  );
 }
 
 export function productRequiresWeight(product: Pick<Product, "weightOptions">) {
@@ -30,9 +62,22 @@ export function isAllowedWeight(
   return (product.weightOptions || []).some((w) => Math.abs(w - weight) < 0.001);
 }
 
+export function stockForWeight(
+  product: Pick<Product, "stock" | "weightOptions" | "weightStock">,
+  weight?: number | null
+) {
+  if (weight != null && product.weightStock) {
+    const key = weightKey(weight);
+    if (Object.prototype.hasOwnProperty.call(product.weightStock, key)) {
+      return Math.max(0, Math.floor(Number(product.weightStock[key]) || 0));
+    }
+  }
+  return Math.max(0, Math.floor(Number(product.stock) || 0));
+}
+
 export function formatWeightLbs(weight: number) {
   const n = Math.round(weight * 10) / 10;
-  return Number.isInteger(n) ? `${n} lb` : `${n} lb`;
+  return `${n} lb`;
 }
 
 export function cartLineKey(productId: string, weight?: number | null) {

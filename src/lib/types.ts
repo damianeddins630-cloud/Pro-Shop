@@ -97,6 +97,11 @@ export interface Product {
    * When non-empty, shoppers must choose a weight bubble before adding to cart.
    */
   weightOptions?: number[];
+  /**
+   * Units in stock per weight (keys are lbs as strings, e.g. "15": 3).
+   * When set, product.stock should match the sum of these buckets.
+   */
+  weightStock?: Record<string, number>;
   /** Optional Shopify variant GID/id if product is synced in Shopify */
   shopifyVariantId?: string;
 }
@@ -155,8 +160,15 @@ export type OrderStatus =
   | "awaiting_payment"
   | "placed"
   | "processing"
+  | "ready"
   | "completed"
   | "cancelled";
+
+export interface OrderStatusEvent {
+  status: OrderStatus;
+  at: string;
+  note?: string;
+}
 
 export interface Order {
   id: string;
@@ -172,6 +184,10 @@ export interface Order {
   couponCode?: string;
   status: OrderStatus;
   createdAt: string;
+  /** Last status change */
+  updatedAt?: string;
+  /** Pipeline history for Ops */
+  statusHistory?: OrderStatusEvent[];
   /** Shopify draft order GID when paid via Shopify */
   shopifyDraftOrderId?: string;
   shopifyInvoiceUrl?: string;

@@ -20,6 +20,7 @@ import {
   isAllowedWeight,
   lineDisplayName,
   productRequiresWeight,
+  stockForWeight,
 } from "@/lib/weights";
 
 export const dynamic = "force-dynamic";
@@ -87,10 +88,12 @@ export async function POST(_req: Request, { params }: Params) {
         { status: 400 }
       );
     }
-    if (product.stock < item.quantity) {
+    if (stockForWeight(product, item.weight) < item.quantity) {
       return NextResponse.json(
         {
-          error: `Not enough stock for ${product.name}`,
+          error: `Not enough stock for ${product.name}${
+            item.weight != null ? ` (${item.weight} lb)` : ""
+          }`,
           code: "OUT_OF_STOCK",
         },
         { status: 400 }

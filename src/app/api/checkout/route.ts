@@ -27,6 +27,7 @@ import {
   isAllowedWeight,
   lineDisplayName,
   productRequiresWeight,
+  stockForWeight,
 } from "@/lib/weights";
 
 export const dynamic = "force-dynamic";
@@ -84,12 +85,15 @@ async function priceCartFromWebsite(
         },
       };
     }
-    if (product.stock < item.quantity) {
+    const available = stockForWeight(product, item.weight);
+    if (available < item.quantity) {
       return {
         ok: false,
         status: 400,
         body: {
-          error: `Not enough stock for ${product.name} (have ${product.stock}, need ${item.quantity})`,
+          error: `Not enough stock for ${product.name}${
+            item.weight != null ? ` (${item.weight} lb)` : ""
+          } (have ${available}, need ${item.quantity})`,
           code: "OUT_OF_STOCK",
         },
       };

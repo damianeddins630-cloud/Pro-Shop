@@ -150,6 +150,98 @@ a {
   color: #fff;
 }
 
+.weight-bubble.is-soldout {
+  opacity: 0.35;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.weight-bubble.is-soldout:hover {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.ops-pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.ops-pipeline-step {
+  position: relative;
+  text-align: center;
+}
+
+.ops-pipeline-step::before {
+  content: "";
+  position: absolute;
+  top: 0.55rem;
+  left: -35%;
+  right: 50%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  z-index: 0;
+}
+
+.ops-pipeline-step:first-child::before {
+  display: none;
+}
+
+.ops-pipeline-step.is-done::before,
+.ops-pipeline-step.is-current::before {
+  background: rgba(225, 6, 0, 0.65);
+}
+
+.ops-pipeline-dot {
+  position: relative;
+  z-index: 1;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0.15rem auto 0.35rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: #0a0a0a;
+}
+
+.ops-pipeline-step.is-done .ops-pipeline-dot {
+  border-color: rgba(225, 6, 0, 0.9);
+  background: rgba(225, 6, 0, 0.85);
+}
+
+.ops-pipeline-step.is-current .ops-pipeline-dot {
+  border-color: #fff;
+  background: #e10600;
+  box-shadow: 0 0 0 4px rgba(225, 6, 0, 0.22);
+  animation: pulseGlow 2.2s ease-in-out infinite;
+}
+
+.ops-pipeline-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--steel);
+}
+
+.ops-pipeline-step.is-done .ops-pipeline-label,
+.ops-pipeline-step.is-current .ops-pipeline-label {
+  color: var(--white);
+}
+
+.ops-order-card {
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+
+.ops-order-card:hover {
+  border-color: rgba(225, 6, 0, 0.35);
+}
+
+@media (max-width: 640px) {
+  .ops-pipeline-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+  }
+}
+
 .circle-mark {
   display: none;
 }
