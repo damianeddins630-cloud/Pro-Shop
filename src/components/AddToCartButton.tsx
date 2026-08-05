@@ -31,6 +31,7 @@ export function AddToCartButton({
       return;
     }
     add(productId, 1, weight);
+    router.push("/cart");
   }
 
   return (

@@ -121,6 +121,7 @@ export function EditableProductGrid({
       return;
     }
     add(productId);
+    router.push("/cart");
   }
 
   async function rename(id: string, name: string) {

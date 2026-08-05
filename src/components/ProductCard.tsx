@@ -27,6 +27,7 @@ export function ProductCard({ product }: { product: Product }) {
       return;
     }
     add(product.id);
+    router.push("/cart");
   }
 
   return (
