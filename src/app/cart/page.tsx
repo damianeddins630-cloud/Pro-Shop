@@ -16,7 +16,12 @@ import {
 import { savePendingCheckout } from "@/lib/pending-checkout";
 import { effectivePrice } from "@/lib/pricing";
 import type { CartItem, Product } from "@/lib/types";
-import { cartLineKey, formatWeightLbs, productRequiresWeight } from "@/lib/weights";
+import {
+  cartLineKey,
+  formatWeightLbs,
+  productRequiresWeight,
+  stockForWeight,
+} from "@/lib/weights";
 
 type AppliedCoupon = {
   code: string;
@@ -370,14 +375,15 @@ export default function CartPage() {
                     <input
                       type="number"
                       min={1}
-                      max={product.stock}
+                      max={stockForWeight(product, item.weight)}
                       value={item.quantity}
                       onChange={(e) => {
                         const n = Number(e.target.value);
                         if (!Number.isFinite(n)) return;
+                        const max = stockForWeight(product, item.weight);
                         setQty(
                           product.id,
-                          Math.min(product.stock, Math.max(1, Math.floor(n))),
+                          Math.min(max, Math.max(1, Math.floor(n))),
                           item.weight
                         );
                       }}

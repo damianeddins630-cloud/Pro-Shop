@@ -143,7 +143,7 @@ export function statusToneClass(tone: MemberOrderStatus["tone"]) {
     case "processing":
       return "border-sky-400/50 text-sky-300 bg-sky-400/10";
     case "ready":
-      return "border-violet-400/50 text-violet-300 bg-violet-400/10";
+      return "border-teal-400/50 text-teal-300 bg-teal-400/10";
     case "completed":
       return "border-emerald-400/50 text-emerald-300 bg-emerald-400/10";
     case "cancelled":

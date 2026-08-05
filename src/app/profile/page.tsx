@@ -166,7 +166,7 @@ export default function ProfilePage() {
                 don’t have it yet)
               </li>
               <li>
-                <span className="text-violet-300">Ready</span> — ready for pickup / handoff
+                <span className="text-teal-300">Ready</span> — ready for pickup / handoff
               </li>
               <li>
                 <span className="text-emerald-300">Completed</span> — you have your ball (or item)
