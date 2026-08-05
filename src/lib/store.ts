@@ -149,7 +149,10 @@ function mergeUsersPreferLocal(
  * Catalog (prices/discounts/stock) is protected by catalogUpdatedAt so an
  * order write on a cold instance cannot wipe a newer Ops price edit.
  */
-async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
+async function reconcileWithRemote(
+  local: StoreData,
+  opts?: { replaceOrders?: boolean }
+): Promise<StoreData> {
   let remote: StoreData | null = null;
   try {
     remote = await loadDurableStore();
@@ -159,7 +162,10 @@ async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
   if (!remote) return local;
 
   local.users = mergeUsersPreferLocal(remote.users, local.users);
-  local.orders = mergeByIdPreferLocal(remote.orders, local.orders);
+  // Ops "clear all orders" must win — never resurrect wiped rows from remote.
+  if (!opts?.replaceOrders) {
+    local.orders = mergeByIdPreferLocal(remote.orders, local.orders);
+  }
   local.subscribers = mergeByIdPreferLocal(
     remote.subscribers,
     local.subscribers
@@ -441,13 +447,16 @@ async function loadFromDisk(): Promise<StoreData> {
   return seed;
 }
 
-async function persist(data: StoreData) {
+async function persist(
+  data: StoreData,
+  opts?: { replaceOrders?: boolean }
+) {
   const store = g();
   let ok = true;
 
   // Merge remote first so a product/inventory save cannot erase new accounts
   // or newer Ops catalog prices.
-  await reconcileWithRemote(data);
+  await reconcileWithRemote(data, opts);
   await ensureAdmin(data);
   // Bump store clock only — never invent a newer catalogUpdatedAt here.
   data.updatedAt = new Date().toISOString();
@@ -609,7 +618,7 @@ export async function getStore(): Promise<StoreData> {
 
 async function mutate(
   updater: (data: StoreData) => void | Promise<void>,
-  opts?: { catalog?: boolean }
+  opts?: { catalog?: boolean; replaceOrders?: boolean }
 ) {
   // Always resolve latest store (remote + memory) so coupon/inventory edits
   // don't clobber newer durable data with a stale in-memory copy.
@@ -618,7 +627,7 @@ async function mutate(
   if (opts?.catalog) touchCatalogUpdatedAt(data);
   else touchUpdatedAt(data);
   g().data = data;
-  await persist(data);
+  await persist(data, { replaceOrders: opts?.replaceOrders });
   return data;
 }
 
@@ -1631,10 +1640,13 @@ export async function listAllOrders() {
 /** Wipe every order record (Ops reset). Catalog/stock unchanged. */
 export async function clearAllOrders() {
   let removed = 0;
-  await mutate((data) => {
-    removed = (data.orders || []).length;
-    data.orders = [];
-  });
+  await mutate(
+    (data) => {
+      removed = (data.orders || []).length;
+      data.orders = [];
+    },
+    { replaceOrders: true }
+  );
   return removed;
 }
 
