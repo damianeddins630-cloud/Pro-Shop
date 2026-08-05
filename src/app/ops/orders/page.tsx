@@ -93,7 +93,14 @@ export default function OpsOrdersPage() {
     setError("");
     setMessage("");
     try {
-      const res = await fetch("/api/orders?all=1", { method: "DELETE" });
+      let res = await fetch("/api/orders?all=1", { method: "DELETE" });
+      if (res.status === 405) {
+        res = await fetch("/api/orders?clear=1&all=1", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ all: true }),
+        });
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || "Could not clear orders");

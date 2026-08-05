@@ -50,16 +50,23 @@ export async function GET(req: Request) {
   );
 }
 
-/** Clear every order (Ops reset). Does not change inventory. */
-export async function DELETE(req: Request) {
+async function clearOrdersHandler(req: Request) {
   const session = await requirePermission("manage_orders");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const all = new URL(req.url).searchParams.get("all") === "1";
+  const url = new URL(req.url);
+  let bodyAll = false;
+  try {
+    const body = await req.json();
+    bodyAll = body?.all === true || body?.all === 1 || body?.all === "1";
+  } catch {
+    // no JSON body
+  }
+  const all = url.searchParams.get("all") === "1" || bodyAll;
   if (!all) {
     return NextResponse.json(
-      { error: "Pass ?all=1 to clear every order" },
+      { error: "Pass ?all=1 (or {\"all\":true}) to clear every order" },
       { status: 400 }
     );
   }
@@ -75,5 +82,22 @@ export async function DELETE(req: Request) {
       message: `Cleared ${removed} order${removed === 1 ? "" : "s"}.`,
     }),
     { headers: noStore }
+  );
+}
+
+/** Clear every order (Ops reset). Does not change inventory. */
+export async function DELETE(req: Request) {
+  return clearOrdersHandler(req);
+}
+
+/** Same as DELETE — used when hosts block DELETE. */
+export async function POST(req: Request) {
+  const url = new URL(req.url);
+  if (url.searchParams.get("clear") === "1") {
+    return clearOrdersHandler(req);
+  }
+  return NextResponse.json(
+    { error: "Use POST /api/orders?clear=1&all=1 to clear orders" },
+    { status: 400 }
   );
 }
