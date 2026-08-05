@@ -151,6 +151,12 @@ export default function OpsInventoryPage() {
           </p>
         </div>
       ) : null}
+      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-mist">
+        This website owns prices. Shopify is payment only — Shopify Admin product
+        prices will <span className="text-chalk">not</span> change. After you save
+        here, the next <span className="text-chalk">Pay with Shopify</span> charge
+        uses these website amounts.
+      </div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="display text-4xl">Inventory</h2>

@@ -65,8 +65,20 @@ function storeUpdatedAtMs(data: StoreData | null | undefined) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function catalogUpdatedAtMs(data: StoreData | null | undefined) {
+  const raw = data?.catalogUpdatedAt || data?.updatedAt || "";
+  const n = Date.parse(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function touchUpdatedAt(data: StoreData) {
   data.updatedAt = new Date().toISOString();
+}
+
+function touchCatalogUpdatedAt(data: StoreData) {
+  const now = new Date().toISOString();
+  data.catalogUpdatedAt = now;
+  data.updatedAt = now;
 }
 
 /** Union-merge by id. Local wins on conflicts so in-progress edits stick. */
@@ -128,8 +140,8 @@ function mergeUsersPreferLocal(
 
 /**
  * Before writing, pull remote and merge account-critical collections.
- * Catalog collections (products/deals/etc.) stay as the local mutation result
- * so deletes in Ops are not undone by a stale remote copy.
+ * Catalog (prices/discounts/stock) is protected by catalogUpdatedAt so an
+ * order write on a cold instance cannot wipe a newer Ops price edit.
  */
 async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
   let remote: StoreData | null = null;
@@ -147,7 +159,21 @@ async function reconcileWithRemote(local: StoreData): Promise<StoreData> {
     local.subscribers
   );
   local.roles = mergeByIdPreferLocal(remote.roles, local.roles);
-  local.coupons = mergeByIdPreferLocal(remote.coupons, local.coupons);
+
+  const remoteCatalogTs = catalogUpdatedAtMs(remote);
+  const localCatalogTs = catalogUpdatedAtMs(local);
+  if (remoteCatalogTs > localCatalogTs) {
+    // Remote catalog is newer — keep Ops price/discount/stock edits.
+    local.products = remote.products || local.products;
+    local.deals = remote.deals || local.deals;
+    local.sponsors = remote.sponsors || local.sponsors;
+    local.coupons = remote.coupons || local.coupons;
+    local.catalogUpdatedAt = remote.catalogUpdatedAt || remote.updatedAt;
+  } else {
+    // Local catalog is newer (or equal) — still union coupons carefully
+    local.coupons = mergeByIdPreferLocal(remote.coupons, local.coupons);
+  }
+
   // Keep Shopify keys from whichever side has them (local wins non-empty fields)
   local.shopifyConfig = {
     ...(remote.shopifyConfig || {}),
@@ -414,9 +440,11 @@ async function persist(data: StoreData) {
   let ok = true;
 
   // Merge remote first so a product/inventory save cannot erase new accounts
+  // or newer Ops catalog prices.
   await reconcileWithRemote(data);
   await ensureAdmin(data);
-  touchUpdatedAt(data);
+  // Bump store clock only — never invent a newer catalogUpdatedAt here.
+  data.updatedAt = new Date().toISOString();
   store.data = data;
 
   const payload = JSON.stringify(
@@ -573,12 +601,16 @@ export async function getStore(): Promise<StoreData> {
   return store.ready;
 }
 
-async function mutate(updater: (data: StoreData) => void | Promise<void>) {
+async function mutate(
+  updater: (data: StoreData) => void | Promise<void>,
+  opts?: { catalog?: boolean }
+) {
   // Always resolve latest store (remote + memory) so coupon/inventory edits
   // don't clobber newer durable data with a stale in-memory copy.
   const data = await getStore();
   await updater(data);
-  touchUpdatedAt(data);
+  if (opts?.catalog) touchCatalogUpdatedAt(data);
+  else touchUpdatedAt(data);
   g().data = data;
   await persist(data);
   return data;
@@ -830,26 +862,31 @@ export async function getProduct(id: string) {
 }
 
 /**
- * Checkout / charge path: pick the newest catalog copy (durable vs memory)
- * so website price and discount edits apply when Shopify collects payment.
+ * Checkout / charge path: ALWAYS prefer durable Blob/Redis catalog prices.
+ * Memory is fallback only — cold order writes must not dictate Shopify totals.
  */
 export async function getFreshProductForCheckout(id: string) {
-  const memory = await getProduct(id);
-  let remoteProduct: Product | null = null;
-  let remoteTs = 0;
   try {
     const remote = await loadDurableStore();
-    remoteTs = storeUpdatedAtMs(remote);
     const hit = remote?.products?.find((p) => p.id === id || p.slug === id);
-    if (hit) remoteProduct = normalizeProduct(hit);
+    if (hit) {
+      // Keep memory in sync so this instance doesn't later overwrite Blob
+      // with an older catalog during an order save.
+      const mem = g().data;
+      if (mem && catalogUpdatedAtMs(remote) >= catalogUpdatedAtMs(mem)) {
+        mem.products = remote!.products;
+        mem.deals = remote!.deals || mem.deals;
+        mem.coupons = remote!.coupons || mem.coupons;
+        mem.sponsors = remote!.sponsors || mem.sponsors;
+        mem.catalogUpdatedAt =
+          remote!.catalogUpdatedAt || remote!.updatedAt || mem.catalogUpdatedAt;
+      }
+      return normalizeProduct(hit);
+    }
   } catch {
-    // ignore
+    // fall through
   }
-  const memTs = storeUpdatedAtMs(g().data);
-  if (remoteProduct && memory) {
-    return memTs >= remoteTs ? memory : remoteProduct;
-  }
-  return remoteProduct || memory;
+  return getProduct(id);
 }
 
 export async function getFreshCouponForCheckout(code: string) {
@@ -880,7 +917,7 @@ export async function createProduct(input: Omit<Product, "id">) {
   await mutate((data) => {
     created = normalizeProduct({ ...input, id: randomUUID() });
     data.products.unshift(created);
-  });
+  }, { catalog: true });
   return created!;
 }
 
@@ -895,7 +932,7 @@ export async function updateProduct(id: string, patch: Partial<Product>) {
       id,
     });
     updated = data.products[idx];
-  });
+  }, { catalog: true });
   return updated;
 }
 
@@ -905,7 +942,7 @@ export async function deleteProduct(id: string) {
     const before = data.products.length;
     data.products = data.products.filter((p) => p.id !== id);
     ok = data.products.length < before;
-  });
+  }, { catalog: true });
   return ok;
 }
 
@@ -918,7 +955,7 @@ export async function createSponsor(input: Omit<Sponsor, "id">) {
   await mutate((data) => {
     created = { ...input, id: randomUUID() };
     data.sponsors.push(created);
-  });
+  }, { catalog: true });
   return created!;
 }
 
@@ -929,7 +966,7 @@ export async function updateSponsor(id: string, patch: Partial<Sponsor>) {
     if (idx === -1) return;
     data.sponsors[idx] = { ...data.sponsors[idx], ...patch, id };
     updated = data.sponsors[idx];
-  });
+  }, { catalog: true });
   return updated;
 }
 
@@ -939,7 +976,7 @@ export async function deleteSponsor(id: string) {
     const before = data.sponsors.length;
     data.sponsors = data.sponsors.filter((s) => s.id !== id);
     ok = data.sponsors.length < before;
-  });
+  }, { catalog: true });
   return ok;
 }
 
@@ -952,7 +989,7 @@ export async function createDeal(input: Omit<Deal, "id">) {
   await mutate((data) => {
     created = { ...input, id: randomUUID() };
     data.deals.unshift(created);
-  });
+  }, { catalog: true });
   return created!;
 }
 
@@ -963,7 +1000,7 @@ export async function updateDeal(id: string, patch: Partial<Deal>) {
     if (idx === -1) return;
     data.deals[idx] = { ...data.deals[idx], ...patch, id };
     updated = data.deals[idx];
-  });
+  }, { catalog: true });
   return updated;
 }
 
@@ -973,7 +1010,7 @@ export async function deleteDeal(id: string) {
     const before = data.deals.length;
     data.deals = data.deals.filter((d) => d.id !== id);
     ok = data.deals.length < before;
-  });
+  }, { catalog: true });
   return ok;
 }
 
@@ -1072,7 +1109,7 @@ export async function reduceStock(items: { productId: string; quantity: number }
       if (p.stock < item.quantity) throw new Error(`Not enough stock for ${p.name}`);
       p.stock -= item.quantity;
     }
-  });
+  }, { catalog: true });
 }
 
 export async function createOrder(input: {
@@ -1164,7 +1201,7 @@ export async function markOrderPaid(
     }
     data.orders[idx] = current;
     updated = current;
-  });
+  }, { catalog: true });
   return updated;
 }
 
@@ -1240,7 +1277,7 @@ export async function createCoupon(
     });
     store.coupons = store.coupons || [];
     store.coupons.unshift(created);
-  });
+  }, { catalog: true });
   return { coupon: created!, coupons: [...(data.coupons || [])] };
 }
 
@@ -1298,7 +1335,7 @@ export async function updateCoupon(id: string, patch: Partial<Coupon>) {
     });
     store.coupons![idx] = next;
     updated = next;
-  });
+  }, { catalog: true });
   if (!updated) return null;
   return { coupon: updated, coupons: [...(data.coupons || [])] };
 }
@@ -1314,7 +1351,7 @@ export async function deleteCoupon(id: string) {
     const before = store.coupons!.length;
     store.coupons = store.coupons!.filter((c) => c.id !== id);
     ok = store.coupons.length < before;
-  });
+  }, { catalog: true });
   return { ok, removedCode, coupons: [...(data.coupons || [])] };
 }
 
@@ -1334,7 +1371,7 @@ export async function recordCouponUse(code: string) {
     });
     store.coupons![idx] = next;
     updated = next;
-  });
+  }, { catalog: true });
   return updated
     ? { coupon: updated, coupons: [...(data.coupons || [])] }
     : null;

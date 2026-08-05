@@ -244,6 +244,13 @@ export async function POST(req: Request) {
         checkoutUrl: shopify.invoiceUrl,
         returnUrl,
         pricedFromWebsite: true,
+        websitePrices: lineItems.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          unitPrice: i.price,
+          quantity: i.quantity,
+          lineTotal: Math.round(i.price * i.quantity * 100) / 100,
+        })),
         subtotal,
         discountAmount,
         total,

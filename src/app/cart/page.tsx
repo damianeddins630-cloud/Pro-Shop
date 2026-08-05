@@ -9,6 +9,7 @@ import { ProductPrice } from "@/components/ProductPrice";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
 import {
+  clearLocalInventory,
   pickNewestProducts,
   saveLocalInventory,
 } from "@/lib/inventory-client";
@@ -186,6 +187,7 @@ export default function CartPage() {
     try {
       // Pull latest website prices/discounts into the cart UI before charging.
       try {
+        clearLocalInventory();
         const fresh = await fetch(`/api/products?t=${Date.now()}`, {
           cache: "no-store",
         });

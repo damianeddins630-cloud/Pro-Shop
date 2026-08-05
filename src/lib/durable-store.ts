@@ -9,6 +9,7 @@ import {
 const REDIS_KEY = "bba:store:v1";
 const REDIS_CATALOG_KEY = "bba:catalog:v1";
 const BLOB_PATHNAME = "bba-store.json";
+const BLOB_CATALOG_PATH = "bba-catalog.json";
 const BLOB_PROBE_PATH = "bba-persist-probe.json";
 
 export type PersistBackendResult = {
@@ -127,18 +128,36 @@ function mergeShopifyConfig(
   };
 }
 
-/** Union account-critical collections; keep catalog from the newer store. */
+function catalogTs(data: StoreData | null | undefined) {
+  return (
+    Date.parse(String(data?.catalogUpdatedAt || data?.updatedAt || "")) || 0
+  );
+}
+
+/** Union account-critical collections; keep newest catalog by catalogUpdatedAt. */
 function mergeDurableCopies(
   primary: StoreData,
   secondary: StoreData | null
 ): StoreData {
   if (!secondary) return primary;
+  const primaryCat = catalogTs(primary);
+  const secondaryCat = catalogTs(secondary);
+  const catalogWinner = secondaryCat > primaryCat ? secondary : primary;
   return {
     ...primary,
+    products: catalogWinner.products,
+    deals: catalogWinner.deals,
+    sponsors: catalogWinner.sponsors,
+    catalogUpdatedAt:
+      catalogWinner.catalogUpdatedAt || catalogWinner.updatedAt,
     users: mergeById<User>(secondary.users, primary.users),
     orders: mergeById<Order>(secondary.orders, primary.orders),
     roles: mergeById<Role>(secondary.roles, primary.roles),
-    coupons: mergeById<Coupon>(secondary.coupons, primary.coupons),
+    coupons: mergeById<Coupon>(
+      secondary.coupons,
+      // Prefer catalog-winner coupons so discount edits stick
+      catalogWinner.coupons
+    ),
     subscribers: mergeById<Subscriber>(
       secondary.subscribers,
       primary.subscribers
@@ -268,6 +287,7 @@ async function saveRedisStore(data: StoreData): Promise<PersistBackendResult> {
   const fullPayload = JSON.stringify(data);
   const catalogPayload = JSON.stringify({
     updatedAt: data.updatedAt,
+    catalogUpdatedAt: data.catalogUpdatedAt || data.updatedAt,
     products: data.products,
     deals: data.deals,
     coupons: data.coupons || [],
@@ -347,18 +367,48 @@ async function readBlobJson(pathname: string): Promise<unknown | null> {
 
 async function loadBlobStore(): Promise<StoreData | null> {
   if (!blobConfigured()) return null;
+  let full: StoreData | null = null;
   try {
     const data = await readBlobJson(BLOB_PATHNAME);
-    if (data && typeof data === "object") return data as StoreData;
+    if (data && typeof data === "object") full = data as StoreData;
   } catch {
     // continue
   }
 
+  // Prefer dedicated catalog blob for products/prices when it's newer.
+  try {
+    const catalog = (await readBlobJson(BLOB_CATALOG_PATH)) as StoreData | null;
+    if (catalog?.products?.length) {
+      if (!full) return catalog;
+      const fullCat = Date.parse(
+        String(full.catalogUpdatedAt || full.updatedAt || "")
+      ) || 0;
+      const catCat = Date.parse(
+        String(catalog.catalogUpdatedAt || catalog.updatedAt || "")
+      ) || 0;
+      if (catCat >= fullCat) {
+        return {
+          ...full,
+          products: catalog.products,
+          deals: catalog.deals || full.deals,
+          coupons: catalog.coupons || full.coupons,
+          sponsors: catalog.sponsors || full.sponsors,
+          catalogUpdatedAt:
+            catalog.catalogUpdatedAt || catalog.updatedAt || full.catalogUpdatedAt,
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  if (full) return full;
+
   // Fallback: list store and fetch by URL/pathname
   try {
     const listed = await blobList({
-      prefix: BLOB_PATHNAME,
-      limit: 10,
+      prefix: "bba-",
+      limit: 20,
       ...blobAuthOptions(),
     });
     const hit = (listed.blobs || []).find((b) => b.pathname === BLOB_PATHNAME);
@@ -381,6 +431,14 @@ async function saveBlobStore(data: StoreData): Promise<PersistBackendResult> {
     return { ok: false, error: "BLOB_READ_WRITE_TOKEN not set" };
   }
   const payload = JSON.stringify(data);
+  const catalogPayload = JSON.stringify({
+    updatedAt: data.updatedAt,
+    catalogUpdatedAt: data.catalogUpdatedAt || data.updatedAt,
+    products: data.products,
+    deals: data.deals,
+    coupons: data.coupons || [],
+    sponsors: data.sponsors,
+  });
   const errors: string[] = [];
   const storeHint = blobStoreId() ? `storeId=${blobStoreId()}` : "storeId=token-default";
 
@@ -388,6 +446,14 @@ async function saveBlobStore(data: StoreData): Promise<PersistBackendResult> {
   for (const access of blobAccessModes()) {
     try {
       const putResult = await blobPut(BLOB_PATHNAME, payload, {
+        access,
+        contentType: "application/json",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        ...blobAuthOptions(),
+      });
+      // Dedicated catalog blob so checkout prices survive even if full-store races.
+      await blobPut(BLOB_CATALOG_PATH, catalogPayload, {
         access,
         contentType: "application/json",
         addRandomSuffix: false,
@@ -414,6 +480,11 @@ async function saveBlobStore(data: StoreData): Promise<PersistBackendResult> {
         }
       }
       if (verify && typeof verify === "object") {
+        return { ok: true };
+      }
+      // Catalog-only write still counts if full-store verify lags
+      const catalogVerify = await readBlobJson(BLOB_CATALOG_PATH);
+      if (catalogVerify && typeof catalogVerify === "object") {
         return { ok: true };
       }
       errors.push(`${access}/${storeHint}:wrote-but-read-failed`);

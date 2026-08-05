@@ -207,6 +207,11 @@ export interface ShopifySiteConfig {
 export interface StoreData {
   /** Bumped on every inventory / catalog change so shop can pick the newest copy */
   updatedAt?: string;
+  /**
+   * Bumped only when products/prices/discounts/coupons/deals change.
+   * Prevents order/user writes from overwriting newer catalog prices.
+   */
+  catalogUpdatedAt?: string;
   products: Product[];
   sponsors: Sponsor[];
   deals: Deal[];

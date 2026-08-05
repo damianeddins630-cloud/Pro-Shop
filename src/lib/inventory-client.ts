@@ -85,13 +85,19 @@ export function pickNewestProducts(
     return apiProducts;
   }
 
-  if (localTs > apiTs) return local.products;
-
-  // Same/missing timestamps — prefer whichever actually changed catalog fields
   const localFp = inventoryFingerprint(local.products);
   const apiFp = inventoryFingerprint(apiProducts);
+
+  // If API catalog fields differ, trust the server (durable Blob) over a stale
+  // browser cache — otherwise Shopify checkout can look "wrong" in the cart UI.
+  if (apiFp !== localFp && apiTs >= localTs - 5_000) {
+    saveLocalInventory(apiProducts, apiUpdatedAt || local.updatedAt);
+    return apiProducts;
+  }
+
+  if (localTs > apiTs) return local.products;
+
   if (localFp !== apiFp) {
-    // Keep local Ops edits when fingerprints differ and times are tied
     return local.products;
   }
   return apiProducts;
