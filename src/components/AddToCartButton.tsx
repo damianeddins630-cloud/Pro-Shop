@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
+import { goToCart } from "@/lib/shop-nav";
 
 export function AddToCartButton({
   productId,
@@ -31,7 +32,7 @@ export function AddToCartButton({
       return;
     }
     add(productId, 1, weight);
-    router.push("/cart");
+    goToCart();
   }
 
   return (

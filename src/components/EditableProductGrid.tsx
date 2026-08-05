@@ -15,6 +15,7 @@ import {
   saveLocalInventory,
 } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
+import { brandsMatch, categoriesMatch, goToCart } from "@/lib/shop-nav";
 import { productRequiresWeight } from "@/lib/weights";
 
 type Filters = {
@@ -28,8 +29,12 @@ type Filters = {
 function applyFilters(list: Product[], filters?: Filters) {
   let next = activeProducts(list);
   if (filters?.featuredOnly) next = next.filter((p) => p.featured);
-  if (filters?.brand) next = next.filter((p) => p.brand === filters.brand);
-  if (filters?.category) next = next.filter((p) => p.category === filters.category);
+  if (filters?.brand) {
+    next = next.filter((p) => brandsMatch(p.brand, filters.brand!));
+  }
+  if (filters?.category) {
+    next = next.filter((p) => categoriesMatch(p.category, filters.category!));
+  }
   if (filters?.q) {
     const q = filters.q.toLowerCase();
     next = next.filter(
@@ -121,7 +126,7 @@ export function EditableProductGrid({
       return;
     }
     add(productId);
-    router.push("/cart");
+    goToCart();
   }
 
   async function rename(id: string, name: string) {
@@ -221,9 +226,12 @@ export function EditableProductGrid({
                 </div>
               </Link>
               <div className="space-y-1 p-4">
-                <p className="text-xs tracking-[0.14em] text-red uppercase">
+                <Link
+                  href={`/shop?brand=${encodeURIComponent(product.brand)}#inventory`}
+                  className="text-xs tracking-[0.14em] text-red uppercase hover:underline"
+                >
                   {product.brand}
-                </p>
+                </Link>
                 <EditableText
                   as="h3"
                   className="text-lg font-semibold text-chalk"

@@ -7,6 +7,7 @@ import type { Product } from "@/lib/types";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
 import { ProductPrice } from "@/components/ProductPrice";
+import { goToCart } from "@/lib/shop-nav";
 import { productRequiresWeight } from "@/lib/weights";
 
 export function ProductCard({ product }: { product: Product }) {
@@ -27,7 +28,7 @@ export function ProductCard({ product }: { product: Product }) {
       return;
     }
     add(product.id);
-    router.push("/cart");
+    goToCart();
   }
 
   return (
@@ -44,7 +45,13 @@ export function ProductCard({ product }: { product: Product }) {
           />
         </div>
         <div className="space-y-1 p-4">
-          <p className="text-xs tracking-[0.14em] text-red uppercase">{product.brand}</p>
+          <Link
+            href={`/shop?brand=${encodeURIComponent(product.brand)}#inventory`}
+            className="text-xs tracking-[0.14em] text-red uppercase hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {product.brand}
+          </Link>
           <h3 className="text-lg font-semibold text-chalk">{product.name}</h3>
           <ProductPrice product={product} />
           <p className="text-xs text-mist/80">
