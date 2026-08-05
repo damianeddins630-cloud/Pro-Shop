@@ -7,22 +7,42 @@ import type { Order, OrderStatus, Product } from "@/lib/types";
 import { useEditMode } from "@/lib/edit-mode";
 import {
   countOrdersByStatus,
-  orderRevenue,
   summarizeBallInventory,
 } from "@/lib/inventory-stats";
 import { IN_STORE_POLICY, STAFF_WORKFLOW } from "@/lib/in-store";
 import {
-  ACTIVE_PIPELINE,
-  OPS_PIPELINE,
+  CUSTOMER_PIPELINE,
+  customerPipelineIndex,
   memberOrderStatus,
   nextOpsStatus,
   opsStatusMeta,
-  pipelineStepIndex,
   statusToneClass,
 } from "@/lib/order-status";
 import { formatWeightLbs } from "@/lib/weights";
 
-type FilterKey = "all" | "active" | OrderStatus;
+type FilterKey =
+  | "all"
+  | "active"
+  | "awaiting_payment"
+  | "balls_in"
+  | "ready"
+  | "completed"
+  | "cancelled";
+
+const FILTER_TABS: { key: FilterKey; label: string; statuses?: OrderStatus[] }[] =
+  [
+    { key: "active", label: "Active" },
+    { key: "all", label: "All" },
+    { key: "awaiting_payment", label: "Pending payment" },
+    {
+      key: "balls_in",
+      label: "Balls in",
+      statuses: ["placed", "processing"],
+    },
+    { key: "ready", label: "Come do drilling" },
+    { key: "completed", label: "Order complete" },
+    { key: "cancelled", label: "Cancelled" },
+  ];
 
 export default function OpsOrdersPage() {
   const { can } = useEditMode();
@@ -33,6 +53,8 @@ export default function OpsOrdersPage() {
   const [filter, setFilter] = useState<FilterKey>("active");
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const [message, setMessage] = useState("");
   const canManage = can("manage_orders");
 
   const load = useCallback(async () => {
@@ -58,6 +80,33 @@ export default function OpsOrdersPage() {
     const id = window.setInterval(() => void load(), 20000);
     return () => window.clearInterval(id);
   }, [load]);
+
+  async function clearOrders() {
+    if (
+      !confirm(
+        "Clear ALL orders? This cannot be undone. Inventory / ball stock stays the same."
+      )
+    ) {
+      return;
+    }
+    setClearing(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/orders?all=1", { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not clear orders");
+        setClearing(false);
+        return;
+      }
+      setOrders([]);
+      setMessage(data.message || "All orders cleared.");
+    } catch {
+      setError("Could not clear orders");
+    }
+    setClearing(false);
+  }
 
   async function patchOrder(
     id: string,
@@ -95,7 +144,6 @@ export default function OpsOrdersPage() {
     [products]
   );
   const pipelineCounts = useMemo(() => countOrdersByStatus(orders), [orders]);
-  const revenue = useMemo(() => orderRevenue(orders), [orders]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -109,6 +157,9 @@ export default function OpsOrdersPage() {
             o.status === "processing" ||
             o.status === "ready"
           );
+        }
+        if (filter === "balls_in") {
+          return o.status === "placed" || o.status === "processing";
         }
         return o.status === filter;
       })
@@ -145,25 +196,41 @@ export default function OpsOrdersPage() {
           <h2 className="display mt-1 text-5xl md:text-6xl">Orders</h2>
           <p className="mt-2 max-w-2xl text-sm text-mist">{IN_STORE_POLICY}</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost text-sm"
-          onClick={() => {
-            setLoading(true);
-            void load();
-          }}
-        >
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {canManage ? (
+            <button
+              type="button"
+              className="btn btn-ghost text-sm text-red-300"
+              disabled={clearing || orders.length === 0}
+              onClick={() => void clearOrders()}
+            >
+              {clearing ? "Clearing…" : "Clear all orders"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn-ghost text-sm"
+            onClick={() => {
+              setLoading(true);
+              void load();
+            }}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
         <p className="text-xs tracking-[0.2em] text-red uppercase">
-          Staff workflow
+          Order flow
         </p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <p className="mt-1 text-sm text-mist">
+          Balls in → Come do drilling → Order complete
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {STAFF_WORKFLOW.map((step) => (
             <div
               key={step.n}
@@ -181,12 +248,14 @@ export default function OpsOrdersPage() {
         <Metric
           label="Active in shop"
           value={String(pipelineCounts.active)}
-          hint="Awaiting pay → ready"
+          hint="Pay → balls in → drilling"
         />
         <Metric
-          label="Settled revenue"
-          value={`$${revenue.toFixed(0)}`}
-          hint="Paid / completed (not pending)"
+          label="Balls in"
+          value={String(
+            (pipelineCounts.placed || 0) + (pipelineCounts.processing || 0)
+          )}
+          hint="Waiting for customer to come drill"
         />
         <Metric
           label="Balls in vault"
@@ -194,9 +263,9 @@ export default function OpsOrdersPage() {
           hint={`${ballSummary.ballSkus} ball SKU${ballSummary.ballSkus === 1 ? "" : "s"}`}
         />
         <Metric
-          label="Ready for walk-in"
+          label="Come do drilling"
           value={String(pipelineCounts.ready || 0)}
-          hint="Customers should come in now"
+          hint="Customer should come in now"
         />
       </div>
 
@@ -239,18 +308,17 @@ export default function OpsOrdersPage() {
       </section>
 
       <div className="flex flex-wrap gap-2">
-        {(
-          [
-            { key: "active" as const, label: "Active", count: pipelineCounts.active },
-            { key: "all" as const, label: "All", count: pipelineCounts.all },
-            ...OPS_PIPELINE.map((s) => ({
-              key: s.value as FilterKey,
-              label: s.label,
-              count: pipelineCounts[s.value] || 0,
-            })),
-          ] as { key: FilterKey; label: string; count: number }[]
-        ).map((tab) => {
+        {FILTER_TABS.map((tab) => {
           const active = filter === tab.key;
+          const count =
+            tab.key === "active"
+              ? pipelineCounts.active
+              : tab.key === "all"
+                ? pipelineCounts.all
+                : tab.key === "balls_in"
+                  ? (pipelineCounts.placed || 0) +
+                    (pipelineCounts.processing || 0)
+                  : pipelineCounts[tab.key as OrderStatus] || 0;
           return (
             <button
               key={tab.key}
@@ -263,7 +331,7 @@ export default function OpsOrdersPage() {
               }`}
             >
               {tab.label}
-              <span className="ml-1.5 opacity-80">{tab.count}</span>
+              <span className="ml-1.5 opacity-80">{count}</span>
             </button>
           );
         })}
@@ -340,7 +408,7 @@ function OrderWorkstationCard({
 }) {
   const meta = opsStatusMeta(order.status);
   const member = memberOrderStatus(order.status);
-  const step = pipelineStepIndex(order.status);
+  const step = customerPipelineIndex(order.status);
   const next = nextOpsStatus(order.status);
   const itemCount = order.items.reduce((n, i) => n + i.quantity, 0);
   const [notes, setNotes] = useState(order.drillingNotes || "");
@@ -422,18 +490,20 @@ function OrderWorkstationCard({
           </div>
         </div>
 
-        <div className="ops-pipeline mt-5" aria-label="In-store processing pipeline">
-          {ACTIVE_PIPELINE.map((status, idx) => {
-            const s = opsStatusMeta(status);
+        <div
+          className="ops-pipeline ops-pipeline-3 mt-5"
+          aria-label="Balls in → drilling → complete"
+        >
+          {CUSTOMER_PIPELINE.map((s, idx) => {
             const done = step >= 0 && idx < step;
             const current = step === idx;
             return (
               <div
-                key={status}
+                key={s.key}
                 className={`ops-pipeline-step ${done ? "is-done" : ""} ${current ? "is-current" : ""}`}
               >
                 <div className="ops-pipeline-dot" />
-                <p className="ops-pipeline-label">{s.short}</p>
+                <p className="ops-pipeline-label">{s.label}</p>
               </div>
             );
           })}
@@ -506,17 +576,30 @@ function OrderWorkstationCard({
               </label>
               <select
                 className="field"
-                value={order.status}
+                value={
+                  order.status === "placed" ? "processing" : order.status
+                }
                 disabled={busy}
                 onChange={(e) =>
                   onPatch({ status: e.target.value as OrderStatus })
                 }
               >
-                {OPS_PIPELINE.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label} — {s.help}
-                  </option>
-                ))}
+                {(
+                  [
+                    "awaiting_payment",
+                    "processing",
+                    "ready",
+                    "completed",
+                    "cancelled",
+                  ] as OrderStatus[]
+                ).map((value) => {
+                  const s = opsStatusMeta(value);
+                  return (
+                    <option key={value} value={value}>
+                      {s.label} — {s.help}
+                    </option>
+                  );
+                })}
               </select>
               <div className="flex flex-wrap gap-2">
                 {next ? (

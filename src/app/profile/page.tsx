@@ -159,17 +159,16 @@ export default function ProfilePage() {
             <p className="font-medium text-chalk">In-store only — no shipping</p>
             <ul className="mt-2 space-y-1">
               <li>
-                <span className="text-amber-300">Pending</span> — payment has not been made yet
+                <span className="text-amber-300">Pending payment</span> — not paid yet
               </li>
               <li>
-                <span className="text-sky-300">Processing</span> — at Ballard&apos;s; come in for
-                drilling
+                <span className="text-sky-300">Balls in</span> — your balls are at Ballard&apos;s
               </li>
               <li>
-                <span className="text-teal-300">Ready</span> — come in for drilling / pickup
+                <span className="text-teal-300">Come do drilling</span> — come in and get drilled
               </li>
               <li>
-                <span className="text-emerald-300">Completed</span> — picked up in person
+                <span className="text-emerald-300">Order complete</span> — drilled and picked up
               </li>
             </ul>
           </div>

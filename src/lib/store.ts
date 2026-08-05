@@ -1628,6 +1628,16 @@ export async function listAllOrders() {
   return (await getStore()).orders || [];
 }
 
+/** Wipe every order record (Ops reset). Catalog/stock unchanged. */
+export async function clearAllOrders() {
+  let removed = 0;
+  await mutate((data) => {
+    removed = (data.orders || []).length;
+    data.orders = [];
+  });
+  return removed;
+}
+
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   return updateOrderFulfillment(id, { status });
 }

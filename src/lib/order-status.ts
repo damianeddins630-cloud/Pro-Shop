@@ -1,7 +1,7 @@
 import type { OrderStatus } from "@/lib/types";
 
 export type MemberOrderStatus = {
-  key: "pending" | "processing" | "ready" | "completed" | "cancelled";
+  key: "pending" | "balls_in" | "come_drill" | "completed" | "cancelled";
   label: string;
   detail: string;
   tone: "pending" | "processing" | "ready" | "completed" | "cancelled";
@@ -15,41 +15,44 @@ export type OpsPipelineStep = {
   tone: MemberOrderStatus["tone"];
 };
 
-/** Full house / pro-shop fulfillment pipeline shown in Ops */
+/**
+ * Simple house flow:
+ * Pending pay → Balls in → Come do drilling → Order complete
+ */
 export const OPS_PIPELINE: OpsPipelineStep[] = [
   {
     value: "awaiting_payment",
     label: "Pending payment",
     short: "Pay",
-    help: "Shopify invoice open — not paid yet",
+    help: "Not paid yet",
     tone: "pending",
   },
   {
     value: "placed",
-    label: "Received",
+    label: "Balls in",
     short: "In",
-    help: "Paid / received — queue for the drill bay",
+    help: "Balls / items are in — waiting for customer to come drill",
     tone: "processing",
   },
   {
     value: "processing",
-    label: "In prep",
-    short: "Drill",
-    help: "In-store prep / drilling — customer must come in",
+    label: "Balls in",
+    short: "In",
+    help: "Balls / items are in — waiting for customer to come drill",
     tone: "processing",
   },
   {
     value: "ready",
-    label: "Ready",
-    short: "Ready",
-    help: "Ready at the pro shop — customer comes in for drilling/pickup",
+    label: "Come do drilling",
+    short: "Drill",
+    help: "Customer needs to come in and do drilling",
     tone: "ready",
   },
   {
     value: "completed",
-    label: "Completed",
+    label: "Order complete",
     short: "Done",
-    help: "Handed off in person — no shipping",
+    help: "Drilling done / handed off — order complete",
     tone: "completed",
   },
   {
@@ -61,10 +64,20 @@ export const OPS_PIPELINE: OpsPipelineStep[] = [
   },
 ];
 
-/** Active fulfillment steps (excludes cancelled) */
+/** Customer + Ops visual stepper (3 main steps after payment) */
+export const CUSTOMER_PIPELINE: {
+  key: "balls_in" | "come_drill" | "completed";
+  label: string;
+  short: string;
+}[] = [
+  { key: "balls_in", label: "Balls in", short: "In" },
+  { key: "come_drill", label: "Come do drilling", short: "Drill" },
+  { key: "completed", label: "Order complete", short: "Done" },
+];
+
+/** Active fulfillment steps for Ops filter strip */
 export const ACTIVE_PIPELINE: OrderStatus[] = [
   "awaiting_payment",
-  "placed",
   "processing",
   "ready",
   "completed",
@@ -77,11 +90,11 @@ export function opsStatusMeta(status: OrderStatus): OpsPipelineStep {
   );
 }
 
-/** Suggested next status for one-tap advance in Ops */
+/** One-tap advance: Pay → Balls in → Come do drilling → Order complete */
 export function nextOpsStatus(status: OrderStatus): OrderStatus | null {
   switch (status) {
     case "awaiting_payment":
-      return "placed";
+      return "processing";
     case "placed":
       return "processing";
     case "processing":
@@ -99,32 +112,30 @@ export function memberOrderStatus(status: OrderStatus): MemberOrderStatus {
     case "awaiting_payment":
       return {
         key: "pending",
-        label: "Pending",
+        label: "Pending payment",
         detail: "Payment has not been completed yet.",
         tone: "pending",
       };
     case "placed":
     case "processing":
       return {
-        key: "processing",
-        label: "Processing",
-        detail:
-          "Your order is at Ballard's. Come in for drilling — we do not ship.",
+        key: "balls_in",
+        label: "Balls in",
+        detail: "Your balls are in at Ballard's. Next: come in and do drilling.",
         tone: "processing",
       };
     case "ready":
       return {
-        key: "ready",
-        label: "Ready",
-        detail:
-          "Ready at Ballard's. Come in for drilling and pickup — in-store only.",
+        key: "come_drill",
+        label: "Come do drilling",
+        detail: "Come in to Ballard's and do your drilling. In-store only — no shipping.",
         tone: "ready",
       };
     case "completed":
       return {
         key: "completed",
-        label: "Completed",
-        detail: "Picked up in person at the pro shop.",
+        label: "Order complete",
+        detail: "Order complete — drilled and picked up at the pro shop.",
         tone: "completed",
       };
     case "cancelled":
@@ -153,7 +164,23 @@ export function statusToneClass(tone: MemberOrderStatus["tone"]) {
   }
 }
 
+/** Index into CUSTOMER_PIPELINE for the stepper UI */
+export function customerPipelineIndex(status: OrderStatus): number {
+  switch (status) {
+    case "awaiting_payment":
+      return -1;
+    case "placed":
+    case "processing":
+      return 0;
+    case "ready":
+      return 1;
+    case "completed":
+      return 2;
+    default:
+      return -1;
+  }
+}
+
 export function pipelineStepIndex(status: OrderStatus) {
-  const idx = ACTIVE_PIPELINE.indexOf(status);
-  return idx === -1 ? -1 : idx;
+  return customerPipelineIndex(status);
 }

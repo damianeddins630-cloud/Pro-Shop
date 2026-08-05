@@ -56,7 +56,7 @@ export async function GET(_req: Request, { params }: Params) {
         phoneNumber,
         fulfillment: "in_store" as const,
       },
-      policy: "In-store only. No shipping. Come in for drilling and pickup.",
+      policy: "In-store only. No shipping. Come in for drilling.",
     },
     { headers: noStore }
   );

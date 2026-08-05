@@ -3,10 +3,10 @@
 export const STORE_NAME = "Ballard's Bowling Academy Pro Shop";
 
 export const IN_STORE_POLICY =
-  "In-store only. No shipping. Buy online, then come in for drilling and pickup.";
+  "In-store only. No shipping. Buy online, then come in for drilling.";
 
 export const IN_STORE_SHORT =
-  "Come in for drilling & pickup — we do not ship.";
+  "Come in for drilling — we do not ship.";
 
 export type JourneyStep = {
   n: string;
@@ -19,22 +19,22 @@ export const CUSTOMER_JOURNEY: JourneyStep[] = [
   {
     n: "01",
     title: "Buy online",
-    text: "Choose your ball and weight. Pay securely on this site.",
+    text: "Choose your ball and weight. Pay on this site.",
   },
   {
     n: "02",
-    title: "Come in",
-    text: "Visit Ballard's — there is no shipping. Everything is in-store.",
+    title: "Balls in",
+    text: "Your order shows Balls in when it is at Ballard's.",
   },
   {
     n: "03",
-    title: "Get drilled",
-    text: "We drill your ball at the pro shop to your specs.",
+    title: "Come do drilling",
+    text: "Come into the pro shop and get your ball drilled. No shipping.",
   },
   {
     n: "04",
-    title: "Take it home",
-    text: "When status shows Ready / Completed, your gear is yours.",
+    title: "Order complete",
+    text: "When drilling is done and you pick up, the order is complete.",
   },
 ];
 
@@ -47,23 +47,18 @@ export const STAFF_WORKFLOW: JourneyStep[] = [
   },
   {
     n: "2",
-    title: "Received",
-    text: "Paid / recorded — queue for the drill bay.",
+    title: "Balls in",
+    text: "Paid / on the shelf — waiting for the customer.",
   },
   {
     n: "3",
-    title: "In prep",
-    text: "Measuring / drilling / finishing in the shop.",
+    title: "Come do drilling",
+    text: "Customer comes in for drilling at the pro shop.",
   },
   {
     n: "4",
-    title: "Ready",
-    text: "Customer can come in — notify them if needed.",
-  },
-  {
-    n: "5",
-    title: "Completed",
-    text: "Handed off in person at the pro shop.",
+    title: "Order complete",
+    text: "Drilled and handed off — done.",
   },
 ];
 

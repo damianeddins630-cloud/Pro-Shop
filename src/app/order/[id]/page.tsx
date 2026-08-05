@@ -7,10 +7,9 @@ import { useEffect, useState } from "react";
 import { InStoreVisitCard } from "@/components/InStoreVisitCard";
 import { IN_STORE_POLICY } from "@/lib/in-store";
 import {
-  ACTIVE_PIPELINE,
+  CUSTOMER_PIPELINE,
+  customerPipelineIndex,
   memberOrderStatus,
-  opsStatusMeta,
-  pipelineStepIndex,
   statusToneClass,
 } from "@/lib/order-status";
 import type { Order } from "@/lib/types";
@@ -74,7 +73,7 @@ export default function OrderDetailPage() {
   }
 
   const member = memberOrderStatus(order.status);
-  const step = pipelineStepIndex(order.status);
+  const step = customerPipelineIndex(order.status);
 
   return (
     <section className="site-shell section-pad pt-24 space-y-8">
@@ -101,18 +100,17 @@ export default function OrderDetailPage() {
         <p className="text-xs tracking-[0.18em] text-mist uppercase">
           Progress
         </p>
-        <div className="ops-pipeline mt-4">
-          {ACTIVE_PIPELINE.map((status, idx) => {
-            const s = opsStatusMeta(status);
+        <div className="ops-pipeline ops-pipeline-3 mt-4">
+          {CUSTOMER_PIPELINE.map((s, idx) => {
             const done = step >= 0 && idx < step;
             const current = step === idx;
             return (
               <div
-                key={status}
+                key={s.key}
                 className={`ops-pipeline-step ${done ? "is-done" : ""} ${current ? "is-current" : ""}`}
               >
                 <div className="ops-pipeline-dot" />
-                <p className="ops-pipeline-label">{s.short}</p>
+                <p className="ops-pipeline-label">{s.label}</p>
               </div>
             );
           })}
