@@ -53,7 +53,7 @@ function LoginForm() {
         </p>
         <h1 className="display mt-2 text-5xl md:text-6xl">Login</h1>
         <p className="mt-2 text-sm text-mist">
-          Use your username or email + password. You must be logged in to buy.
+          Use your username or email + password. Login is required to checkout.
         </p>
       </div>
 

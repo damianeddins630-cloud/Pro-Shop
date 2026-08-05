@@ -2,34 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { useCart } from "@/lib/cart";
-import { useEditMode } from "@/lib/edit-mode";
 import { ProductPrice } from "@/components/ProductPrice";
-import { goToCart } from "@/lib/shop-nav";
 import { productRequiresWeight } from "@/lib/weights";
 
 export function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
-  const { user, loading } = useEditMode();
-  const router = useRouter();
   const out = product.stock <= 0;
   const needsWeight = productRequiresWeight(product);
-
-  function onBuy() {
-    if (loading) return;
-    if (needsWeight) {
-      router.push(`/shop/${product.slug}`);
-      return;
-    }
-    if (!user) {
-      router.push(`/login?next=${encodeURIComponent(`/shop/${product.slug}`)}`);
-      return;
-    }
-    add(product.id);
-    goToCart();
-  }
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-red/40 hover:bg-white/[0.05]">
@@ -64,20 +45,29 @@ export function ProductCard({ product }: { product: Product }) {
         </p>
       </div>
       <div className="px-4 pb-4">
-        <button
-          type="button"
-          disabled={out || loading}
-          onClick={onBuy}
-          className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {out
-            ? "Sold out"
-            : needsWeight
-              ? "Choose weight"
-              : user
-                ? "Add to cart"
-                : "Login to buy"}
-        </button>
+        {out ? (
+          <button
+            type="button"
+            disabled
+            className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Sold out
+          </button>
+        ) : needsWeight ? (
+          <Link href={`/shop/${product.slug}`} className="btn btn-primary w-full">
+            Choose weight
+          </Link>
+        ) : (
+          <a
+            href="/cart"
+            className="btn btn-primary w-full"
+            onClick={() => {
+              add(product.id);
+            }}
+          >
+            Add to cart
+          </a>
+        )}
       </div>
     </article>
   );

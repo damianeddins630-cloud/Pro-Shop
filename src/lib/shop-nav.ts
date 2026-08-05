@@ -1,7 +1,15 @@
 /** Hard navigate to cart so add-to-cart always lands on /cart. */
 export function goToCart() {
   if (typeof window === "undefined") return;
-  window.location.assign("/cart");
+  // Defer one tick so the cart localStorage write commits before unload.
+  // Use href (not Next soft nav) so shoppers never stay on the product/shop page.
+  window.setTimeout(() => {
+    try {
+      window.location.href = "/cart";
+    } catch {
+      window.location.assign("/cart");
+    }
+  }, 10);
 }
 
 export function brandsMatch(productBrand: string, filterBrand: string) {

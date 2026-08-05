@@ -15,7 +15,7 @@ import {
   saveLocalInventory,
 } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
-import { brandsMatch, categoriesMatch, goToCart } from "@/lib/shop-nav";
+import { brandsMatch, categoriesMatch } from "@/lib/shop-nav";
 import { productRequiresWeight } from "@/lib/weights";
 
 type Filters = {
@@ -61,7 +61,7 @@ export function EditableProductGrid({
   );
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<"local" | "api" | "">("");
-  const { editMode: editing, user, loading: authLoading } = useEditMode();
+  const { editMode: editing } = useEditMode();
   const { add } = useCart();
   const router = useRouter();
 
@@ -113,21 +113,6 @@ export function EditableProductGrid({
       window.clearInterval(id);
     };
   }, [load]);
-
-  function onBuy(productId: string, slug: string, requiresWeight: boolean) {
-    if (authLoading) return;
-    // Weight-required balls must be chosen on the product page.
-    if (requiresWeight) {
-      router.push(`/shop/${slug}`);
-      return;
-    }
-    if (!user) {
-      router.push(`/login?next=${encodeURIComponent(`/shop/${slug}`)}`);
-      return;
-    }
-    add(productId);
-    goToCart();
-  }
 
   async function rename(id: string, name: string) {
     const res = await fetch(`/api/products/${id}`, {
@@ -249,22 +234,32 @@ export function EditableProductGrid({
               </div>
               {!editing && (
                 <div className="px-4 pb-4">
-                  <button
-                    type="button"
-                    disabled={out || authLoading}
-                    onClick={() =>
-                      onBuy(product.id, product.slug, needsWeight)
-                    }
-                    className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {out
-                      ? "Sold out"
-                      : needsWeight
-                        ? "Choose weight"
-                        : user
-                          ? "Add to cart"
-                          : "Login to buy"}
-                  </button>
+                  {out ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Sold out
+                    </button>
+                  ) : needsWeight ? (
+                    <Link
+                      href={`/shop/${product.slug}`}
+                      className="btn btn-primary w-full"
+                    >
+                      Choose weight
+                    </Link>
+                  ) : (
+                    <a
+                      href="/cart"
+                      className="btn btn-primary w-full"
+                      onClick={() => {
+                        add(product.id);
+                      }}
+                    >
+                      Add to cart
+                    </a>
+                  )}
                 </div>
               )}
             </article>
