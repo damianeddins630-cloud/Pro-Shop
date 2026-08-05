@@ -487,6 +487,27 @@ export function discardMemoryStore() {
   store.ready = null;
 }
 
+/**
+ * After Blob/Redis self-test succeeds, write the live catalog once so
+ * lastPersistOk flips true and Ops warning clears.
+ */
+export async function verifyDurablePersistWithLiveStore() {
+  const data = await getStore();
+  touchUpdatedAt(data);
+  const ok = await persist(data);
+  return {
+    ok,
+    persist: storePersistStatus(),
+  };
+}
+
+/** Let Ops self-test mark this instance as durable-verified. */
+export function markDurablePersistVerified(detail: string) {
+  const store = g();
+  store.lastPersistOk = true;
+  store.lastPersistDetail = detail;
+}
+
 export async function getStore(): Promise<StoreData> {
   const store = g();
 

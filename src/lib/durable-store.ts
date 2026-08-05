@@ -36,6 +36,11 @@ export function getLastPersistResult() {
   return lastPersistResult;
 }
 
+/** Mark backends verified after a successful Ops self-test / probe. */
+export function markPersistResult(result: PersistResult) {
+  lastPersistResult = result;
+}
+
 function redisConfigured() {
   return Boolean(
     process.env.UPSTASH_REDIS_REST_URL?.trim() &&
