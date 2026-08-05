@@ -57,6 +57,17 @@ const patchSchema = z.object({
   active: z.coerce.boolean().optional(),
   discountPercent: z.coerce.number().min(0).max(100).optional(),
   shopifyVariantId: z.string().optional(),
+  weightOptions: z
+    .array(z.coerce.number().positive().max(30))
+    .optional()
+    .nullable()
+    .transform((v) => {
+      if (v == null) return undefined;
+      const cleaned = [
+        ...new Set(v.map((n) => Math.round(n * 10) / 10)),
+      ].sort((a, b) => a - b);
+      return cleaned;
+    }),
 });
 
 export async function PUT(req: Request, { params }: Params) {
@@ -77,13 +88,14 @@ export async function PUT(req: Request, { params }: Params) {
       return persistFailedResponse("Product update");
     }
 
-    const priceChanged =
+    const catalogChanged =
       before &&
       (body.price !== undefined ||
         body.discountPercent !== undefined ||
         body.stock !== undefined ||
-        body.active !== undefined);
-    const voided = priceChanged ? await voidStaleShopifyInvoices() : 0;
+        body.active !== undefined ||
+        body.weightOptions !== undefined);
+    const voided = catalogChanged ? await voidStaleShopifyInvoices() : 0;
 
     const products = await listProducts({ includeInactive: true });
     return NextResponse.json(

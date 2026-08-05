@@ -78,6 +78,17 @@ const createSchema = z.object({
   active: z.coerce.boolean().optional(),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
   shopifyVariantId: z.string().optional(),
+  weightOptions: z
+    .array(z.coerce.number().positive().max(30))
+    .optional()
+    .nullable()
+    .transform((v) => {
+      if (!v) return undefined;
+      const cleaned = [
+        ...new Set(v.map((n) => Math.round(n * 10) / 10)),
+      ].sort((a, b) => a - b);
+      return cleaned.length ? cleaned : undefined;
+    }),
 });
 
 export async function POST(req: Request) {
@@ -107,6 +118,7 @@ export async function POST(req: Request) {
       featured: body.featured ?? false,
       active: body.active ?? true,
       shopifyVariantId: body.shopifyVariantId,
+      weightOptions: body.weightOptions,
     });
 
     if (!requireDurablePersistOrLocal()) {

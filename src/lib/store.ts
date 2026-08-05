@@ -840,11 +840,24 @@ export async function updateUser(
 }
 
 function normalizeProduct(p: Product): Product {
+  const weightOptions = (() => {
+    if (!Array.isArray(p.weightOptions)) return undefined;
+    const cleaned = [
+      ...new Set(
+        p.weightOptions
+          .map((n) => Number(n))
+          .filter((n) => Number.isFinite(n) && n > 0 && n <= 30)
+          .map((n) => Math.round(n * 10) / 10)
+      ),
+    ].sort((a, b) => a - b);
+    return cleaned.length ? cleaned : undefined;
+  })();
   return {
     ...p,
     price: Math.max(0, Number(p.price) || 0),
     discountPercent: Math.min(100, Math.max(0, Number(p.discountPercent) || 0)),
     stock: Math.max(0, Math.floor(Number(p.stock) || 0)),
+    weightOptions,
   };
 }
 
@@ -926,12 +939,17 @@ export async function updateProduct(id: string, patch: Partial<Product>) {
   await mutate((data) => {
     const idx = data.products.findIndex((p) => p.id === id);
     if (idx === -1) return;
-    data.products[idx] = normalizeProduct({
+    const next = normalizeProduct({
       ...data.products[idx],
       ...patch,
       id,
     });
-    updated = data.products[idx];
+    // Explicit empty weight list from Ops clears the requirement.
+    if (Array.isArray(patch.weightOptions) && patch.weightOptions.length === 0) {
+      delete next.weightOptions;
+    }
+    data.products[idx] = next;
+    updated = next;
   }, { catalog: true });
   return updated;
 }

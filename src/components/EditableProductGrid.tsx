@@ -15,6 +15,7 @@ import {
   saveLocalInventory,
 } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
+import { productRequiresWeight } from "@/lib/weights";
 
 type Filters = {
   brand?: string;
@@ -108,8 +109,13 @@ export function EditableProductGrid({
     };
   }, [load]);
 
-  function onBuy(productId: string, slug: string) {
+  function onBuy(productId: string, slug: string, requiresWeight: boolean) {
     if (authLoading) return;
+    // Weight-required balls must be chosen on the product page.
+    if (requiresWeight) {
+      router.push(`/shop/${slug}`);
+      return;
+    }
     if (!user) {
       router.push(`/login?next=${encodeURIComponent(`/shop/${slug}`)}`);
       return;
@@ -195,6 +201,7 @@ export function EditableProductGrid({
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {products.map((product) => {
           const out = product.stock <= 0;
+          const needsWeight = productRequiresWeight(product);
           return (
             <article
               key={product.id}
@@ -225,6 +232,9 @@ export function EditableProductGrid({
                 <ProductPrice product={product} />
                 <p className="text-xs text-mist/80">
                   {out ? "Out of stock" : `${product.stock} in stock`}
+                  {needsWeight
+                    ? ` · ${(product.weightOptions || []).join("/")} lb`
+                    : ""}
                 </p>
                 <ItemControls onRemove={() => remove(product.id)} />
               </div>
@@ -233,10 +243,18 @@ export function EditableProductGrid({
                   <button
                     type="button"
                     disabled={out || authLoading}
-                    onClick={() => onBuy(product.id, product.slug)}
+                    onClick={() =>
+                      onBuy(product.id, product.slug, needsWeight)
+                    }
                     className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {out ? "Sold out" : user ? "Add to cart" : "Login to buy"}
+                    {out
+                      ? "Sold out"
+                      : needsWeight
+                        ? "Choose weight"
+                        : user
+                          ? "Add to cart"
+                          : "Login to buy"}
                   </button>
                 </div>
               )}

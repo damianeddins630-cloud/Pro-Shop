@@ -167,7 +167,7 @@ export default function OpsOrdersPage() {
                 </div>
                 <ul className="mt-4 space-y-1 text-sm text-mist">
                   {order.items.map((item) => (
-                    <li key={`${order.id}-${item.productId}`}>
+                    <li key={`${order.id}-${item.productId}-${item.weight ?? "na"}-${item.name}`}>
                       {item.name} × {item.quantity} — ${item.price.toFixed(2)} each
                     </li>
                   ))}

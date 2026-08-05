@@ -92,6 +92,11 @@ export interface Product {
   image: string;
   featured: boolean;
   active: boolean;
+  /**
+   * Available ball weights in lbs (e.g. 14, 15, 16).
+   * When non-empty, shoppers must choose a weight bubble before adding to cart.
+   */
+  weightOptions?: number[];
   /** Optional Shopify variant GID/id if product is synced in Shopify */
   shopifyVariantId?: string;
 }
@@ -142,6 +147,8 @@ export interface OrderItem {
   price: number;
   quantity: number;
   image: string;
+  /** Selected ball weight in lbs when the product requires weight choice */
+  weight?: number;
 }
 
 export type OrderStatus =
@@ -229,6 +236,8 @@ export interface StoreData {
 export interface CartItem {
   productId: string;
   quantity: number;
+  /** Selected ball weight in lbs (required when product has weightOptions) */
+  weight?: number;
 }
 
 export interface SessionPayload {

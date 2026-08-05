@@ -15,7 +15,8 @@ import {
 } from "@/lib/inventory-client";
 import { savePendingCheckout } from "@/lib/pending-checkout";
 import { effectivePrice } from "@/lib/pricing";
-import type { Product } from "@/lib/types";
+import type { CartItem, Product } from "@/lib/types";
+import { cartLineKey, formatWeightLbs, productRequiresWeight } from "@/lib/weights";
 
 type AppliedCoupon = {
   code: string;
@@ -108,9 +109,18 @@ export default function CartPage() {
       return product ? { item, product } : null;
     })
     .filter(Boolean) as {
-    item: { productId: string; quantity: number };
+    item: CartItem;
     product: Product;
   }[];
+
+  const weightIssues = lines.filter(
+    ({ item, product }) =>
+      productRequiresWeight(product) &&
+      (item.weight == null ||
+        !(product.weightOptions || []).some(
+          (w) => Math.abs(w - (item.weight as number)) < 0.001
+        ))
+  );
 
   const subtotal = useMemo(() => total(products), [total, products]);
 
@@ -264,7 +274,8 @@ export default function CartPage() {
 
   const due = coupon ? coupon.total : subtotal;
   const paidCheckoutBlocked = due > 0 && !shopifyReady;
-  const checkoutDisabled = loading || authLoading || paidCheckoutBlocked;
+  const checkoutDisabled =
+    loading || authLoading || paidCheckoutBlocked || weightIssues.length > 0;
 
   const checkoutLabel = !user
     ? "Login to checkout"
@@ -319,9 +330,16 @@ export default function CartPage() {
       ) : (
         <div className="grid gap-8 lg:grid-cols-[1.4fr_0.8fr]">
           <div className="space-y-4">
+            {weightIssues.length > 0 ? (
+              <div className="rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                Select a weight on the product page for{" "}
+                {weightIssues.map(({ product }) => product.name).join(", ")}{" "}
+                before checkout.
+              </div>
+            ) : null}
             {lines.map(({ item, product }) => (
               <div
-                key={product.id}
+                key={cartLineKey(product.id, item.weight)}
                 className="flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4"
               >
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-black/30">
@@ -334,6 +352,19 @@ export default function CartPage() {
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold">{product.name}</h3>
+                  {item.weight != null ? (
+                    <p className="text-sm text-red">{formatWeightLbs(item.weight)}</p>
+                  ) : productRequiresWeight(product) ? (
+                    <p className="text-sm text-amber-200">
+                      Weight not selected —{" "}
+                      <Link
+                        href={`/shop/${product.slug}`}
+                        className="underline"
+                      >
+                        choose weight
+                      </Link>
+                    </p>
+                  ) : null}
                   <ProductPrice product={product} size="sm" />
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <input
@@ -346,14 +377,15 @@ export default function CartPage() {
                         if (!Number.isFinite(n)) return;
                         setQty(
                           product.id,
-                          Math.min(product.stock, Math.max(1, Math.floor(n)))
+                          Math.min(product.stock, Math.max(1, Math.floor(n))),
+                          item.weight
                         );
                       }}
                       className="field w-24"
                     />
                     <button
                       type="button"
-                      onClick={() => remove(product.id)}
+                      onClick={() => remove(product.id, item.weight)}
                       className="text-sm text-red-300 underline"
                     >
                       Remove

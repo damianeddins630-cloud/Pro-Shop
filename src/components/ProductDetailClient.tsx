@@ -10,6 +10,10 @@ import {
   pickNewestProducts,
 } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
+import {
+  formatWeightLbs,
+  productRequiresWeight,
+} from "@/lib/weights";
 
 export function ProductDetailClient({
   slug,
@@ -19,6 +23,7 @@ export function ProductDetailClient({
   initial: Product;
 }) {
   const [product, setProduct] = useState<Product>(initial);
+  const [selectedWeight, setSelectedWeight] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +62,21 @@ export function ProductDetailClient({
     };
   }, [slug]);
 
+  useEffect(() => {
+    const options = product.weightOptions || [];
+    if (!options.length) {
+      setSelectedWeight(null);
+      return;
+    }
+    setSelectedWeight((prev) =>
+      prev != null && options.some((w) => Math.abs(w - prev) < 0.001)
+        ? prev
+        : null
+    );
+  }, [product.id, product.weightOptions]);
+
   const out = product.stock <= 0;
+  const needsWeight = productRequiresWeight(product);
 
   return (
     <section className="site-shell section-pad pt-24">
@@ -85,8 +104,53 @@ export function ProductDetailClient({
             {out ? "Out of stock" : `${product.stock} in stock`} · {product.category}
           </p>
           <p className="mt-6 leading-relaxed text-mist">{product.description}</p>
+
+          {needsWeight ? (
+            <div className="mt-8">
+              <p className="text-sm font-medium text-chalk">
+                Select weight
+                {selectedWeight != null
+                  ? ` · ${formatWeightLbs(selectedWeight)}`
+                  : " · required"}
+              </p>
+              <div
+                className="mt-3 flex flex-wrap gap-2"
+                role="radiogroup"
+                aria-label="Ball weight"
+              >
+                {(product.weightOptions || []).map((weight) => {
+                  const selected =
+                    selectedWeight != null &&
+                    Math.abs(selectedWeight - weight) < 0.001;
+                  return (
+                    <button
+                      key={weight}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setSelectedWeight(weight)}
+                      className={`weight-bubble ${selected ? "is-selected" : ""}`}
+                    >
+                      {formatWeightLbs(weight)}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedWeight == null ? (
+                <p className="mt-2 text-xs text-mist">
+                  Choose the weight you want before adding to cart.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="mt-8">
-            <AddToCartButton productId={product.id} disabled={out} />
+            <AddToCartButton
+              productId={product.id}
+              disabled={out}
+              requireWeight={needsWeight}
+              weight={selectedWeight ?? undefined}
+            />
           </div>
         </div>
       </div>

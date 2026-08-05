@@ -446,6 +446,9 @@ export async function createShopifyCheckout(input: {
         { key: "website_product_id", value: String(item.productId) },
         { key: "website_order_id", value: input.localOrderId },
         { key: "website_unit_price", value: amount },
+        ...(item.weight != null
+          ? [{ key: "weight_lbs", value: String(item.weight) }]
+          : []),
       ],
     };
   });

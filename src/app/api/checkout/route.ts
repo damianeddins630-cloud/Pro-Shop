@@ -23,6 +23,11 @@ import {
 } from "@/lib/shopify";
 import { effectivePrice } from "@/lib/pricing";
 import type { OrderItem } from "@/lib/types";
+import {
+  isAllowedWeight,
+  lineDisplayName,
+  productRequiresWeight,
+} from "@/lib/weights";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +37,7 @@ const schema = z.object({
       z.object({
         productId: z.string().min(1),
         quantity: z.number().int().positive().max(999),
+        weight: z.number().positive().max(30).optional(),
       })
     )
     .min(1),
@@ -48,7 +54,7 @@ export async function GET() {
 
 /** Build line items from the live website catalog (prices + % discounts). */
 async function priceCartFromWebsite(
-  items: { productId: string; quantity: number }[]
+  items: { productId: string; quantity: number; weight?: number }[]
 ): Promise<
   | { ok: true; lineItems: OrderItem[]; subtotal: number }
   | { ok: false; status: number; body: Record<string, unknown> }
@@ -68,6 +74,16 @@ async function priceCartFromWebsite(
         },
       };
     }
+    if (productRequiresWeight(product) && !isAllowedWeight(product, item.weight)) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: `Choose a weight for ${product.name} before checkout.`,
+          code: "WEIGHT_REQUIRED",
+        },
+      };
+    }
     if (product.stock < item.quantity) {
       return {
         ok: false,
@@ -81,13 +97,15 @@ async function priceCartFromWebsite(
     const unitPrice = effectivePrice(product);
     lineItems.push({
       productId: product.id,
-      name:
-        (product.discountPercent || 0) > 0
-          ? `${product.name} (${product.discountPercent}% off)`
-          : product.name,
+      name: lineDisplayName(
+        product.name,
+        item.weight,
+        product.discountPercent
+      ),
       price: unitPrice,
       quantity: item.quantity,
       image: product.image,
+      ...(item.weight != null ? { weight: item.weight } : {}),
     });
     subtotal += unitPrice * item.quantity;
   }

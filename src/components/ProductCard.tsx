@@ -7,15 +7,21 @@ import type { Product } from "@/lib/types";
 import { useCart } from "@/lib/cart";
 import { useEditMode } from "@/lib/edit-mode";
 import { ProductPrice } from "@/components/ProductPrice";
+import { productRequiresWeight } from "@/lib/weights";
 
 export function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
   const { user, loading } = useEditMode();
   const router = useRouter();
   const out = product.stock <= 0;
+  const needsWeight = productRequiresWeight(product);
 
   function onBuy() {
     if (loading) return;
+    if (needsWeight) {
+      router.push(`/shop/${product.slug}`);
+      return;
+    }
     if (!user) {
       router.push(`/login?next=${encodeURIComponent(`/shop/${product.slug}`)}`);
       return;
@@ -42,6 +48,9 @@ export function ProductCard({ product }: { product: Product }) {
           <ProductPrice product={product} />
           <p className="text-xs text-mist/80">
             {out ? "Out of stock" : `${product.stock} in stock`}
+            {needsWeight
+              ? ` · ${(product.weightOptions || []).join("/")} lb`
+              : ""}
           </p>
         </div>
       </Link>
@@ -52,7 +61,13 @@ export function ProductCard({ product }: { product: Product }) {
           onClick={onBuy}
           className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {out ? "Sold out" : user ? "Add to cart" : "Login to buy"}
+          {out
+            ? "Sold out"
+            : needsWeight
+              ? "Choose weight"
+              : user
+                ? "Add to cart"
+                : "Login to buy"}
         </button>
       </div>
     </article>

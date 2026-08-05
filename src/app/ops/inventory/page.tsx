@@ -6,6 +6,11 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ProductPrice } from "@/components/ProductPrice";
 import { saveLocalInventory } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
+import {
+  STANDARD_BALL_WEIGHTS,
+  formatWeightLbs,
+  normalizeWeightOptions,
+} from "@/lib/weights";
 
 const empty = {
   name: "",
@@ -18,6 +23,8 @@ const empty = {
   image: "",
   featured: false,
   active: true,
+  weightOptions: [] as number[],
+  customWeight: "",
 };
 
 export default function OpsInventoryPage() {
@@ -62,6 +69,7 @@ export default function OpsInventoryPage() {
       setError("Price, discount, and stock must be numbers. $0 is allowed.");
       return;
     }
+    const weightOptions = normalizeWeightOptions(form.weightOptions) || [];
     const payload = {
       name: form.name.trim(),
       description: form.description,
@@ -73,6 +81,7 @@ export default function OpsInventoryPage() {
       image: form.image.trim() || "/images/logo.png",
       featured: form.featured,
       active: form.active,
+      weightOptions,
     };
     const res = await fetch(editingId ? `/api/products/${editingId}` : "/api/products", {
       method: editingId ? "PUT" : "POST",
@@ -265,6 +274,136 @@ export default function OpsInventoryPage() {
             value={form.image}
             onChange={(e) => setForm({ ...form, image: e.target.value })}
           />
+
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-chalk">Ball weights</p>
+                <p className="mt-1 text-xs text-mist">
+                  Tap to add or remove. When any weight is set, shoppers must
+                  choose a bubble before buying.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="text-xs text-red underline"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      weightOptions: [...STANDARD_BALL_WEIGHTS],
+                    })
+                  }
+                >
+                  Add 8–16 lb
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-mist underline"
+                  onClick={() => setForm({ ...form, weightOptions: [] })}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {STANDARD_BALL_WEIGHTS.map((weight) => {
+                const on = form.weightOptions.some(
+                  (w) => Math.abs(w - weight) < 0.001
+                );
+                return (
+                  <button
+                    key={weight}
+                    type="button"
+                    className={`weight-bubble ${on ? "is-selected" : ""}`}
+                    onClick={() => {
+                      const next = on
+                        ? form.weightOptions.filter(
+                            (w) => Math.abs(w - weight) >= 0.001
+                          )
+                        : [...form.weightOptions, weight].sort((a, b) => a - b);
+                      setForm({ ...form, weightOptions: next });
+                    }}
+                  >
+                    {formatWeightLbs(weight)}
+                  </button>
+                );
+              })}
+            </div>
+            {form.weightOptions.some(
+              (w) =>
+                !STANDARD_BALL_WEIGHTS.some((s) => Math.abs(s - w) < 0.001)
+            ) ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {form.weightOptions
+                  .filter(
+                    (w) =>
+                      !STANDARD_BALL_WEIGHTS.some(
+                        (s) => Math.abs(s - w) < 0.001
+                      )
+                  )
+                  .map((weight) => (
+                    <button
+                      key={`custom-${weight}`}
+                      type="button"
+                      className="weight-bubble is-selected"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          weightOptions: form.weightOptions.filter(
+                            (w) => Math.abs(w - weight) >= 0.001
+                          ),
+                        })
+                      }
+                      title="Remove custom weight"
+                    >
+                      {formatWeightLbs(weight)} ×
+                    </button>
+                  ))}
+              </div>
+            ) : null}
+            <div className="mt-3 flex gap-2">
+              <input
+                className="field"
+                inputMode="decimal"
+                placeholder="Custom lb"
+                value={form.customWeight}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    customWeight: e.target.value.replace(/[^0-9.]/g, ""),
+                  })
+                }
+              />
+              <button
+                type="button"
+                className="btn btn-ghost shrink-0 !py-2"
+                onClick={() => {
+                  const n = Number(form.customWeight);
+                  if (!Number.isFinite(n) || n <= 0 || n > 30) return;
+                  const rounded = Math.round(n * 10) / 10;
+                  if (
+                    form.weightOptions.some(
+                      (w) => Math.abs(w - rounded) < 0.001
+                    )
+                  ) {
+                    setForm({ ...form, customWeight: "" });
+                    return;
+                  }
+                  setForm({
+                    ...form,
+                    customWeight: "",
+                    weightOptions: [...form.weightOptions, rounded].sort(
+                      (a, b) => a - b
+                    ),
+                  });
+                }}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
           <label className="flex items-center gap-2 text-sm text-mist">
             <input
               type="checkbox"
@@ -317,6 +456,9 @@ export default function OpsInventoryPage() {
                   <p className="text-xs text-mist">
                     Stock {p.stock}
                     {!p.active ? " · hidden" : ""}
+                    {p.weightOptions?.length
+                      ? ` · weights ${p.weightOptions.join("/")} lb`
+                      : ""}
                   </p>
                   <div className="mt-2 flex gap-3">
                     <button
@@ -335,6 +477,8 @@ export default function OpsInventoryPage() {
                           image: p.image,
                           featured: p.featured,
                           active: p.active,
+                          weightOptions: p.weightOptions || [],
+                          customWeight: "",
                         });
                       }}
                     >

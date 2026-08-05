@@ -16,6 +16,11 @@ import {
 } from "@/lib/shopify";
 import { effectivePrice } from "@/lib/pricing";
 import type { OrderItem } from "@/lib/types";
+import {
+  isAllowedWeight,
+  lineDisplayName,
+  productRequiresWeight,
+} from "@/lib/weights";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +78,15 @@ export async function POST(_req: Request, { params }: Params) {
         { status: 400 }
       );
     }
+    if (productRequiresWeight(product) && !isAllowedWeight(product, item.weight)) {
+      return NextResponse.json(
+        {
+          error: `Choose a weight for ${product.name} before checkout.`,
+          code: "WEIGHT_REQUIRED",
+        },
+        { status: 400 }
+      );
+    }
     if (product.stock < item.quantity) {
       return NextResponse.json(
         {
@@ -85,13 +99,15 @@ export async function POST(_req: Request, { params }: Params) {
     const unitPrice = effectivePrice(product);
     lineItems.push({
       productId: product.id,
-      name:
-        (product.discountPercent || 0) > 0
-          ? `${product.name} (${product.discountPercent}% off)`
-          : product.name,
+      name: lineDisplayName(
+        product.name,
+        item.weight,
+        product.discountPercent
+      ),
       price: unitPrice,
       quantity: item.quantity,
       image: product.image,
+      ...(item.weight != null ? { weight: item.weight } : {}),
     });
     subtotal += unitPrice * item.quantity;
   }
