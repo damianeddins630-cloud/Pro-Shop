@@ -148,6 +148,12 @@ function SuccessInner() {
             </span>
           </p>
         )}
+        {order?.items.some((i) => i.weight != null) ? (
+          <p className="mt-4 text-sm text-mist">
+            Remember: drilling is in-store only. Come in to Ballard&apos;s for
+            drilling — we do not ship balls already drilled.
+          </p>
+        ) : null}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/profile" className="btn btn-primary">
             View my account
