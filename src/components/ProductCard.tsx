@@ -44,24 +44,25 @@ export function ProductCard({ product }: { product: Product }) {
             unoptimized
           />
         </div>
-        <div className="space-y-1 p-4">
-          <Link
-            href={`/shop?brand=${encodeURIComponent(product.brand)}#inventory`}
-            className="text-xs tracking-[0.14em] text-red uppercase hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {product.brand}
-          </Link>
-          <h3 className="text-lg font-semibold text-chalk">{product.name}</h3>
-          <ProductPrice product={product} />
-          <p className="text-xs text-mist/80">
-            {out ? "Out of stock" : `${product.stock} in stock`}
-            {needsWeight
-              ? ` · ${(product.weightOptions || []).join("/")} lb`
-              : ""}
-          </p>
-        </div>
       </Link>
+      <div className="space-y-1 p-4">
+        <Link
+          href={`/shop?brand=${encodeURIComponent(product.brand)}#inventory`}
+          className="text-xs tracking-[0.14em] text-red uppercase hover:underline"
+        >
+          {product.brand}
+        </Link>
+        <Link href={`/shop/${product.slug}`} className="block">
+          <h3 className="text-lg font-semibold text-chalk">{product.name}</h3>
+        </Link>
+        <ProductPrice product={product} />
+        <p className="text-xs text-mist/80">
+          {out ? "Out of stock" : `${product.stock} in stock`}
+          {needsWeight
+            ? ` · ${(product.weightOptions || []).join("/")} lb`
+            : ""}
+        </p>
+      </div>
       <div className="px-4 pb-4">
         <button
           type="button"
