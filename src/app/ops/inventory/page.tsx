@@ -47,9 +47,23 @@ export default function OpsInventoryPage() {
     const list = data.products || [];
     setProducts(list);
     if (data.persist?.lastPersistOk === false) {
-      setPersistWarning(
-        `Durable save is broken (${data.persist.lastPersistDetail || "unknown"}). Fixes will not stick for shoppers until Redis/Blob/GITHUB_TOKEN works.`
-      );
+      const detail = String(data.persist.lastPersistDetail || "unknown");
+      const coldStart = detail.includes("No durable save verified");
+      const blobOk = Boolean(data.persist.backends?.blob?.ok);
+      // Cold instance + Blob already readable (or write-configured) is not "broken".
+      if (coldStart && (blobOk || data.persist.durableWriteConfigured)) {
+        setPersistWarning("");
+        saveLocalInventory(list, data.updatedAt);
+      } else if (blobOk) {
+        setPersistWarning(
+          `Optional backups offline (${detail}). Blob is working — price/stock changes still stick for shoppers.`
+        );
+        saveLocalInventory(list, data.updatedAt);
+      } else {
+        setPersistWarning(
+          `Durable save is broken (${detail}). Fixes will not stick for shoppers until Blob (or Redis/GITHUB_TOKEN) works.`
+        );
+      }
     } else {
       setPersistWarning("");
       saveLocalInventory(list, data.updatedAt);

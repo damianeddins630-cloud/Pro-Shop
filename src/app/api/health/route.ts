@@ -16,12 +16,20 @@ export async function GET() {
     const anyBackendOk = Boolean(
       backends.redis?.ok || backends.blob?.ok || backends.github?.ok
     );
+    const coldUnverified =
+      !persist.lastPersistOk &&
+      String(persist.lastPersistDetail || "").includes(
+        "No durable save verified"
+      );
     let warning: string | null = null;
     if (!persist.durableWriteConfigured) {
       warning =
         "No durable storage configured — Ops price/stock/account saves will disappear. Add UPSTASH_REDIS_REST_URL + TOKEN (or BLOB / GITHUB_TOKEN) in Vercel.";
-    } else if (!persist.lastPersistOk || !anyBackendOk) {
-      warning = `Durable storage not verified yet (${persist.lastPersistDetail || "unknown"}). Connect Public Blob store Pro_shop_2026 to pro-shop-lemon, set BLOB_READ_WRITE_TOKEN + BLOB_STORE_ID, redeploy, then Ops → Inventory → Save one item (or /api/persist/self-test while logged in).`;
+    } else if (!persist.lastPersistOk && !coldUnverified && !anyBackendOk) {
+      // Real write/load failure — not a fresh-instance "not verified yet" false alarm.
+      warning = `Durable storage failed (${persist.lastPersistDetail || "unknown"}). Confirm Production env vars BLOB_READ_WRITE_TOKEN + BLOB_STORE_ID on pro-shop-lemon, redeploy, then run /api/persist/self-test while logged into Ops. Redis and GITHUB_TOKEN are optional when Blob works.`;
+    } else if (!persist.lastPersistOk && !anyBackendOk && coldUnverified) {
+      warning = `Durable storage configured but not confirmed on this instance yet (${persist.lastPersistDetail || "unknown"}). Open Ops → Inventory (loads Blob) or run /api/persist/self-test while logged in. Redis/GitHub are optional backups when Blob is working.`;
     } else if (!shopify.configured) {
       warning =
         "Shopify is not connected — open Ops → Shopify and click Save Connect / Refresh status.";

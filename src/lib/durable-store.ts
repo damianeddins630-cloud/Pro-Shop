@@ -498,6 +498,73 @@ async function saveBlobStore(data: StoreData): Promise<PersistBackendResult> {
   return { ok: false, error: errors.join(" | ") };
 }
 
+/**
+ * After a successful durable READ, upgrade cold-start backend status so Ops
+ * doesn't claim "broken" on a fresh Vercel instance that can already load Blob.
+ * Does not clear a real failed WRITE — only upgrades never-attempted state.
+ */
+function noteDurableLoadSources(sources: {
+  redis: StoreData | null;
+  github: StoreData | null;
+  blob: StoreData | null;
+}) {
+  const redisOk = Boolean(sources.redis);
+  const githubOk = Boolean(sources.github);
+  const blobOk = Boolean(sources.blob);
+  if (!redisOk && !githubOk && !blobOk) return;
+
+  const detail = [
+    `durableLoad redis=${redisOk}`,
+    `blob=${blobOk}`,
+    `github=${githubOk}`,
+  ].join("; ");
+
+  const prior = lastPersistResult.detail || "";
+  const neverVerified =
+    !lastPersistResult.ok &&
+    (prior.includes("No durable save") ||
+      prior.includes("attempted yet") ||
+      prior === "unknown" ||
+      !prior);
+
+  if (neverVerified || lastPersistResult.ok) {
+    lastPersistResult = {
+      ok: true,
+      redis: {
+        ok: redisOk,
+        error: redisOk
+          ? undefined
+          : redisConfigured()
+            ? "no data"
+            : "not configured",
+      },
+      blob: {
+        ok: blobOk,
+        error: blobOk
+          ? undefined
+          : blobConfigured()
+            ? "no data"
+            : "not configured",
+      },
+      github: {
+        ok: githubOk,
+        error: githubOk
+          ? undefined
+          : githubWriteConfigured()
+            ? "no data"
+            : "GITHUB_TOKEN not set",
+      },
+      detail,
+    };
+    return;
+  }
+
+  // Keep failed-write ok=false, but surface which backends are still readable.
+  if (blobOk) lastPersistResult.blob = { ok: true };
+  if (redisOk) lastPersistResult.redis = { ok: true };
+  if (githubOk) lastPersistResult.github = { ok: true };
+}
+
 /** Load full store JSON from GitHub / Upstash / Blob. */
 export async function loadDurableStore(): Promise<StoreData | null> {
   const [redis, github, blob] = await Promise.all([
@@ -505,6 +572,8 @@ export async function loadDurableStore(): Promise<StoreData | null> {
     loadGithubStore(),
     loadBlobStore(),
   ]);
+
+  noteDurableLoadSources({ redis, github, blob });
 
   const copies = [redis, github, blob].filter(Boolean) as StoreData[];
   if (!copies.length) return null;

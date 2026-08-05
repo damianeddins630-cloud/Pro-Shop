@@ -565,6 +565,23 @@ export async function getStore(): Promise<StoreData> {
   }
 
   if (remote) {
+    // Cold Vercel instances start with lastPersistOk=false even when Blob already
+    // has the live catalog. A successful durable load proves storage is live —
+    // clear the false "No durable save verified yet" Ops banner on this instance.
+    const coldDetail = store.lastPersistDetail || "";
+    if (
+      !store.lastPersistOk &&
+      (coldDetail.includes("No durable save verified") ||
+        coldDetail === "unknown")
+    ) {
+      const last = getLastPersistResult();
+      markDurablePersistVerified(
+        last.detail && last.detail !== "No durable save attempted yet"
+          ? last.detail
+          : "Durable store loaded on this instance (Blob/Redis/GitHub)"
+      );
+    }
+
     const merged = mergeWithSeed(remote);
     await ensureAdmin(merged);
     const remoteTs = storeUpdatedAtMs(merged);
