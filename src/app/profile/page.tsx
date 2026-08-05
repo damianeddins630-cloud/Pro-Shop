@@ -162,16 +162,20 @@ export default function ProfilePage() {
                 <span className="text-amber-300">Pending</span> — payment has not been made yet
               </li>
               <li>
-                <span className="text-sky-300">Processing</span> — order is being prepared (you
-                don’t have it yet)
+                <span className="text-sky-300">Processing</span> — order is being prepared; come
+                in for drilling (not shipped drilled)
               </li>
               <li>
-                <span className="text-teal-300">Ready</span> — ready for pickup / handoff
+                <span className="text-teal-300">Ready</span> — ready at the pro shop; come in for
+                drilling / pickup
               </li>
               <li>
                 <span className="text-emerald-300">Completed</span> — you have your ball (or item)
               </li>
             </ul>
+            <p className="mt-3 text-xs text-mist">
+              Ball drilling is in-store only at Ballard&apos;s Bowling Academy.
+            </p>
           </div>
           {ordersError && <p className="text-sm text-red-300">{ordersError}</p>}
           {orders.length === 0 ? (

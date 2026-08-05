@@ -35,14 +35,14 @@ export const OPS_PIPELINE: OpsPipelineStep[] = [
     value: "processing",
     label: "In prep",
     short: "Prep",
-    help: "Drilling, layout, or packing in progress",
+    help: "In prep — customer must come in for drilling",
     tone: "processing",
   },
   {
     value: "ready",
     label: "Ready",
     short: "Ready",
-    help: "Ready for pickup or handoff",
+    help: "Ready at the pro shop — come in for drilling / pickup",
     tone: "ready",
   },
   {
@@ -108,21 +108,23 @@ export function memberOrderStatus(status: OrderStatus): MemberOrderStatus {
       return {
         key: "processing",
         label: "Processing",
-        detail: "Your order is being prepared — you don’t have it yet.",
+        detail:
+          "Your order is being prepared. You must come in to the pro shop for drilling — balls are not shipped drilled.",
         tone: "processing",
       };
     case "ready":
       return {
         key: "ready",
         label: "Ready",
-        detail: "Ready for pickup / handoff at the pro shop.",
+        detail:
+          "Ready at Ballard's — come in for drilling and pickup at the pro shop.",
         tone: "ready",
       };
     case "completed":
       return {
         key: "completed",
         label: "Completed",
-        detail: "You have your ball (or item).",
+        detail: "You have your ball (or item) from the pro shop.",
         tone: "completed",
       };
     case "cancelled":

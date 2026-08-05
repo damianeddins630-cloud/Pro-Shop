@@ -168,6 +168,10 @@ export function ProductDetailClient({
                   Choose the weight you want before adding to cart.
                 </p>
               ) : null}
+              <p className="mt-3 text-sm text-chalk">
+                Drilling is in-store only — you must come in to Ballard&apos;s
+                for drilling after purchase.
+              </p>
             </div>
           ) : null}
 

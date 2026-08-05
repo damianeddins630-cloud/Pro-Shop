@@ -342,6 +342,13 @@ export default function CartPage() {
                 before checkout.
               </div>
             ) : null}
+            {lines.some(({ product }) => productRequiresWeight(product)) ? (
+              <div className="rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-mist">
+                <span className="font-medium text-chalk">In-store drilling:</span>{" "}
+                Ball purchases require you to come in to Ballard&apos;s for
+                drilling. We do not ship balls already drilled.
+              </div>
+            ) : null}
             {lines.map(({ item, product }) => (
               <div
                 key={cartLineKey(product.id, item.weight)}
