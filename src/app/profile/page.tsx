@@ -34,8 +34,12 @@ export default function ProfilePage() {
             const oRes = await fetch("/api/orders", { cache: "no-store" });
             const o = await oRes.json();
             if (!cancelled) {
-              if (oRes.ok) setOrders(o.orders || []);
-              else setOrdersError(o.error || "Could not load orders");
+              if (oRes.ok) {
+                const list = (o.orders || []) as Order[];
+                setOrders(list);
+                // Stay on account if they have no real purchases.
+                if (!list.length) setTab("account");
+              } else setOrdersError(o.error || "Could not load orders");
             }
           } catch {
             if (!cancelled) setOrdersError("Could not load orders");
@@ -102,18 +106,30 @@ export default function ProfilePage() {
           <h1 className="display text-5xl">{view.username}</h1>
         </div>
         <div className="flex gap-2">
-          {(["account", "orders"] as Tab[]).map((t) => (
+          <button
+            type="button"
+            onClick={() => setTab("account")}
+            className={`rounded-full px-4 py-2 text-sm capitalize ${
+              tab === "account"
+                ? "bg-red text-white font-bold"
+                : "border border-white/15 text-mist"
+            }`}
+          >
+            Account
+          </button>
+          {orders.length > 0 ? (
             <button
-              key={t}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => setTab("orders")}
               className={`rounded-full px-4 py-2 text-sm capitalize ${
-                tab === t ? "bg-red text-white font-bold" : "border border-white/15 text-mist"
+                tab === "orders"
+                  ? "bg-red text-white font-bold"
+                  : "border border-white/15 text-mist"
               }`}
             >
-              {t === "orders" ? "Previous orders" : "Account"}
+              Previous orders ({orders.length})
             </button>
-          ))}
+          ) : null}
         </div>
       </div>
 
@@ -175,7 +191,10 @@ export default function ProfilePage() {
           {ordersError && <p className="text-sm text-red-300">{ordersError}</p>}
           {orders.length === 0 ? (
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
-              <p className="text-mist">No previous orders yet.</p>
+              <p className="text-mist">
+                Orders show here only after you buy. Unpaid checkouts are not
+                saved in your history.
+              </p>
               <Link href="/shop" className="btn btn-primary mt-6">
                 Browse the shop
               </Link>

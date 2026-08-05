@@ -43,6 +43,7 @@ import {
   totalFromWeightStock,
   weightKey,
 } from "./weights";
+import { isPurchasedOrder } from "./order-status";
 import {
   CUSTOM_ROLE_RANK_DEFAULT,
   CUSTOMER_ROLE_ID,
@@ -1630,7 +1631,9 @@ export async function findOrderByShopifyDraftId(draftId: string) {
 
 export async function listOrdersForUser(userId: string) {
   const data = await getStore();
-  return (data.orders || []).filter((o) => o.userId === userId);
+  return (data.orders || []).filter(
+    (o) => o.userId === userId && isPurchasedOrder(o)
+  );
 }
 
 export async function listAllOrders() {

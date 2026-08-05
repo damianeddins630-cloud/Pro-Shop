@@ -8,6 +8,7 @@ import {
   storePersistStatus,
   updateUser,
 } from "@/lib/store";
+import { isPurchasedOrder } from "@/lib/order-status";
 import { actorRankFromSession } from "@/lib/role-rank";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,9 @@ async function publicUsersList() {
 
   for (const u of users) {
     try {
-      const userOrders = orders.filter((o) => o.userId === u.id);
+      const userOrders = orders.filter(
+        (o) => o.userId === u.id && isPurchasedOrder(o)
+      );
       const last = userOrders[0];
       publicUsers.push(
         await toPublicUser(u, {

@@ -1,4 +1,17 @@
-import type { OrderStatus } from "@/lib/types";
+import type { Order, OrderStatus } from "@/lib/types";
+
+/** Real purchase — hide unpaid Shopify drafts and cancelled never-paid rows from customers. */
+export function isPurchasedOrder(order: Pick<Order, "status" | "inventoryApplied">) {
+  if (order.status === "awaiting_payment") return false;
+  if (order.status === "cancelled" && !order.inventoryApplied) return false;
+  return (
+    order.inventoryApplied === true ||
+    order.status === "placed" ||
+    order.status === "processing" ||
+    order.status === "ready" ||
+    order.status === "completed"
+  );
+}
 
 export type MemberOrderStatus = {
   key: "pending" | "balls_in" | "come_drill" | "completed" | "cancelled";
