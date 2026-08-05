@@ -21,7 +21,7 @@ export async function GET() {
       warning =
         "No durable storage configured — Ops price/stock/account saves will disappear. Add UPSTASH_REDIS_REST_URL + TOKEN (or BLOB / GITHUB_TOKEN) in Vercel.";
     } else if (!persist.lastPersistOk || !anyBackendOk) {
-      warning = `Durable storage not verified yet (${persist.lastPersistDetail || "unknown"}). Make sure Pro_Shop Blob is connected to pro-shop-lemon with BLOB_READ_WRITE_TOKEN, redeploy, then Ops → Inventory → Save one item (or open /api/persist/self-test while logged in).`;
+      warning = `Durable storage not verified yet (${persist.lastPersistDetail || "unknown"}). Connect Public Blob store Pro_shop_2026 to pro-shop-lemon, set BLOB_READ_WRITE_TOKEN + BLOB_STORE_ID, redeploy, then Ops → Inventory → Save one item (or /api/persist/self-test while logged in).`;
     } else if (!shopify.configured) {
       warning =
         "Shopify is not connected — open Ops → Shopify and click Save Connect / Refresh status.";

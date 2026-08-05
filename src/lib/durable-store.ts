@@ -47,6 +47,31 @@ function blobConfigured() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 }
 
+/** Public Pro_shop_2026 store id from Vercel env (also accepts common typo BLOD_STORE_ID). */
+function blobStoreId() {
+  return (
+    process.env.BLOB_STORE_ID?.trim() ||
+    process.env.BLOB_STOREID?.trim() ||
+    process.env.BLOD_STORE_ID?.trim() ||
+    ""
+  );
+}
+
+function blobAuthOptions() {
+  const storeId = blobStoreId();
+  return {
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+    ...(storeId ? { storeId } : {}),
+  };
+}
+
+/** Prefer public first for Pro_shop_2026 Public Blob store. */
+function blobAccessModes(): Array<"public" | "private"> {
+  const forced = (process.env.BLOB_ACCESS || "").trim().toLowerCase();
+  if (forced === "private") return ["private", "public"];
+  return ["public", "private"];
+}
+
 export function durableStoreConfigured() {
   return true;
 }
@@ -279,13 +304,30 @@ async function saveRedisStore(data: StoreData): Promise<PersistBackendResult> {
 
 async function readBlobJson(pathname: string): Promise<unknown | null> {
   if (!blobConfigured()) return null;
-  // Private store first (matches Vercel "Private" Blob stores like Pro_Shop)
-  for (const access of ["private", "public"] as const) {
+
+  // Public URL fetch first when we already know the blob URL
+  const knownUrl =
+    process.env.BBA_STORE_BLOB_URL?.trim() ||
+    (globalThis as typeof globalThis & { __bba_blob_url?: string }).__bba_blob_url;
+  if (knownUrl && pathname === BLOB_PATHNAME) {
+    try {
+      const res = await fetch(
+        `${knownUrl}${knownUrl.includes("?") ? "&" : "?"}cache=0&t=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      if (res.ok) return await res.json();
+    } catch {
+      // fall through to SDK
+    }
+  }
+
+  // Prefer public for Pro_shop_2026 Public store, then private fallback
+  for (const access of blobAccessModes()) {
     try {
       const result = await blobGet(pathname, {
         access,
         useCache: false,
-        token: process.env.BLOB_READ_WRITE_TOKEN,
+        ...blobAuthOptions(),
       });
       if (!result || result.statusCode === 304 || !result.stream) continue;
       const text = await new Response(result.stream).text();
@@ -312,10 +354,15 @@ async function loadBlobStore(): Promise<StoreData | null> {
     const listed = await blobList({
       prefix: BLOB_PATHNAME,
       limit: 10,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      ...blobAuthOptions(),
     });
     const hit = (listed.blobs || []).find((b) => b.pathname === BLOB_PATHNAME);
     if (!hit) return null;
+    if (hit.url) {
+      (
+        globalThis as typeof globalThis & { __bba_blob_url?: string }
+      ).__bba_blob_url = hit.url;
+    }
     const data = await readBlobJson(hit.pathname || hit.url);
     if (data && typeof data === "object") return data as StoreData;
   } catch {
@@ -330,16 +377,17 @@ async function saveBlobStore(data: StoreData): Promise<PersistBackendResult> {
   }
   const payload = JSON.stringify(data);
   const errors: string[] = [];
+  const storeHint = blobStoreId() ? `storeId=${blobStoreId()}` : "storeId=token-default";
 
-  // Private first — user's Pro_Shop Blob store is Private.
-  for (const access of ["private", "public"] as const) {
+  // Public first — Pro_shop_2026 is a Public Blob store.
+  for (const access of blobAccessModes()) {
     try {
       const putResult = await blobPut(BLOB_PATHNAME, payload, {
         access,
         contentType: "application/json",
         addRandomSuffix: false,
         allowOverwrite: true,
-        token: process.env.BLOB_READ_WRITE_TOKEN,
+        ...blobAuthOptions(),
       });
       if (putResult?.url) {
         (
@@ -347,14 +395,27 @@ async function saveBlobStore(data: StoreData): Promise<PersistBackendResult> {
         ).__bba_blob_url = putResult.url;
       }
 
-      // Read-after-write prove
-      const verify = await readBlobJson(BLOB_PATHNAME);
+      // Read-after-write prove (public URL or SDK get)
+      let verify = await readBlobJson(BLOB_PATHNAME);
+      if (!verify && putResult?.url) {
+        try {
+          const res = await fetch(
+            `${putResult.url}${putResult.url.includes("?") ? "&" : "?"}t=${Date.now()}`,
+            { cache: "no-store" }
+          );
+          if (res.ok) verify = await res.json();
+        } catch {
+          // ignore
+        }
+      }
       if (verify && typeof verify === "object") {
         return { ok: true };
       }
-      errors.push(`${access}:wrote-but-read-failed`);
+      errors.push(`${access}/${storeHint}:wrote-but-read-failed`);
     } catch (e) {
-      errors.push(`${access}:${e instanceof Error ? e.message : "error"}`);
+      errors.push(
+        `${access}/${storeHint}:${e instanceof Error ? e.message : "error"}`
+      );
     }
   }
 
@@ -456,7 +517,7 @@ export async function selfTestDurablePersist(): Promise<{
     }
   }
 
-  // Blob self-test: write/read a tiny private probe (does not touch live catalog)
+  // Blob self-test against Pro_shop_2026 Public store (tiny probe file only)
   let blobOk = false;
   let blobError: string | undefined = "not configured";
   if (blobConfigured()) {
@@ -464,31 +525,45 @@ export async function selfTestDurablePersist(): Promise<{
       const probeBody = JSON.stringify({
         t: new Date().toISOString(),
         ok: true,
+        store: "Pro_shop_2026",
       });
-      let wrote = false;
-      for (const access of ["private", "public"] as const) {
+      let wroteUrl = "";
+      for (const access of blobAccessModes()) {
         try {
-          await blobPut(BLOB_PROBE_PATH, probeBody, {
+          const putResult = await blobPut(BLOB_PROBE_PATH, probeBody, {
             access,
             contentType: "application/json",
             addRandomSuffix: false,
             allowOverwrite: true,
-            token: process.env.BLOB_READ_WRITE_TOKEN,
+            ...blobAuthOptions(),
           });
-          wrote = true;
+          wroteUrl = putResult.url || "";
           break;
         } catch (e) {
           blobError = `${access}:${e instanceof Error ? e.message : "put failed"}`;
         }
       }
-      if (wrote) {
-        const readBack = await readBlobJson(BLOB_PROBE_PATH);
+      if (wroteUrl || blobConfigured()) {
+        let readBack = await readBlobJson(BLOB_PROBE_PATH);
+        if (!readBack && wroteUrl) {
+          try {
+            const res = await fetch(
+              `${wroteUrl}${wroteUrl.includes("?") ? "&" : "?"}t=${Date.now()}`,
+              { cache: "no-store" }
+            );
+            if (res.ok) readBack = await res.json();
+          } catch {
+            // ignore
+          }
+        }
         blobOk = Boolean(
           readBack &&
             typeof readBack === "object" &&
             (readBack as { ok?: boolean }).ok === true
         );
-        blobError = blobOk ? undefined : "blob wrote but read-back failed";
+        blobError = blobOk
+          ? undefined
+          : `blob wrote but read-back failed (${blobStoreId() || "no-store-id"})`;
       }
     } catch (e) {
       blobError = e instanceof Error ? e.message : "blob self-test failed";

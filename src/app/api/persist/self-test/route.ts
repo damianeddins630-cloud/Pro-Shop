@@ -25,7 +25,7 @@ export async function POST() {
       persist: storePersistStatus(),
       help: result.ok
         ? "Durable storage is working — Ops price/stock/coupon saves should stick for every visitor."
-          : "Durable storage is NOT working. For your Private Blob store: Vercel → Storage → Pro_Shop → Connect project pro-shop-lemon → confirm BLOB_READ_WRITE_TOKEN is in Production env vars → Redeploy → run this self-test again while logged into Ops.",
+          : "Durable storage is NOT working. Connect Public Blob store Pro_shop_2026 to pro-shop-lemon, confirm Production env vars BLOB_READ_WRITE_TOKEN and BLOB_STORE_ID, Redeploy, then run this self-test again while logged into Ops.",
     },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );
