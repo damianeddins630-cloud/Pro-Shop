@@ -25,7 +25,7 @@ export async function POST() {
       persist: storePersistStatus(),
       help: result.ok
         ? "Durable storage is working — Ops price/stock/coupon saves should stick for every visitor."
-        : "Durable storage is NOT working. In Vercel → pro-shop-lemon → Settings → Environment Variables, set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (recommended), or BLOB_READ_WRITE_TOKEN + BBA_STORE_BLOB_URL, or GITHUB_TOKEN with repo write access. Redeploy after saving.",
+          : "Durable storage is NOT working. For your Private Blob store: Vercel → Storage → Pro_Shop → Connect project pro-shop-lemon → confirm BLOB_READ_WRITE_TOKEN is in Production env vars → Redeploy → run this self-test again while logged into Ops.",
     },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );

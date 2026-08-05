@@ -1,3 +1,4 @@
+import { get as blobGet, list as blobList, put as blobPut } from "@vercel/blob";
 import type { StoreData, User, Order, Role, Coupon, Subscriber } from "@/lib/types";
 import {
   githubWriteConfigured,
@@ -8,6 +9,7 @@ import {
 const REDIS_KEY = "bba:store:v1";
 const REDIS_CATALOG_KEY = "bba:catalog:v1";
 const BLOB_PATHNAME = "bba-store.json";
+const BLOB_PROBE_PATH = "bba-persist-probe.json";
 
 export type PersistBackendResult = {
   ok: boolean;
@@ -275,48 +277,49 @@ async function saveRedisStore(data: StoreData): Promise<PersistBackendResult> {
   };
 }
 
-async function listBlobUrl(): Promise<string | null> {
+async function readBlobJson(pathname: string): Promise<unknown | null> {
   if (!blobConfigured()) return null;
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN!;
-  try {
-    const res = await fetch(
-      `https://blob.vercel-storage.com?prefix=${encodeURIComponent(BLOB_PATHNAME)}&limit=10`,
-      {
-        headers: {
-          Authorization: `Bearer ${blobToken}`,
-          "x-api-version": "7",
-        },
-        cache: "no-store",
-      }
-    );
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      blobs?: { pathname?: string; url?: string }[];
-    };
-    const hit = (json.blobs || []).find(
-      (b) => b.pathname === BLOB_PATHNAME || b.url?.includes(BLOB_PATHNAME)
-    );
-    return hit?.url || null;
-  } catch {
-    return null;
+  // Private store first (matches Vercel "Private" Blob stores like Pro_Shop)
+  for (const access of ["private", "public"] as const) {
+    try {
+      const result = await blobGet(pathname, {
+        access,
+        useCache: false,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      if (!result || result.statusCode === 304 || !result.stream) continue;
+      const text = await new Response(result.stream).text();
+      if (!text) continue;
+      return JSON.parse(text);
+    } catch {
+      // try next access mode
+    }
   }
+  return null;
 }
 
 async function loadBlobStore(): Promise<StoreData | null> {
   if (!blobConfigured()) return null;
-  const known =
-    process.env.BBA_STORE_BLOB_URL?.trim() ||
-    (globalThis as typeof globalThis & { __bba_blob_url?: string }).__bba_blob_url ||
-    (await listBlobUrl());
-  if (!known) return null;
   try {
-    const res = await fetch(
-      `${known}${known.includes("?") ? "&" : "?"}cache=0&t=${Date.now()}`,
-      { cache: "no-store" }
-    );
-    if (res.ok) return (await res.json()) as StoreData;
+    const data = await readBlobJson(BLOB_PATHNAME);
+    if (data && typeof data === "object") return data as StoreData;
   } catch {
     // continue
+  }
+
+  // Fallback: list store and fetch by URL/pathname
+  try {
+    const listed = await blobList({
+      prefix: BLOB_PATHNAME,
+      limit: 10,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    const hit = (listed.blobs || []).find((b) => b.pathname === BLOB_PATHNAME);
+    if (!hit) return null;
+    const data = await readBlobJson(hit.pathname || hit.url);
+    if (data && typeof data === "object") return data as StoreData;
+  } catch {
+    // ignore
   }
   return null;
 }
@@ -325,57 +328,33 @@ async function saveBlobStore(data: StoreData): Promise<PersistBackendResult> {
   if (!blobConfigured()) {
     return { ok: false, error: "BLOB_READ_WRITE_TOKEN not set" };
   }
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN!;
   const payload = JSON.stringify(data);
   const errors: string[] = [];
 
-  const attempts: { label: string; url: string; headers: Record<string, string> }[] =
-    [
-      {
-        label: "headers-v7",
-        url: `https://blob.vercel-storage.com/${BLOB_PATHNAME}`,
-        headers: {
-          Authorization: `Bearer ${blobToken}`,
-          "Content-Type": "application/json",
-          "x-api-version": "7",
-          "x-content-type": "application/json",
-          "x-vercel-blob-access": "public",
-          "x-vercel-blob-allow-overwrite": "true",
-        },
-      },
-      {
-        label: "query-legacy",
-        url: `https://blob.vercel-storage.com/${BLOB_PATHNAME}?access=public&addRandomSuffix=false&allowOverwrite=true`,
-        headers: {
-          Authorization: `Bearer ${blobToken}`,
-          "Content-Type": "application/json",
-        },
-      },
-    ];
-
-  for (const attempt of attempts) {
+  // Private first — user's Pro_Shop Blob store is Private.
+  for (const access of ["private", "public"] as const) {
     try {
-      const res = await fetch(attempt.url, {
-        method: "PUT",
-        headers: attempt.headers,
-        body: payload,
-        cache: "no-store",
+      const putResult = await blobPut(BLOB_PATHNAME, payload, {
+        access,
+        contentType: "application/json",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
       });
-      if (res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { url?: string };
-        if (json.url) {
-          (
-            globalThis as typeof globalThis & { __bba_blob_url?: string }
-          ).__bba_blob_url = json.url;
-        }
+      if (putResult?.url) {
+        (
+          globalThis as typeof globalThis & { __bba_blob_url?: string }
+        ).__bba_blob_url = putResult.url;
+      }
+
+      // Read-after-write prove
+      const verify = await readBlobJson(BLOB_PATHNAME);
+      if (verify && typeof verify === "object") {
         return { ok: true };
       }
-      const text = await res.text().catch(() => "");
-      errors.push(`${attempt.label}:${res.status}:${text.slice(0, 120)}`);
+      errors.push(`${access}:wrote-but-read-failed`);
     } catch (e) {
-      errors.push(
-        `${attempt.label}:${e instanceof Error ? e.message : "error"}`
-      );
+      errors.push(`${access}:${e instanceof Error ? e.message : "error"}`);
     }
   }
 
@@ -477,21 +456,51 @@ export async function selfTestDurablePersist(): Promise<{
     }
   }
 
-  // Blob self-test: list API only (never overwrite the live catalog with a probe)
-  let blobListOk = false;
+  // Blob self-test: write/read a tiny private probe (does not touch live catalog)
+  let blobOk = false;
   let blobError: string | undefined = "not configured";
   if (blobConfigured()) {
-    const listed = await listBlobUrl();
-    blobListOk = Boolean(listed);
-    blobError = listed ? undefined : "blob list/read URL not found";
+    try {
+      const probeBody = JSON.stringify({
+        t: new Date().toISOString(),
+        ok: true,
+      });
+      let wrote = false;
+      for (const access of ["private", "public"] as const) {
+        try {
+          await blobPut(BLOB_PROBE_PATH, probeBody, {
+            access,
+            contentType: "application/json",
+            addRandomSuffix: false,
+            allowOverwrite: true,
+            token: process.env.BLOB_READ_WRITE_TOKEN,
+          });
+          wrote = true;
+          break;
+        } catch (e) {
+          blobError = `${access}:${e instanceof Error ? e.message : "put failed"}`;
+        }
+      }
+      if (wrote) {
+        const readBack = await readBlobJson(BLOB_PROBE_PATH);
+        blobOk = Boolean(
+          readBack &&
+            typeof readBack === "object" &&
+            (readBack as { ok?: boolean }).ok === true
+        );
+        blobError = blobOk ? undefined : "blob wrote but read-back failed";
+      }
+    } catch (e) {
+      blobError = e instanceof Error ? e.message : "blob self-test failed";
+    }
   }
 
   const githubConfigured = githubWriteConfigured();
-  const ok = Boolean(redisProbe.ok && redisReadOk) || blobListOk;
+  const ok = Boolean(redisProbe.ok && redisReadOk) || blobOk;
   const detail = [
     `redisWrite=${redisProbe.ok}`,
     `redisRead=${redisReadOk}`,
-    `blobList=${blobListOk}`,
+    `blobOk=${blobOk}`,
     `githubConfigured=${githubConfigured}`,
   ].join("; ");
 
@@ -504,7 +513,7 @@ export async function selfTestDurablePersist(): Promise<{
         ok: Boolean(redisProbe.ok && redisReadOk),
         error: redisProbe.error,
       },
-      blob: { ok: blobListOk, error: blobListOk ? undefined : blobError },
+      blob: { ok: blobOk, error: blobOk ? undefined : blobError },
       github: {
         ok: false,
         error: githubConfigured
