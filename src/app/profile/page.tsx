@@ -156,26 +156,22 @@ export default function ProfilePage() {
       {tab === "orders" && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-mist">
-            <p className="font-medium text-chalk">Order status guide</p>
+            <p className="font-medium text-chalk">In-store only — no shipping</p>
             <ul className="mt-2 space-y-1">
               <li>
                 <span className="text-amber-300">Pending</span> — payment has not been made yet
               </li>
               <li>
-                <span className="text-sky-300">Processing</span> — order is being prepared; come
-                in for drilling (not shipped drilled)
+                <span className="text-sky-300">Processing</span> — at Ballard&apos;s; come in for
+                drilling
               </li>
               <li>
-                <span className="text-teal-300">Ready</span> — ready at the pro shop; come in for
-                drilling / pickup
+                <span className="text-teal-300">Ready</span> — come in for drilling / pickup
               </li>
               <li>
-                <span className="text-emerald-300">Completed</span> — you have your ball (or item)
+                <span className="text-emerald-300">Completed</span> — picked up in person
               </li>
             </ul>
-            <p className="mt-3 text-xs text-mist">
-              Ball drilling is in-store only at Ballard&apos;s Bowling Academy.
-            </p>
           </div>
           {ordersError && <p className="text-sm text-red-300">{ordersError}</p>}
           {orders.length === 0 ? (
@@ -234,12 +230,20 @@ export default function ProfilePage() {
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium">{item.name}</p>
                           <p className="text-sm text-mist">
-                            Qty {item.quantity} · ${item.price.toFixed(2)} each
+                            Qty {item.quantity}
+                            {item.weight != null ? ` · ${item.weight} lb` : ""} · $
+                            {item.price.toFixed(2)} each
                           </p>
                         </div>
                       </li>
                     ))}
                   </ul>
+                  <Link
+                    href={`/order/${order.id}`}
+                    className="btn btn-ghost mt-5 !py-2 text-sm"
+                  >
+                    View progress →
+                  </Link>
                 </article>
               );
             })

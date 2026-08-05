@@ -870,12 +870,14 @@ function normalizeProduct(p: Product): Product {
 function appendStatusHistory(
   order: Order,
   status: OrderStatus,
-  note?: string
+  note?: string,
+  opts?: { force?: boolean }
 ): Order {
   const at = new Date().toISOString();
   const history = [...(order.statusHistory || [])];
   const last = history[history.length - 1];
-  if (!last || last.status !== status) {
+  const statusChanged = !last || last.status !== status;
+  if (statusChanged || opts?.force) {
     history.push({ status, at, ...(note ? { note } : {}) });
   }
   return { ...order, status, updatedAt: at, statusHistory: history };
@@ -1191,6 +1193,7 @@ export async function createOrder(input: {
   userId: string;
   username: string;
   email: string;
+  phoneNumber?: string;
   items: OrderItem[];
   total: number;
   subtotal?: number;
@@ -1201,16 +1204,20 @@ export async function createOrder(input: {
   shopifyInvoiceUrl?: string;
   paymentProvider?: "shopify" | "local";
   inventoryApplied?: boolean;
+  drillingNotes?: string;
 }) {
   let created: Order | null = null;
   await mutate((data) => {
     const status = input.status || "placed";
     const createdAt = new Date().toISOString();
+    const user = data.users.find((u) => u.id === input.userId);
     created = {
       id: randomUUID(),
       userId: input.userId,
       username: input.username,
       email: input.email,
+      phoneNumber:
+        (input.phoneNumber || user?.phoneNumber || "").trim() || undefined,
       items: input.items,
       total: input.total,
       subtotal: input.subtotal,
@@ -1220,6 +1227,8 @@ export async function createOrder(input: {
       createdAt,
       updatedAt: createdAt,
       statusHistory: [{ status, at: createdAt, note: "Order created" }],
+      fulfillment: "in_store",
+      drillingNotes: input.drillingNotes,
       shopifyDraftOrderId: input.shopifyDraftOrderId,
       shopifyInvoiceUrl: input.shopifyInvoiceUrl,
       paymentProvider: input.paymentProvider || "local",
@@ -1475,6 +1484,10 @@ export async function updateOrder(
       | "discountAmount"
       | "couponCode"
       | "total"
+      | "drillingNotes"
+      | "customerNotifiedAt"
+      | "handedOffAt"
+      | "phoneNumber"
     >
   >
 ) {
@@ -1482,8 +1495,77 @@ export async function updateOrder(
   await mutate((data) => {
     const idx = (data.orders || []).findIndex((o) => o.id === id);
     if (idx === -1) return;
-    data.orders[idx] = { ...data.orders[idx], ...patch, id };
-    updated = data.orders[idx];
+    let next: Order = {
+      ...data.orders[idx],
+      ...patch,
+      id,
+      fulfillment: "in_store",
+      updatedAt: new Date().toISOString(),
+    };
+    if (patch.status && patch.status !== data.orders[idx].status) {
+      next = appendStatusHistory(
+        next,
+        patch.status,
+        patch.status === "completed"
+          ? "Handed off in store"
+          : "Updated in Operations"
+      );
+      if (patch.status === "completed" && !next.handedOffAt) {
+        next.handedOffAt = next.updatedAt;
+      }
+    }
+    data.orders[idx] = next;
+    updated = next;
+  });
+  return updated;
+}
+
+/** Ops workstation patch: notes, notify flag, status advance */
+export async function updateOrderFulfillment(
+  id: string,
+  patch: {
+    status?: OrderStatus;
+    drillingNotes?: string;
+    customerNotified?: boolean;
+    markHandedOff?: boolean;
+  }
+) {
+  let updated: Order | null = null;
+  await mutate((data) => {
+    const idx = (data.orders || []).findIndex((o) => o.id === id);
+    if (idx === -1) return;
+    let next: Order = {
+      ...data.orders[idx],
+      fulfillment: "in_store",
+    };
+    if (typeof patch.drillingNotes === "string") {
+      next.drillingNotes = patch.drillingNotes;
+    }
+    if (patch.customerNotified === true) {
+      next.customerNotifiedAt = new Date().toISOString();
+      next = appendStatusHistory(
+        next,
+        next.status,
+        "Customer notified — come in for drilling/pickup",
+        { force: true }
+      );
+    }
+    if (patch.markHandedOff || patch.status === "completed") {
+      next.handedOffAt = new Date().toISOString();
+    }
+    if (patch.status && patch.status !== next.status) {
+      next = appendStatusHistory(
+        next,
+        patch.status,
+        patch.status === "completed"
+          ? "Handed off in store"
+          : "Updated in Operations"
+      );
+    } else {
+      next.updatedAt = new Date().toISOString();
+    }
+    data.orders[idx] = next;
+    updated = next;
   });
   return updated;
 }
@@ -1547,18 +1629,21 @@ export async function listAllOrders() {
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
-  let updated: Order | null = null;
-  await mutate((data) => {
-    const idx = (data.orders || []).findIndex((o) => o.id === id);
-    if (idx === -1) return;
-    data.orders[idx] = appendStatusHistory(
-      data.orders[idx],
-      status,
-      "Updated in Operations"
-    );
-    updated = data.orders[idx];
+  return updateOrderFulfillment(id, { status });
+}
+
+/** Enrich Ops order list with phone from user account when missing on older orders */
+export async function listAllOrdersForOps() {
+  const data = await getStore();
+  const users = new Map(data.users.map((u) => [u.id, u]));
+  return (data.orders || []).map((o) => {
+    const u = users.get(o.userId);
+    return {
+      ...o,
+      fulfillment: "in_store" as const,
+      phoneNumber: o.phoneNumber || u?.phoneNumber || undefined,
+    };
   });
-  return updated;
 }
 
 export async function listCoaches() {

@@ -175,6 +175,8 @@ export interface Order {
   userId: string;
   username: string;
   email: string;
+  /** Phone snapshot for staff call / text when Ready */
+  phoneNumber?: string;
   items: OrderItem[];
   /** Amount charged after coupon */
   total: number;
@@ -188,6 +190,14 @@ export interface Order {
   updatedAt?: string;
   /** Pipeline history for Ops */
   statusHistory?: OrderStatusEvent[];
+  /** Always in-store — Ballard's does not ship */
+  fulfillment?: "in_store";
+  /** Staff drilling / layout / fit notes */
+  drillingNotes?: string;
+  /** When staff marked the customer as notified (Ready) */
+  customerNotifiedAt?: string;
+  /** When gear was handed off in person */
+  handedOffAt?: string;
   /** Shopify draft order GID when paid via Shopify */
   shopifyDraftOrderId?: string;
   shopifyInvoiceUrl?: string;

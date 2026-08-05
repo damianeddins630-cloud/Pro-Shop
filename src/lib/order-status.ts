@@ -28,28 +28,28 @@ export const OPS_PIPELINE: OpsPipelineStep[] = [
     value: "placed",
     label: "Received",
     short: "In",
-    help: "Paid / received — queue for prep",
+    help: "Paid / received — queue for the drill bay",
     tone: "processing",
   },
   {
     value: "processing",
     label: "In prep",
-    short: "Prep",
-    help: "In prep — customer must come in for drilling",
+    short: "Drill",
+    help: "In-store prep / drilling — customer must come in",
     tone: "processing",
   },
   {
     value: "ready",
     label: "Ready",
     short: "Ready",
-    help: "Ready at the pro shop — come in for drilling / pickup",
+    help: "Ready at the pro shop — customer comes in for drilling/pickup",
     tone: "ready",
   },
   {
     value: "completed",
     label: "Completed",
     short: "Done",
-    help: "Customer has the ball / item",
+    help: "Handed off in person — no shipping",
     tone: "completed",
   },
   {
@@ -109,7 +109,7 @@ export function memberOrderStatus(status: OrderStatus): MemberOrderStatus {
         key: "processing",
         label: "Processing",
         detail:
-          "Your order is being prepared. You must come in to the pro shop for drilling — balls are not shipped drilled.",
+          "Your order is at Ballard's. Come in for drilling — we do not ship.",
         tone: "processing",
       };
     case "ready":
@@ -117,14 +117,14 @@ export function memberOrderStatus(status: OrderStatus): MemberOrderStatus {
         key: "ready",
         label: "Ready",
         detail:
-          "Ready at Ballard's — come in for drilling and pickup at the pro shop.",
+          "Ready at Ballard's. Come in for drilling and pickup — in-store only.",
         tone: "ready",
       };
     case "completed":
       return {
         key: "completed",
         label: "Completed",
-        detail: "You have your ball (or item) from the pro shop.",
+        detail: "Picked up in person at the pro shop.",
         tone: "completed",
       };
     case "cancelled":

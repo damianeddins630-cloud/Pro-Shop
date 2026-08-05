@@ -150,12 +150,17 @@ function SuccessInner() {
         )}
         {order?.items.some((i) => i.weight != null) ? (
           <p className="mt-4 text-sm text-mist">
-            Remember: drilling is in-store only. Come in to Ballard&apos;s for
-            drilling — we do not ship balls already drilled.
+            In-store only — no shipping. Come in to Ballard&apos;s for drilling
+            and pickup.
           </p>
         ) : null}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link href="/profile" className="btn btn-primary">
+          {orderId ? (
+            <Link href={`/order/${orderId}`} className="btn btn-primary">
+              View order progress
+            </Link>
+          ) : null}
+          <Link href="/profile" className="btn btn-ghost">
             View my account
           </Link>
           <Link href="/shop" className="btn btn-ghost">

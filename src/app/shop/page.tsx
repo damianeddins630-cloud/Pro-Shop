@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 import { EditableProductGrid } from "@/components/EditableProductGrid";
+import { InStoreVisitCard } from "@/components/InStoreVisitCard";
 import { getText, listProducts } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export default async function ShopPage({
     getText(
       "shop",
       "intro",
-      "Real products from Ballard's Bowling Academy — balls, bags, Turbo accessories, and coaching services. Inventory is live and admin-managed."
+      "Buy online, then come in for drilling and pickup. In-store only — no shipping. Live inventory from Ballard's pro shop."
     ),
   ]);
   const filters = {
@@ -81,6 +82,9 @@ export default async function ShopPage({
       </section>
 
       <section className="site-shell section-pad">
+        <div className="mb-8">
+          <InStoreVisitCard />
+        </div>
         <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           {brands.map((b) => (
             <Link

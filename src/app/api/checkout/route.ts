@@ -23,6 +23,7 @@ import {
 } from "@/lib/shopify";
 import { effectivePrice } from "@/lib/pricing";
 import type { OrderItem } from "@/lib/types";
+import { orderNeedsInStoreVisit } from "@/lib/in-store";
 import {
   isAllowedWeight,
   lineDisplayName,
@@ -169,10 +170,11 @@ export async function POST(req: Request) {
       req.headers.get("origin") ||
       "http://localhost:3000";
 
-    // Free / fully discounted orders complete on this website (no Shopify popup)
+    // Free / fully discounted — no Shopify popup. Balls still enter the in-store pipeline.
     if (total <= 0) {
       await reduceStock(body.items);
       if (appliedCode) await recordCouponUse(appliedCode);
+      const needsVisit = orderNeedsInStoreVisit(lineItems);
       const order = await createOrder({
         userId: session.userId,
         username: session.username,
@@ -182,7 +184,8 @@ export async function POST(req: Request) {
         discountAmount,
         couponCode: appliedCode,
         total: 0,
-        status: "completed",
+        // Balls must be drilled in-store — never skip the prep/ready pipeline.
+        status: needsVisit ? "processing" : "completed",
         paymentProvider: "local",
         inventoryApplied: true,
       });
@@ -196,9 +199,12 @@ export async function POST(req: Request) {
         order,
         products,
         updatedAt: await getInventoryUpdatedAt(),
-        message: appliedCode
-          ? `Free order recorded with coupon ${appliedCode}${couponNote ? ` (${couponNote})` : ""}. No Shopify payment needed.`
-          : "Free order recorded on this website.",
+        needsInStoreVisit: needsVisit,
+        message: needsVisit
+          ? `Order recorded${appliedCode ? ` with coupon ${appliedCode}` : ""}. Come in to Ballard's for drilling and pickup — we do not ship.`
+          : appliedCode
+            ? `Free order recorded with coupon ${appliedCode}${couponNote ? ` (${couponNote})` : ""}.`
+            : "Free order recorded on this website.",
       });
     }
 

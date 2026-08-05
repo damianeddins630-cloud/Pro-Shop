@@ -15,17 +15,20 @@ Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, Op
 |---|---|
 | Products, prices, inventory, images | Checkout / payment page |
 | Categories, deals, coupons, sponsors | Card / Shop Pay / Apple Pay / Google Pay |
-| Ops admin for employees | Taxes & shipping at checkout |
-| Order records on the site | Payment processing |
+| Ops admin for employees | Payment processing only |
+| Order records + in-store drilling pipeline | (no shipping — pickup at Ballard's) |
+
+**Fulfillment model: in-store only.** No shipping. Customers buy online, then come in for drilling and pickup.
 
 Shopify does **not** own your product catalog. Employees should manage products only in **Operations (`/ops`)**.
 
 Flow:
 
-1. Customer browses/carts on this website
+1. Customer browses/carts on this website (choose ball weight)
 2. Checkout creates a **Shopify Draft Order** from the cart
 3. Customer pays on Shopify
 4. Shopify `orders/paid` webhook marks the order paid and reduces website inventory
+5. Staff runs the in-store pipeline in Ops (prep → ready → handoff)
 
 No Storefront API token is required.
 

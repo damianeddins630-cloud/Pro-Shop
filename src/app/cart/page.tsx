@@ -16,6 +16,7 @@ import {
 import { savePendingCheckout } from "@/lib/pending-checkout";
 import { effectivePrice } from "@/lib/pricing";
 import type { CartItem, Product } from "@/lib/types";
+import { InStoreVisitCard } from "@/components/InStoreVisitCard";
 import {
   cartLineKey,
   formatWeightLbs,
@@ -261,15 +262,18 @@ export default function CartPage() {
         return;
       }
 
-      // Free / local path — purchase completed on this site, so clear cart.
+      // Free / local path — clear cart; balls still need an in-store visit.
       clear();
       setCoupon(null);
-      setMessage(
-        data.message ||
-          (data.orderId
-            ? `Order ${data.orderId} recorded.`
-            : "Order placed!")
-      );
+      if (data.orderId && data.needsInStoreVisit) {
+        window.location.assign(`/order/${data.orderId}`);
+        return;
+      }
+      if (data.orderId) {
+        window.location.assign(`/order/${data.orderId}`);
+        return;
+      }
+      setMessage(data.message || "Order placed!");
       setLoading(false);
     } catch {
       setError("Checkout failed — check your connection and try again.");
@@ -343,11 +347,7 @@ export default function CartPage() {
               </div>
             ) : null}
             {lines.some(({ product }) => productRequiresWeight(product)) ? (
-              <div className="rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-mist">
-                <span className="font-medium text-chalk">In-store drilling:</span>{" "}
-                Ball purchases require you to come in to Ballard&apos;s for
-                drilling. We do not ship balls already drilled.
-              </div>
+              <InStoreVisitCard compact />
             ) : null}
             {lines.map(({ item, product }) => (
               <div

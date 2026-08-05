@@ -169,8 +169,8 @@ export function ProductDetailClient({
                 </p>
               ) : null}
               <p className="mt-3 text-sm text-chalk">
-                Drilling is in-store only — you must come in to Ballard&apos;s
-                for drilling after purchase.
+                In-store only. No shipping. Buy online, then come in to
+                Ballard&apos;s for drilling and pickup.
               </p>
             </div>
           ) : null}

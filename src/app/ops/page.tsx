@@ -38,7 +38,7 @@ const cards: {
   {
     href: "/ops/orders",
     title: "Orders",
-    text: "Fulfillment command center — pipeline, ball vault totals, and processing timeline.",
+    text: "In-store command center — drill notes, phone, pipeline, ball vault. No shipping.",
     perms: ["view_orders", "manage_orders"],
   },
   {
