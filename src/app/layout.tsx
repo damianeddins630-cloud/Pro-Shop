@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Manrope } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -41,6 +42,7 @@ export default function RootLayout({
             <main>{children}</main>
             <SiteFooter />
             <AdminEditButton />
+            <Analytics />
           </EditModeProvider>
         </CartProvider>
       </body>
