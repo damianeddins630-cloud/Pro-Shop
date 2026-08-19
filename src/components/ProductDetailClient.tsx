@@ -83,14 +83,16 @@ export function ProductDetailClient({
 
   const needsWeight = productRequiresWeight(product);
   const selectedStock =
-    selectedWeight != null
-      ? stockForWeight(product, selectedWeight)
-      : product.stock;
-  const out = needsWeight
-    ? (product.weightOptions || []).every((w) => stockForWeight(product, w) <= 0)
-    : product.stock <= 0;
+    selectedWeight != null ? stockForWeight(product, selectedWeight) : 0;
+  const overallStock = needsWeight
+    ? (product.weightOptions || []).reduce(
+        (sum, w) => sum + stockForWeight(product, w),
+        0
+      )
+    : product.stock;
+  const out = overallStock <= 0;
   const selectedOut =
-    needsWeight && selectedWeight != null && selectedStock <= 0;
+    needsWeight && (selectedWeight == null || selectedStock <= 0);
 
   return (
     <section className="site-shell section-pad pt-24">
@@ -117,17 +119,19 @@ export function ProductDetailClient({
           <p className="mt-2 text-sm text-mist">
             {out
               ? "Out of stock"
-              : needsWeight && selectedWeight != null
-                ? `${selectedStock} in stock · ${formatWeightLbs(selectedWeight)}`
+              : needsWeight
+                ? selectedWeight != null
+                  ? `${selectedStock} in stock · ${formatWeightLbs(selectedWeight)}`
+                  : "Select a size to see stock"
                 : `${product.stock} in stock`}{" "}
             · {product.category}
           </p>
           <p className="mt-6 leading-relaxed text-mist">{product.description}</p>
 
-          {needsWeight ? (
+          {needsWeight && !out ? (
             <div className="mt-8">
               <p className="text-sm font-medium text-chalk">
-                Select weight
+                Select size
                 {selectedWeight != null
                   ? ` · ${formatWeightLbs(selectedWeight)}`
                   : " · required"}
@@ -135,7 +139,7 @@ export function ProductDetailClient({
               <div
                 className="mt-3 flex flex-wrap gap-2"
                 role="radiogroup"
-                aria-label="Ball weight"
+                aria-label="Ball size"
               >
                 {(product.weightOptions || []).map((weight) => {
                   const available = stockForWeight(product, weight);
@@ -150,29 +154,48 @@ export function ProductDetailClient({
                       role="radio"
                       aria-checked={selected}
                       disabled={soldOut}
-                      onClick={() => setSelectedWeight(weight)}
+                      onClick={() => {
+                        if (soldOut) return;
+                        setSelectedWeight(weight);
+                      }}
                       className={`weight-bubble ${selected ? "is-selected" : ""} ${soldOut ? "is-soldout" : ""}`}
                       title={
                         soldOut
-                          ? "Sold out"
+                          ? "Sold out — cannot select"
                           : `${available} in stock`
                       }
                     >
-                      {formatWeightLbs(weight)}
+                      <span className="weight-bubble-main">
+                        {formatWeightLbs(weight)}
+                      </span>
+                      <span className="weight-bubble-qty">
+                        {soldOut ? "0" : available}
+                      </span>
                     </button>
                   );
                 })}
               </div>
               {selectedWeight == null ? (
                 <p className="mt-2 text-xs text-mist">
-                  Choose the weight you want before adding to cart.
+                  Choose a size with stock before adding to cart. Sizes at 0
+                  cannot be selected.
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-2 text-xs text-mist">
+                  {selectedStock} available at {formatWeightLbs(selectedWeight)}.
+                </p>
+              )}
               <p className="mt-3 text-sm text-chalk">
                 In-store only. No shipping. Buy online, then come in to
                 Ballard&apos;s for drilling and pickup.
               </p>
             </div>
+          ) : null}
+
+          {needsWeight && out ? (
+            <p className="mt-8 text-sm text-mist">
+              This ball is out of stock in every size right now.
+            </p>
           ) : null}
 
           <div className="mt-8">

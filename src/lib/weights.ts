@@ -66,11 +66,11 @@ export function stockForWeight(
   product: Pick<Product, "stock" | "weightOptions" | "weightStock">,
   weight?: number | null
 ) {
-  if (weight != null && product.weightStock) {
+  // Sized products: only the per-size count counts. Missing/0 = not selectable.
+  if (productRequiresWeight(product) && weight != null && Number.isFinite(weight)) {
     const key = weightKey(weight);
-    if (Object.prototype.hasOwnProperty.call(product.weightStock, key)) {
-      return Math.max(0, Math.floor(Number(product.weightStock[key]) || 0));
-    }
+    const raw = product.weightStock?.[key];
+    return Math.max(0, Math.floor(Number(raw) || 0));
   }
   return Math.max(0, Math.floor(Number(product.stock) || 0));
 }

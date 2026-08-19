@@ -38,6 +38,8 @@ export default function OpsInventoryPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [persistWarning, setPersistWarning] = useState("");
+  /** Size currently selected for entering "how many in stock". */
+  const [editingWeight, setEditingWeight] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/products?admin=1&t=${Date.now()}`, {
@@ -151,6 +153,7 @@ export default function OpsInventoryPage() {
     );
     setForm(empty);
     setEditingId(null);
+    setEditingWeight(null);
   }
 
   async function remove(id: string) {
@@ -170,6 +173,7 @@ export default function OpsInventoryPage() {
     if (editingId === id) {
       setEditingId(null);
       setForm(empty);
+      setEditingWeight(null);
     }
   }
 
@@ -188,7 +192,7 @@ export default function OpsInventoryPage() {
             </h3>
             <p className="mt-1 text-sm text-mist">
               {ballSummary.ballSkus} ball SKUs · {ballSummary.accessoryUnits} accessory
-              units · set qty under each weight for exact lb counts
+              units · pick a size, then enter how many you have
             </p>
           </div>
           <Link href="/ops/orders" className="btn btn-ghost !py-2 text-sm">
@@ -296,7 +300,7 @@ export default function OpsInventoryPage() {
             </div>
             <div>
               <label className="label">
-                {form.weightOptions.length ? "Total (auto)" : "In stock"}
+                {form.weightOptions.length ? "Total (all sizes)" : "In stock"}
               </label>
               <input
                 className="field"
@@ -324,6 +328,12 @@ export default function OpsInventoryPage() {
               />
             </div>
           </div>
+          {form.weightOptions.length ? (
+            <p className="text-xs text-mist">
+              Total stock is the sum of each size. Shoppers pick a size first — sizes
+              with 0 cannot be selected on the shop.
+            </p>
+          ) : null}
           <p className="text-xs text-mist">
             Discount keeps the regular price. Example: $100 + 20% = $80 on the shop.
             {Number(form.price) > 0 && Number(form.discountPercent) > 0
@@ -359,10 +369,10 @@ export default function OpsInventoryPage() {
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-chalk">Ball weights</p>
+                <p className="text-sm font-medium text-chalk">Ball sizes (lb)</p>
                 <p className="mt-1 text-xs text-mist">
-                  Tap weights to offer them. Enter qty under each weight — shoppers
-                  must pick a bubble, and the vault uses these counts.
+                  1) Select a size · 2) Enter how many you have. Shoppers can only
+                  pick sizes with stock above 0.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -380,6 +390,7 @@ export default function OpsInventoryPage() {
                       weightOptions: [...STANDARD_BALL_WEIGHTS],
                       weightStock: nextStock,
                     });
+                    setEditingWeight(15);
                   }}
                 >
                   Add 8–16 lb
@@ -387,9 +398,10 @@ export default function OpsInventoryPage() {
                 <button
                   type="button"
                   className="text-xs text-mist underline"
-                  onClick={() =>
-                    setForm({ ...form, weightOptions: [], weightStock: {} })
-                  }
+                  onClick={() => {
+                    setForm({ ...form, weightOptions: [], weightStock: {} });
+                    setEditingWeight(null);
+                  }}
                 >
                   Clear
                 </button>
@@ -400,24 +412,26 @@ export default function OpsInventoryPage() {
                 const on = form.weightOptions.some(
                   (w) => Math.abs(w - weight) < 0.001
                 );
+                const key = weightKey(weight);
+                const qty = Math.max(
+                  0,
+                  Math.floor(Number(form.weightStock[key] ?? "0") || 0)
+                );
+                const selected =
+                  editingWeight != null &&
+                  Math.abs(editingWeight - weight) < 0.001;
                 return (
                   <button
                     key={weight}
                     type="button"
-                    className={`weight-bubble ${on ? "is-selected" : ""}`}
+                    className={`weight-bubble ${selected ? "is-selected" : ""} ${on && qty <= 0 ? "is-soldout" : ""}`}
+                    title={
+                      on
+                        ? `${formatWeightLbs(weight)} · ${qty} in stock — click to edit qty`
+                        : `Add ${formatWeightLbs(weight)}`
+                    }
                     onClick={() => {
-                      const key = weightKey(weight);
-                      if (on) {
-                        const nextStock = { ...form.weightStock };
-                        delete nextStock[key];
-                        setForm({
-                          ...form,
-                          weightOptions: form.weightOptions.filter(
-                            (w) => Math.abs(w - weight) >= 0.001
-                          ),
-                          weightStock: nextStock,
-                        });
-                      } else {
+                      if (!on) {
                         setForm({
                           ...form,
                           weightOptions: [...form.weightOptions, weight].sort(
@@ -429,39 +443,113 @@ export default function OpsInventoryPage() {
                           },
                         });
                       }
+                      setEditingWeight(weight);
                     }}
                   >
-                    {formatWeightLbs(weight)}
+                    <span className="weight-bubble-main">
+                      {formatWeightLbs(weight)}
+                    </span>
+                    {on ? (
+                      <span className="weight-bubble-qty">{qty}</span>
+                    ) : null}
                   </button>
                 );
               })}
             </div>
+
+            {editingWeight != null &&
+            form.weightOptions.some(
+              (w) => Math.abs(w - editingWeight) < 0.001
+            ) ? (
+              <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="min-w-[10rem] flex-1">
+                    <span className="label">
+                      How many in stock · {formatWeightLbs(editingWeight)}
+                    </span>
+                    <input
+                      className="field"
+                      inputMode="numeric"
+                      autoFocus
+                      value={
+                        form.weightStock[weightKey(editingWeight)] ?? "0"
+                      }
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          weightStock: {
+                            ...form.weightStock,
+                            [weightKey(editingWeight)]: e.target.value.replace(
+                              /[^0-9]/g,
+                              ""
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-ghost !py-2 text-sm"
+                    onClick={() => {
+                      const key = weightKey(editingWeight);
+                      const nextStock = { ...form.weightStock };
+                      delete nextStock[key];
+                      const nextOptions = form.weightOptions.filter(
+                        (w) => Math.abs(w - editingWeight) >= 0.001
+                      );
+                      setForm({
+                        ...form,
+                        weightOptions: nextOptions,
+                        weightStock: nextStock,
+                      });
+                      setEditingWeight(nextOptions[0] ?? null);
+                    }}
+                  >
+                    Remove size
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-mist">
+                  Enter 0 if you are out of this size — shoppers will not be able
+                  to select it.
+                </p>
+              </div>
+            ) : form.weightOptions.length ? (
+              <p className="mt-3 text-xs text-mist">
+                Tap a size above to set how many you have.
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-mist">
+                No sizes yet — tap a weight (or Add 8–16 lb) to start.
+              </p>
+            )}
+
             {form.weightOptions.length ? (
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {form.weightOptions.map((weight) => {
                   const key = weightKey(weight);
+                  const qty = Math.max(
+                    0,
+                    Math.floor(Number(form.weightStock[key] ?? "0") || 0)
+                  );
                   return (
-                    <label key={`stock-${key}`} className="block">
-                      <span className="label">{formatWeightLbs(weight)} qty</span>
-                      <input
-                        className="field"
-                        inputMode="numeric"
-                        value={form.weightStock[key] ?? "0"}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            weightStock: {
-                              ...form.weightStock,
-                              [key]: e.target.value.replace(/[^0-9]/g, ""),
-                            },
-                          })
-                        }
-                      />
-                    </label>
+                    <button
+                      key={`summary-${key}`}
+                      type="button"
+                      className={`rounded-full border px-3 py-1 text-xs ${
+                        qty > 0
+                          ? "border-white/20 text-chalk"
+                          : "border-white/10 text-mist line-through"
+                      }`}
+                      onClick={() => setEditingWeight(weight)}
+                    >
+                      {formatWeightLbs(weight)} · {qty}
+                    </button>
                   );
                 })}
               </div>
             ) : null}
+
             {form.weightOptions.some(
               (w) =>
                 !STANDARD_BALL_WEIGHTS.some((s) => Math.abs(s - w) < 0.001)
@@ -478,22 +566,27 @@ export default function OpsInventoryPage() {
                     <button
                       key={`custom-${weight}`}
                       type="button"
-                      className="weight-bubble is-selected"
-                      onClick={() => {
-                        const key = weightKey(weight);
-                        const nextStock = { ...form.weightStock };
-                        delete nextStock[key];
-                        setForm({
-                          ...form,
-                          weightOptions: form.weightOptions.filter(
-                            (w) => Math.abs(w - weight) >= 0.001
-                          ),
-                          weightStock: nextStock,
-                        });
-                      }}
-                      title="Remove custom weight"
+                      className={`weight-bubble ${
+                        editingWeight != null &&
+                        Math.abs(editingWeight - weight) < 0.001
+                          ? "is-selected"
+                          : ""
+                      }`}
+                      onClick={() => setEditingWeight(weight)}
+                      title="Edit custom weight qty"
                     >
-                      {formatWeightLbs(weight)} ×
+                      <span className="weight-bubble-main">
+                        {formatWeightLbs(weight)}
+                      </span>
+                      <span className="weight-bubble-qty">
+                        {Math.max(
+                          0,
+                          Math.floor(
+                            Number(form.weightStock[weightKey(weight)] ?? "0") ||
+                              0
+                          )
+                        )}
+                      </span>
                     </button>
                   ))}
               </div>
@@ -525,6 +618,7 @@ export default function OpsInventoryPage() {
                     )
                   ) {
                     setForm({ ...form, customWeight: "" });
+                    setEditingWeight(rounded);
                     return;
                   }
                   setForm({
@@ -538,6 +632,7 @@ export default function OpsInventoryPage() {
                       [key]: form.weightStock[key] ?? "0",
                     },
                   });
+                  setEditingWeight(rounded);
                 }}
               >
                 Add
@@ -572,6 +667,7 @@ export default function OpsInventoryPage() {
                 onClick={() => {
                   setEditingId(null);
                   setForm(empty);
+                  setEditingWeight(null);
                 }}
               >
                 Cancel
@@ -622,6 +718,17 @@ export default function OpsInventoryPage() {
                           );
                         }
                         setEditingId(p.id);
+                        const firstWithStock =
+                          weightOptions.find((w) => {
+                            const key = weightKey(w);
+                            return (
+                              Math.max(
+                                0,
+                                Math.floor(Number(p.weightStock?.[key] ?? 0) || 0)
+                              ) > 0
+                            );
+                          }) ?? weightOptions[0] ?? null;
+                        setEditingWeight(firstWithStock);
                         setForm({
                           name: p.name,
                           description: p.description,

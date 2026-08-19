@@ -225,8 +225,12 @@ export function EditableProductGrid({
                 />
                 <ProductPrice product={product} />
                 <p className="text-xs text-mist/80">
-                  {out ? "Out of stock" : `${product.stock} in stock`}
-                  {needsWeight
+                  {out
+                    ? "Out of stock"
+                    : needsWeight
+                      ? "Select a size"
+                      : `${product.stock} in stock`}
+                  {needsWeight && !out
                     ? ` · ${(product.weightOptions || []).join("/")} lb`
                     : ""}
                 </p>
