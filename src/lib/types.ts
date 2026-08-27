@@ -99,7 +99,7 @@ export interface Product {
   weightOptions?: number[];
   /**
    * Units in stock per weight (keys are lbs as strings, e.g. "15": 3).
-   * When set, product.stock should match the sum of these buckets.
+   * For sized balls, product.stock is always the sum of these buckets — never a separate total.
    */
   weightStock?: Record<string, number>;
   /** Optional Shopify variant GID/id if product is synced in Shopify */

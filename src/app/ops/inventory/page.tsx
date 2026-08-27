@@ -272,7 +272,11 @@ export default function OpsInventoryPage() {
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
-          <div className="grid grid-cols-3 gap-3">
+          <div
+            className={`grid gap-3 ${
+              form.weightOptions.length ? "grid-cols-2" : "grid-cols-3"
+            }`}
+          >
             <div>
               <label className="label">Price ($0 OK)</label>
               <input
@@ -298,42 +302,23 @@ export default function OpsInventoryPage() {
                 }
               />
             </div>
-            <div>
-              <label className="label">
-                {form.weightOptions.length ? "Total (all sizes)" : "In stock"}
-              </label>
-              <input
-                className="field"
-                inputMode="numeric"
-                disabled={form.weightOptions.length > 0}
-                value={
-                  form.weightOptions.length
-                    ? String(
-                        form.weightOptions.reduce((sum, w) => {
-                          const key = weightKey(w);
-                          return (
-                            sum +
-                            Math.max(
-                              0,
-                              Math.floor(Number(form.weightStock[key] ?? "0") || 0)
-                            )
-                          );
-                        }, 0)
-                      )
-                    : form.stock
-                }
-                onChange={(e) =>
-                  setForm({ ...form, stock: e.target.value.replace(/[^0-9]/g, "") })
-                }
-              />
-            </div>
+            {!form.weightOptions.length ? (
+              <div>
+                <label className="label">In stock</label>
+                <input
+                  className="field"
+                  inputMode="numeric"
+                  value={form.stock}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      stock: e.target.value.replace(/[^0-9]/g, ""),
+                    })
+                  }
+                />
+              </div>
+            ) : null}
           </div>
-          {form.weightOptions.length ? (
-            <p className="text-xs text-mist">
-              Total stock is the sum of each size. Shoppers pick a size first — sizes
-              with 0 cannot be selected on the shop.
-            </p>
-          ) : null}
           <p className="text-xs text-mist">
             Discount keeps the regular price. Example: $100 + 20% = $80 on the shop.
             {Number(form.price) > 0 && Number(form.discountPercent) > 0
@@ -371,8 +356,9 @@ export default function OpsInventoryPage() {
               <div>
                 <p className="text-sm font-medium text-chalk">Ball sizes (lb)</p>
                 <p className="mt-1 text-xs text-mist">
-                  1) Select a size · 2) Enter how many you have. Shoppers can only
-                  pick sizes with stock above 0.
+                  No separate total — ball stock is the sum of each size qty.
+                  Select a size, enter how many you have. Shoppers can only pick
+                  sizes above 0.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -525,7 +511,23 @@ export default function OpsInventoryPage() {
             )}
 
             {form.weightOptions.length ? (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <p className="text-sm text-chalk">
+                  Total balls:{" "}
+                  <span className="font-semibold">
+                    {form.weightOptions.reduce((sum, w) => {
+                      const key = weightKey(w);
+                      return (
+                        sum +
+                        Math.max(
+                          0,
+                          Math.floor(Number(form.weightStock[key] ?? "0") || 0)
+                        )
+                      );
+                    }, 0)}
+                  </span>{" "}
+                  <span className="text-mist">(from sizes only)</span>
+                </p>
                 {form.weightOptions.map((weight) => {
                   const key = weightKey(weight);
                   const qty = Math.max(
@@ -691,18 +693,21 @@ export default function OpsInventoryPage() {
                   <h4 className="truncate font-semibold">{p.name}</h4>
                   <ProductPrice product={p} size="sm" />
                   <p className="text-xs text-mist">
-                    Stock {p.stock}
-                    {!p.active ? " · hidden" : ""}
-                    {p.weightOptions?.length
-                      ? ` · ${p.weightOptions
+                    {p.weightOptions?.length ? (
+                      <>
+                        {p.weightOptions
                           .map((w) => {
-                            const qty = p.weightStock?.[weightKey(w)];
-                            return qty != null
-                              ? `${w}lb×${qty}`
-                              : `${w}lb`;
+                            const qty = p.weightStock?.[weightKey(w)] ?? 0;
+                            return `${w}lb×${qty}`;
                           })
-                          .join(" · ")}`
-                      : ""}
+                          .join(" · ")}
+                        {" · "}
+                        {p.stock} total from sizes
+                      </>
+                    ) : (
+                      <>Stock {p.stock}</>
+                    )}
+                    {!p.active ? " · hidden" : ""}
                   </p>
                   <div className="mt-2 flex gap-3">
                     <button

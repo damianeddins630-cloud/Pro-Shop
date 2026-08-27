@@ -26,16 +26,26 @@ export function normalizeWeightStock(
   raw: unknown,
   options?: number[]
 ): Record<string, number> | undefined {
+  // When sizes are offered, every size gets a qty (default 0) — total is always the sum.
+  if (options?.length) {
+    const src =
+      raw && typeof raw === "object" && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>)
+        : {};
+    const out: Record<string, number> = {};
+    for (const w of options) {
+      const key = weightKey(w);
+      out[key] = Math.max(0, Math.floor(Number(src[key]) || 0));
+    }
+    return out;
+  }
+
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-  const allowed = options?.length
-    ? new Set(options.map((w) => weightKey(w)))
-    : null;
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     const w = Number(k);
     if (!Number.isFinite(w) || w <= 0 || w > 30) continue;
     const key = weightKey(w);
-    if (allowed && !allowed.has(key)) continue;
     out[key] = Math.max(0, Math.floor(Number(v) || 0));
   }
   return Object.keys(out).length ? out : undefined;

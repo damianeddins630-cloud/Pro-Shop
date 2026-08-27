@@ -874,23 +874,28 @@ export async function updateUser(
 
 function normalizeProduct(p: Product): Product {
   const weightOptions = normalizeWeightOptions(p.weightOptions);
-  const weightStock = weightOptions?.length
-    ? normalizeWeightStock(p.weightStock, weightOptions)
-    : undefined;
-  const stockFromWeights = weightStock
-    ? totalFromWeightStock(weightStock)
-    : null;
+  // Balls with sizes: stock is ONLY the sum of per-weight qty — never a separate total.
+  if (weightOptions?.length) {
+    const weightStock =
+      normalizeWeightStock(p.weightStock, weightOptions) ||
+      Object.fromEntries(weightOptions.map((w) => [weightKey(w), 0]));
+    return {
+      ...p,
+      price: Math.max(0, Number(p.price) || 0),
+      discountPercent: Math.min(100, Math.max(0, Number(p.discountPercent) || 0)),
+      stock: totalFromWeightStock(weightStock),
+      weightOptions,
+      weightStock,
+    };
+  }
 
   return {
     ...p,
     price: Math.max(0, Number(p.price) || 0),
     discountPercent: Math.min(100, Math.max(0, Number(p.discountPercent) || 0)),
-    stock:
-      stockFromWeights != null
-        ? stockFromWeights
-        : Math.max(0, Math.floor(Number(p.stock) || 0)),
-    weightOptions,
-    weightStock,
+    stock: Math.max(0, Math.floor(Number(p.stock) || 0)),
+    weightOptions: undefined,
+    weightStock: undefined,
   };
 }
 
@@ -1018,17 +1023,28 @@ export async function updateProduct(id: string, patch: Partial<Product>) {
   await mutate((data) => {
     const idx = data.products.findIndex((p) => p.id === id);
     if (idx === -1) return;
-    const next = normalizeProduct({
+    let next = normalizeProduct({
       ...data.products[idx],
       ...patch,
       id,
     });
-    // Explicit empty weight list from Ops clears the requirement.
+    // Explicit empty weight list from Ops clears size-based stock.
     if (Array.isArray(patch.weightOptions) && patch.weightOptions.length === 0) {
       delete next.weightOptions;
       delete next.weightStock;
-    }
-    if (patch.weightStock && Object.keys(patch.weightStock).length === 0) {
+      next.stock = Math.max(
+        0,
+        Math.floor(Number(patch.stock ?? data.products[idx].stock) || 0)
+      );
+    } else if (next.weightOptions?.length) {
+      // Balls never keep a separate total — stock is always the sum of sizes.
+      next.weightStock = normalizeWeightStock(
+        next.weightStock,
+        next.weightOptions
+      );
+      next.stock = totalFromWeightStock(next.weightStock);
+    } else {
+      delete next.weightOptions;
       delete next.weightStock;
     }
     data.products[idx] = next;
