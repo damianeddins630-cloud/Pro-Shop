@@ -1,16 +1,34 @@
 import type { Order, OrderStatus } from "@/lib/types";
 
-/** Real purchase — hide unpaid Shopify drafts and cancelled never-paid rows from customers. */
-export function isPurchasedOrder(order: Pick<Order, "status" | "inventoryApplied">) {
+/**
+ * Real purchase that belongs in Ops / customer order history.
+ * Unpaid Shopify drafts (awaiting_payment) and cancelled never-paid rows stay out.
+ * Shopify rows only count after inventory settlement (full payment confirmed).
+ */
+export function isPurchasedOrder(
+  order: Pick<
+    Order,
+    "status" | "inventoryApplied" | "paymentProvider" | "total"
+  >
+) {
   if (order.status === "awaiting_payment") return false;
   if (order.status === "cancelled" && !order.inventoryApplied) return false;
-  return (
-    order.inventoryApplied === true ||
-    order.status === "placed" ||
-    order.status === "processing" ||
-    order.status === "ready" ||
-    order.status === "completed"
-  );
+
+  // Full payment (or free checkout) always sets inventoryApplied.
+  if (order.inventoryApplied === true) return true;
+
+  // Legacy local / free rows that never set the flag.
+  if (order.paymentProvider !== "shopify" && order.status !== "cancelled") {
+    return (
+      order.status === "placed" ||
+      order.status === "processing" ||
+      order.status === "ready" ||
+      order.status === "completed"
+    );
+  }
+
+  // Shopify without inventoryApplied = not fully paid — keep out of Orders.
+  return false;
 }
 
 export type MemberOrderStatus = {
@@ -29,15 +47,15 @@ export type OpsPipelineStep = {
 };
 
 /**
- * Simple house flow:
- * Pending pay → Balls in → Come do drilling → Order complete
+ * Simple house flow (after payment only):
+ * Balls in → Come do drilling → Order complete
  */
 export const OPS_PIPELINE: OpsPipelineStep[] = [
   {
     value: "awaiting_payment",
     label: "Pending payment",
     short: "Pay",
-    help: "Not paid yet",
+    help: "Not paid yet — hidden from Ops Orders until fully paid",
     tone: "pending",
   },
   {
@@ -88,9 +106,8 @@ export const CUSTOMER_PIPELINE: {
   { key: "completed", label: "Order complete", short: "Done" },
 ];
 
-/** Active fulfillment steps for Ops filter strip */
+/** Active fulfillment steps for Ops filter strip (paid orders only) */
 export const ACTIVE_PIPELINE: OrderStatus[] = [
-  "awaiting_payment",
   "processing",
   "ready",
   "completed",
@@ -103,11 +120,12 @@ export function opsStatusMeta(status: OrderStatus): OpsPipelineStep {
   );
 }
 
-/** One-tap advance: Pay → Balls in → Come do drilling → Order complete */
+/** One-tap advance: Balls in → Come do drilling → Order complete */
 export function nextOpsStatus(status: OrderStatus): OrderStatus | null {
   switch (status) {
     case "awaiting_payment":
-      return "processing";
+      // Never advance unpaid checkouts from Ops — payment must settle first.
+      return null;
     case "placed":
       return "processing";
     case "processing":
@@ -141,7 +159,8 @@ export function memberOrderStatus(status: OrderStatus): MemberOrderStatus {
       return {
         key: "come_drill",
         label: "Come do drilling",
-        detail: "Come in to Ballard's and do your drilling. In-store only — no shipping.",
+        detail:
+          "Come in to Ballard's and do your drilling. In-store only — no shipping.",
         tone: "ready",
       };
     case "completed":

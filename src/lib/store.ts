@@ -1558,6 +1558,7 @@ export async function updateOrderFulfillment(
   }
 ) {
   let updated: Order | null = null;
+  let blockedUnpaid = false;
   await mutate((data) => {
     const idx = (data.orders || []).findIndex((o) => o.id === id);
     if (idx === -1) return;
@@ -1565,6 +1566,20 @@ export async function updateOrderFulfillment(
       ...data.orders[idx],
       fulfillment: "in_store",
     };
+
+    // Unpaid Shopify drafts cannot be pushed into the in-store pipeline.
+    if (
+      patch.status &&
+      patch.status !== next.status &&
+      patch.status !== "cancelled" &&
+      patch.status !== "awaiting_payment" &&
+      next.status === "awaiting_payment" &&
+      !next.inventoryApplied
+    ) {
+      blockedUnpaid = true;
+      return;
+    }
+
     if (typeof patch.drillingNotes === "string") {
       next.drillingNotes = patch.drillingNotes;
     }
@@ -1594,6 +1609,11 @@ export async function updateOrderFulfillment(
     data.orders[idx] = next;
     updated = next;
   });
+  if (blockedUnpaid) {
+    throw new Error(
+      "Order is not fully paid yet — it will appear in Ops Orders only after Shopify payment completes."
+    );
+  }
   return updated;
 }
 
@@ -1674,18 +1694,22 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   return updateOrderFulfillment(id, { status });
 }
 
-/** Enrich Ops order list with phone from user account when missing on older orders */
+/** Enrich Ops order list with phone from user account when missing on older orders.
+ * Unpaid / partial Shopify checkouts are excluded — they are not real orders yet.
+ */
 export async function listAllOrdersForOps() {
   const data = await getStore();
   const users = new Map(data.users.map((u) => [u.id, u]));
-  return (data.orders || []).map((o) => {
-    const u = users.get(o.userId);
-    return {
-      ...o,
-      fulfillment: "in_store" as const,
-      phoneNumber: o.phoneNumber || u?.phoneNumber || undefined,
-    };
-  });
+  return (data.orders || [])
+    .filter((o) => isPurchasedOrder(o))
+    .map((o) => {
+      const u = users.get(o.userId);
+      return {
+        ...o,
+        fulfillment: "in_store" as const,
+        phoneNumber: o.phoneNumber || u?.phoneNumber || undefined,
+      };
+    });
 }
 
 export async function listCoaches() {

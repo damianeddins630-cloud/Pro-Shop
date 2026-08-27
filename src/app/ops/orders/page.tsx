@@ -23,7 +23,6 @@ import { formatWeightLbs } from "@/lib/weights";
 type FilterKey =
   | "all"
   | "active"
-  | "awaiting_payment"
   | "balls_in"
   | "ready"
   | "completed"
@@ -33,7 +32,6 @@ const FILTER_TABS: { key: FilterKey; label: string; statuses?: OrderStatus[] }[]
   [
     { key: "active", label: "Active" },
     { key: "all", label: "All" },
-    { key: "awaiting_payment", label: "Pending payment" },
     {
       key: "balls_in",
       label: "Balls in",
@@ -159,7 +157,6 @@ export default function OpsOrdersPage() {
         if (filter === "all") return true;
         if (filter === "active") {
           return (
-            o.status === "awaiting_payment" ||
             o.status === "placed" ||
             o.status === "processing" ||
             o.status === "ready"
@@ -201,7 +198,10 @@ export default function OpsOrdersPage() {
             In-store fulfillment
           </p>
           <h2 className="display mt-1 text-5xl md:text-6xl">Orders</h2>
-          <p className="mt-2 max-w-2xl text-sm text-mist">{IN_STORE_POLICY}</p>
+          <p className="mt-2 max-w-2xl text-sm text-mist">
+            {IN_STORE_POLICY} Only fully paid checkouts appear here — unpaid
+            Shopify invoices stay out until payment completes.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canManage ? (
@@ -255,7 +255,7 @@ export default function OpsOrdersPage() {
         <Metric
           label="Active in shop"
           value={String(pipelineCounts.active)}
-          hint="Pay → balls in → drilling"
+          hint="Paid only · balls in → drilling"
         />
         <Metric
           label="Balls in"
@@ -593,7 +593,6 @@ function OrderWorkstationCard({
               >
                 {(
                   [
-                    "awaiting_payment",
                     "processing",
                     "ready",
                     "completed",

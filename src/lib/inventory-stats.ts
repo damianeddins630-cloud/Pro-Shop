@@ -94,9 +94,10 @@ export function countOrdersByStatus(orders: Order[]): PipelineCounts {
     cancelled: 0,
   };
   for (const o of orders) {
+    // Unpaid checkouts should already be filtered out of Ops lists.
+    if (o.status === "awaiting_payment") continue;
     counts[o.status] = (counts[o.status] || 0) + 1;
     if (
-      o.status === "awaiting_payment" ||
       o.status === "placed" ||
       o.status === "processing" ||
       o.status === "ready"
@@ -104,6 +105,13 @@ export function countOrdersByStatus(orders: Order[]): PipelineCounts {
       counts.active += 1;
     }
   }
+  // Recalculate all as paid-visible rows only.
+  counts.all =
+    (counts.placed || 0) +
+    (counts.processing || 0) +
+    (counts.ready || 0) +
+    (counts.completed || 0) +
+    (counts.cancelled || 0);
   return counts;
 }
 

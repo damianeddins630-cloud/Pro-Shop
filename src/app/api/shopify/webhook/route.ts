@@ -28,9 +28,10 @@ function verifyShopifyHmac(rawBody: string, hmacHeader: string | null) {
   }
 }
 
-function looksPaid(topic: string, financialStatus: string) {
+function looksFullyPaid(topic: string, financialStatus: string) {
+  // Only fully paid — partial payments must NOT enter Ops Orders.
   if (topic === "orders/paid") return true;
-  if (financialStatus === "paid" || financialStatus === "partially_paid") {
+  if (financialStatus === "paid") {
     return (
       !topic ||
       topic === "orders/updated" ||
@@ -76,11 +77,14 @@ export async function POST(req: Request) {
     };
 
     const financial = (payload.financial_status || "").toLowerCase();
-    if (!looksPaid(topic, financial)) {
+    if (!looksFullyPaid(topic, financial)) {
       return NextResponse.json({
         ok: true,
         matched: false,
-        reason: "not_paid",
+        reason:
+          financial === "partially_paid"
+            ? "partial_payment_ignored"
+            : "not_paid",
       });
     }
 

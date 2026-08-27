@@ -598,7 +598,8 @@ export async function isShopifyDraftOrderPaid(
     if (!draft) return false;
     if (draft.status === "COMPLETED" && draft.order) {
       const status = (draft.order.displayFinancialStatus || "").toUpperCase();
-      return status === "PAID" || status === "PARTIALLY_PAID";
+      // Fully paid only — partial payments must not settle inventory / Ops Orders.
+      return status === "PAID";
     }
     return false;
   } catch {

@@ -31,9 +31,9 @@ export async function GET() {
       checkoutFlow: [
         "Website owns catalog, prices, cart, and stock",
         "Cart items stay in the browser until the shopper pays or removes them",
-        "POST /api/checkout creates a website order (awaiting_payment) without reducing stock",
+        "POST /api/checkout creates a website order (awaiting_payment) without reducing stock; unpaid drafts stay out of Ops Orders",
         "Each Pay click rebuilds a Shopify Draft Order from LIVE website prices/discounts",
-        "Shopify webhook / return confirm marks paid, then website stock drops once",
+        "Shopify webhook / return confirm requires FULL payment, then the order appears in Ops and stock drops once",
       ],
       webhookUrl:
         (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||

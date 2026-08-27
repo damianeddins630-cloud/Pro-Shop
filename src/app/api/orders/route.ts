@@ -38,6 +38,7 @@ export async function GET(req: Request) {
         orderCount: orders.length,
         fulfillment: "in_store",
         policy: "In-store only. No shipping. Come in for drilling.",
+        note: "Only fully paid orders appear here. Unpaid Shopify checkouts stay out until payment completes.",
       },
       { headers: noStore }
     );
