@@ -139,6 +139,7 @@ export async function requireAdmin() {
     "manage_inventory",
     "manage_deals",
     "manage_sponsors",
+    "manage_subscribers",
     "manage_coaches",
     "edit_pages"
   );

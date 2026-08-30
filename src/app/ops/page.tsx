@@ -36,6 +36,12 @@ const cards: {
     perms: ["manage_sponsors", "edit_pages"],
   },
   {
+    href: "/ops/subscribers",
+    title: "Subscribers",
+    text: "See who signed up and email announcements or documents to their signup address.",
+    perms: ["manage_subscribers", "edit_pages", "manage_users"],
+  },
+  {
     href: "/ops/orders",
     title: "Orders",
     text: "In-store command center — drill notes, phone, pipeline, ball vault. No shipping.",

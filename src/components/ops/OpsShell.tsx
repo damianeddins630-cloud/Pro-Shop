@@ -26,6 +26,11 @@ const nav: { href: string; label: string; perms: Permission[] }[] = [
     label: "Sponsors",
     perms: ["manage_sponsors", "edit_pages"],
   },
+  {
+    href: "/ops/subscribers",
+    label: "Subscribers",
+    perms: ["manage_subscribers", "edit_pages", "manage_users"],
+  },
   { href: "/ops/orders", label: "Orders", perms: ["view_orders", "manage_orders"] },
   {
     href: "/ops/shopify",
@@ -56,6 +61,7 @@ export function OpsShell({ children }: { children: ReactNode }) {
     can("manage_inventory") ||
     can("manage_deals") ||
     can("manage_sponsors") ||
+    can("manage_subscribers") ||
     can("manage_roles") ||
     can("manage_users") ||
     can("view_orders") ||

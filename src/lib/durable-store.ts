@@ -1,5 +1,5 @@
 import { get as blobGet, list as blobList, put as blobPut } from "@vercel/blob";
-import type { StoreData, User, Order, Role, Coupon, Subscriber } from "@/lib/types";
+import type { StoreData, User, Order, Role, Coupon, Subscriber, SubscriberAnnouncement } from "@/lib/types";
 import {
   githubWriteConfigured,
   loadGithubStore,
@@ -161,6 +161,10 @@ function mergeDurableCopies(
     subscribers: mergeById<Subscriber>(
       secondary.subscribers,
       primary.subscribers
+    ),
+    announcements: mergeById<SubscriberAnnouncement>(
+      secondary.announcements || [],
+      primary.announcements || []
     ),
     shopifyConfig: mergeShopifyConfig(
       secondary.shopifyConfig,

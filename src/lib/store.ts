@@ -18,6 +18,7 @@ import type {
   Permission,
   Coupon,
   ShopifySiteConfig,
+  SubscriberAnnouncement,
 } from "./types";
 import { ALL_PERMISSIONS } from "./types";
 import seedJson from "@/data/seed.json";
@@ -171,6 +172,10 @@ async function reconcileWithRemote(
     remote.subscribers,
     local.subscribers
   );
+  local.announcements = mergeByIdPreferLocal(
+    remote.announcements,
+    local.announcements
+  );
   local.roles = mergeByIdPreferLocal(remote.roles, local.roles);
 
   const remoteCatalogTs = catalogUpdatedAtMs(remote);
@@ -254,6 +259,7 @@ function defaultRoles(): Role[] {
         "manage_deals",
         "manage_coaches",
         "view_orders",
+        "manage_subscribers",
       ],
       system: true,
       rank: STAFF_ROLE_RANK,
@@ -280,6 +286,7 @@ function cloneSeed(): StoreData {
   const seed = JSON.parse(JSON.stringify(seedJson)) as StoreData;
   seed.users = seed.users || [];
   seed.subscribers = seed.subscribers || [];
+  seed.announcements = seed.announcements || [];
   seed.products = seed.products || [];
   seed.sponsors = seed.sponsors || [];
   seed.deals = seed.deals || [];
@@ -415,6 +422,7 @@ function mergeWithSeed(parsed: StoreData): StoreData {
   parsed.roles = parsed.roles?.length ? parsed.roles : seed.roles;
   parsed.orders = parsed.orders || [];
   parsed.subscribers = parsed.subscribers || [];
+  parsed.announcements = parsed.announcements || [];
   parsed.users = parsed.users || [];
   // Keep an empty coupons list if ops deleted every custom code — only
   // fall back to seed when the field is missing entirely.
@@ -1208,14 +1216,107 @@ export async function createUser(input: {
 export async function addSubscriber(input: Omit<Subscriber, "id" | "createdAt">) {
   let created: Subscriber | null = null;
   await mutate((data) => {
+    data.subscribers = data.subscribers || [];
+    const email = input.email.trim().toLowerCase();
+    const existing = data.subscribers.find(
+      (s) => s.email.trim().toLowerCase() === email
+    );
+    if (existing) {
+      existing.firstName = input.firstName.trim();
+      existing.lastName = input.lastName.trim();
+      existing.city = input.city.trim();
+      existing.state = input.state.trim();
+      existing.email = email;
+      created = existing;
+      return;
+    }
     created = {
       ...input,
+      email,
       id: randomUUID(),
       createdAt: new Date().toISOString(),
     };
-    data.subscribers.push(created);
+    data.subscribers.unshift(created);
   });
   return created!;
+}
+
+export async function listSubscribers() {
+  const data = await getStore();
+  return [...(data.subscribers || [])].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export async function deleteSubscriber(id: string) {
+  let ok = false;
+  await mutate((data) => {
+    const before = (data.subscribers || []).length;
+    data.subscribers = (data.subscribers || []).filter((s) => s.id !== id);
+    ok = data.subscribers.length < before;
+  });
+  return ok;
+}
+
+export async function listAnnouncements() {
+  const data = await getStore();
+  return [...(data.announcements || [])].sort(
+    (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+  );
+}
+
+export async function recordAnnouncement(
+  input: Omit<SubscriberAnnouncement, "id" | "sentAt">
+) {
+  let created: SubscriberAnnouncement | null = null;
+  await mutate((data) => {
+    data.announcements = data.announcements || [];
+    created = {
+      ...input,
+      id: randomUUID(),
+      sentAt: new Date().toISOString(),
+    };
+    data.announcements.unshift(created);
+    // Keep last 100 blasts
+    data.announcements = data.announcements.slice(0, 100);
+  });
+  return created!;
+}
+
+/** Emails to blast: subscribers, optionally registered account emails too. */
+export async function listAnnouncementRecipients(opts?: {
+  includeAccounts?: boolean;
+}) {
+  const data = await getStore();
+  const map = new Map<
+    string,
+    { email: string; firstName: string; source: "subscriber" | "account" }
+  >();
+
+  for (const s of data.subscribers || []) {
+    const email = (s.email || "").trim().toLowerCase();
+    if (!email.includes("@")) continue;
+    map.set(email, {
+      email,
+      firstName: s.firstName || "",
+      source: "subscriber",
+    });
+  }
+
+  if (opts?.includeAccounts) {
+    for (const u of data.users || []) {
+      const email = (u.email || "").trim().toLowerCase();
+      if (!email.includes("@") || map.has(email)) continue;
+      map.set(email, {
+        email,
+        firstName: u.username || "",
+        source: "account",
+      });
+    }
+  }
+
+  return Array.from(map.values());
 }
 
 export async function reduceStock(

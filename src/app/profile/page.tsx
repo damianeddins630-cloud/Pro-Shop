@@ -93,6 +93,7 @@ export default function ProfilePage() {
         "manage_users",
         "manage_deals",
         "manage_sponsors",
+        "manage_subscribers",
         "view_orders",
         "edit_pages",
       ].includes(p)

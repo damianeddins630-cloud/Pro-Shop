@@ -569,6 +569,7 @@
     }
   ],
   "subscribers": [],
+  "announcements": [],
   "users": [
     {
       "id": "user_owner",

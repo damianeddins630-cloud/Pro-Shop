@@ -7,7 +7,8 @@ export type Permission =
   | "manage_users"
   | "manage_roles"
   | "view_orders"
-  | "manage_orders";
+  | "manage_orders"
+  | "manage_subscribers";
 
 export const ALL_PERMISSIONS: Permission[] = [
   "edit_pages",
@@ -19,6 +20,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "manage_roles",
   "view_orders",
   "manage_orders",
+  "manage_subscribers",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -31,6 +33,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   manage_roles: "Manage roles & permissions",
   view_orders: "View all orders",
   manage_orders: "Manage order status",
+  manage_subscribers: "Email subscribers & announcements",
 };
 
 export interface Role {
@@ -130,6 +133,20 @@ export interface Subscriber {
   city: string;
   state: string;
   createdAt: string;
+}
+
+/** Ops-sent announcement / document blast to subscriber emails */
+export interface SubscriberAnnouncement {
+  id: string;
+  subject: string;
+  body: string;
+  documentName?: string;
+  documentUrl?: string;
+  recipientCount: number;
+  failedCount?: number;
+  sentAt: string;
+  sentBy: string;
+  includeAccounts?: boolean;
 }
 
 export interface Coach {
@@ -249,6 +266,8 @@ export interface StoreData {
   sponsors: Sponsor[];
   deals: Deal[];
   subscribers: Subscriber[];
+  /** Ops announcement / document email history */
+  announcements?: SubscriberAnnouncement[];
   users: User[];
   coaches: Coach[];
   texts: PageText[];
