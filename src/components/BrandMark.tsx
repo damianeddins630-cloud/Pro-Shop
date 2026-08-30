@@ -33,14 +33,19 @@ export function BrandMark({ mode = "logo", size = 52, className = "" }: BrandMar
   }
 
   return (
-    <Image
-      src="/images/logo.png"
-      alt="Ballard's Bowling Academy"
-      width={size}
-      height={size}
-      className={`object-contain ${className}`}
-      style={{ width: size, height: "auto" }}
-      priority
-    />
+    <span
+      className={`logo-box inline-flex items-center justify-center !p-1.5 ${className}`}
+      style={{ width: size + 12, height: size + 12 }}
+    >
+      <Image
+        src="/images/logo.png"
+        alt="Ballard's Bowling Academy"
+        width={size}
+        height={size}
+        className="img-clean h-auto w-full"
+        style={{ width: size, height: "auto" }}
+        priority
+      />
+    </span>
   );
 }
