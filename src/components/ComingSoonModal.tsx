@@ -69,13 +69,12 @@ export function ComingSoonModal({
           className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-3 sm:p-5"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="logo-box relative w-full max-w-5xl overflow-hidden rounded-xl shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+          <div className="logo-box relative w-full max-w-6xl overflow-hidden rounded-xl shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image}
               alt={title}
               className="img-clean mx-auto block h-auto w-full"
-              style={{ maxHeight: "none" }}
             />
           </div>
         </div>
