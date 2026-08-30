@@ -65,7 +65,7 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
         >
           <button
             type="button"
-            className="media-box mx-auto block w-full max-w-5xl p-3 text-left sm:p-5 md:p-6"
+            className="media-box mx-auto block w-full p-2 text-left sm:p-4 md:p-5"
             onClick={() => {
               if (!editMode) setActive(deal);
             }}
