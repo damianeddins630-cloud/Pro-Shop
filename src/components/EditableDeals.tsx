@@ -57,7 +57,7 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
   }
 
   return (
-    <div className="grid gap-14">
+    <div className="grid gap-10">
       {deals.map((deal) => (
         <article
           key={deal.id}
@@ -65,18 +65,18 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
         >
           <button
             type="button"
-            className="media-box mx-auto block w-full p-1 text-left sm:p-2 md:p-3"
+            className="media-box mx-auto block w-full max-w-[800px] p-2 text-left sm:p-3"
             onClick={() => {
               if (!editMode) setActive(deal);
             }}
             aria-label={`Open ${deal.title} flyer larger`}
           >
-            {/* Full-width natural size so prices stay readable while scrolling */}
+            {/* ~50% of prior full-bleed width; tap to enlarge for full reading */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={deal.image}
               alt={deal.title}
-              className="img-clean mx-auto block h-auto w-full max-w-none"
+              className="img-clean mx-auto block h-auto w-full"
               loading="eager"
             />
           </button>
