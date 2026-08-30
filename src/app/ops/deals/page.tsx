@@ -130,8 +130,8 @@ export default function OpsDealsPage() {
           {deals.map((d) => (
             <article key={d.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <div className="flex gap-3">
-                <div className="relative h-20 w-28 overflow-hidden rounded-lg">
-                  <Image src={d.image} alt={d.title} fill className="object-cover" unoptimized />
+                <div className="logo-box relative h-20 w-28 overflow-hidden !rounded-lg">
+                  <Image src={d.image} alt={d.title} fill className="img-clean p-1" unoptimized />
                 </div>
                 <div>
                   <h3 className="font-semibold">{d.title}</h3>

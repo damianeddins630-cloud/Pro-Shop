@@ -89,15 +89,17 @@ export default async function BvbcPage() {
       <section className="site-shell section-pad pt-24">
         <div className="flex flex-col items-start gap-6 md:flex-row md:items-center">
           <div className="relative h-24 w-56 shrink-0 md:h-28 md:w-72">
-            <Image
-              src="/images/bvbc-logo.png"
-              alt='Ballard vs. The Big "C"'
-              fill
-              className="img-clean"
-              priority
-              sizes="288px"
-              unoptimized
-            />
+            <div className="logo-box relative h-full w-full">
+              <Image
+                src="/images/bvbc-logo.png"
+                alt='Ballard vs. The Big "C"'
+                fill
+                className="img-clean"
+                priority
+                sizes="288px"
+                unoptimized
+              />
+            </div>
           </div>
           <div>
             <EditablePageTitle
@@ -180,7 +182,7 @@ export default async function BvbcPage() {
         </div>
 
         <div className="space-y-5">
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-transparent p-4">
+          <div className="media-box overflow-hidden p-4">
             <Image
               src="/images/bvbc-flyer.png"
               alt="BVBC Flyer 2026"

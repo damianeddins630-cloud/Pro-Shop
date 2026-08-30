@@ -62,11 +62,11 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
       {deals.map((deal) => (
         <article
           key={deal.id}
-          className="grid overflow-hidden rounded-[2rem] border border-white/10 bg-transparent lg:grid-cols-2"
+          className="grid overflow-hidden rounded-[2rem] border border-white/15 lg:grid-cols-2"
         >
           <button
             type="button"
-            className="relative min-h-[280px] w-full bg-transparent text-left"
+            className="media-box relative min-h-[280px] w-full text-left"
             onClick={() => {
               if (!editMode) setActive(deal);
             }}
@@ -75,7 +75,7 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
               src={deal.image}
               alt={deal.title}
               fill
-              className="img-clean"
+              className="img-clean p-4"
               sizes="(max-width:1024px) 100vw, 50vw"
               unoptimized
             />

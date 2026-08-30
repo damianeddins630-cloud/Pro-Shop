@@ -182,11 +182,28 @@ a {
   border-color: rgba(255, 255, 255, 0.22);
 }
 
-/* Product / coach / deal art: full subject visible, no crop, no filled card bg */
+/* Product / coach / deal / logo art: full subject visible, no crop */
 .img-clean {
   object-fit: contain !important;
   object-position: center;
   background: transparent !important;
+}
+
+/* White see-through boxes so logos (incl. dark ones) stay fully visible */
+.logo-box,
+.media-box {
+  background: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+}
+
+.logo-box {
+  border-radius: 1rem;
+  padding: 0.75rem;
+}
+
+.media-box {
+  border-radius: 1.25rem;
 }
 
 .hero-copy-panel {

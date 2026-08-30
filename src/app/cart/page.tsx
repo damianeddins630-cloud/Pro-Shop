@@ -354,12 +354,13 @@ export default function CartPage() {
                 key={cartLineKey(product.id, item.weight)}
                 className="flex gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4"
               >
-                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-black/30">
+                <div className="logo-box relative h-24 w-24 shrink-0 overflow-hidden !rounded-xl">
                   <Image
                     src={product.image}
                     alt={product.name}
                     fill
-                    className="object-contain p-2"
+                    className="img-clean p-2"
+                    unoptimized
                   />
                 </div>
                 <div className="flex-1">

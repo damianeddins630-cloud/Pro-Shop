@@ -61,7 +61,7 @@ export function EditableCoaches({ initial }: { initial: Coach[] }) {
         {coaches.map((coach) => (
           <article
             key={coach.id}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-transparent"
+            className="overflow-hidden rounded-2xl border border-white/15"
           >
             <button
               type="button"
@@ -70,12 +70,12 @@ export function EditableCoaches({ initial }: { initial: Coach[] }) {
                 if (!editMode) setActive(coach);
               }}
             >
-              <div className="relative aspect-[3/4] bg-transparent">
+              <div className="media-box relative aspect-[3/4] overflow-hidden">
                 <Image
                   src={coach.image}
                   alt={coach.name}
                   fill
-                  className="img-clean transition duration-500 group-hover:scale-[1.02]"
+                  className="img-clean p-2 transition duration-500 group-hover:scale-[1.02]"
                   sizes="(max-width:768px) 50vw, 25vw"
                   unoptimized
                 />

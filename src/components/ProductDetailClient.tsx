@@ -100,7 +100,7 @@ export function ProductDetailClient({
         ← Back to shop
       </Link>
       <div className="mt-6 grid gap-8 lg:grid-cols-2">
-        <div className="relative aspect-square overflow-hidden rounded-3xl border border-white/10 bg-transparent">
+        <div className="media-box relative aspect-square overflow-hidden">
           <Image
             src={product.image}
             alt={product.name}

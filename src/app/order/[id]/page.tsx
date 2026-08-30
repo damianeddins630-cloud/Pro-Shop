@@ -125,12 +125,12 @@ export default function OrderDetailPage() {
               key={`${item.productId}-${item.weight ?? "na"}-${item.name}`}
               className="flex gap-3"
             >
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-black/40">
+              <div className="logo-box relative h-16 w-16 shrink-0 overflow-hidden !rounded-xl">
                 <Image
                   src={item.image || "/images/logo.png"}
                   alt={item.name}
                   fill
-                  className="object-contain p-1"
+                  className="img-clean p-1"
                   unoptimized
                 />
               </div>

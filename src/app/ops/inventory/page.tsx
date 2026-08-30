@@ -686,8 +686,8 @@ export default function OpsInventoryPage() {
                 key={p.id}
                 className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
               >
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-black/40">
-                  <Image src={p.image} alt={p.name} fill className="object-contain p-1" unoptimized />
+                <div className="logo-box relative h-20 w-20 shrink-0 overflow-hidden !rounded-xl">
+                  <Image src={p.image} alt={p.name} fill className="img-clean p-1" unoptimized />
                 </div>
                 <div className="min-w-0 flex-1">
                   <h4 className="truncate font-semibold">{p.name}</h4>

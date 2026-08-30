@@ -53,15 +53,17 @@ export function ComingSoonModal({
         onClick={(e) => e.stopPropagation()}
       >
         {image ? (
-          <div className="relative mx-auto mt-6 h-48 w-full max-w-[220px]">
-            <Image
-              src={image}
-              alt={title}
-              fill
-              className="img-clean"
-              sizes="220px"
-              unoptimized
-            />
+          <div className="logo-box relative mx-auto mt-6 h-48 w-full max-w-[220px]">
+            <span className="relative block h-full w-full">
+              <Image
+                src={image}
+                alt={title}
+                fill
+                className="img-clean"
+                sizes="220px"
+                unoptimized
+              />
+            </span>
           </div>
         ) : null}
         <div className="space-y-3 p-6 text-center md:p-8">

@@ -57,21 +57,23 @@ export function EditableSponsors({ initial }: { initial: Sponsor[] }) {
         {sponsors.map((sponsor) => (
           <div
             key={sponsor.id}
-            className="group flex flex-col items-center rounded-2xl border border-white/10 bg-transparent p-5 transition hover:border-red/40"
+            className="group flex flex-col items-center rounded-2xl border border-white/15 p-4 transition hover:border-red/40"
           >
             <a
               href={sponsor.url || "#"}
               target={sponsor.url?.startsWith("http") ? "_blank" : undefined}
               rel="noreferrer"
-              className="relative mb-4 h-28 w-full bg-transparent"
+              className="logo-box relative mb-4 flex h-28 w-full items-center justify-center"
             >
-              <Image
-                src={sponsor.image}
-                alt={sponsor.name}
-                fill
-                className="img-clean"
-                unoptimized
-              />
+              <span className="relative h-full w-full">
+                <Image
+                  src={sponsor.image}
+                  alt={sponsor.name}
+                  fill
+                  className="img-clean"
+                  unoptimized
+                />
+              </span>
             </a>
             <EditableText
               as="span"

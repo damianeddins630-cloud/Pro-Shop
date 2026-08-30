@@ -528,12 +528,12 @@ function OrderWorkstationCard({
                 key={`${order.id}-${item.productId}-${item.weight ?? "na"}-${item.name}`}
                 className="flex gap-3"
               >
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-black/40">
+                <div className="logo-box relative h-14 w-14 shrink-0 overflow-hidden !rounded-xl">
                   <Image
                     src={item.image || "/images/logo.png"}
                     alt={item.name}
                     fill
-                    className="object-contain p-1"
+                    className="img-clean p-1"
                     unoptimized
                   />
                 </div>

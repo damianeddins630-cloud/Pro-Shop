@@ -237,12 +237,12 @@ export default function ProfilePage() {
                   <ul className="mt-5 space-y-3">
                     {order.items.map((item) => (
                       <li key={`${order.id}-${item.productId}-${item.weight ?? "na"}-${item.name}`} className="flex gap-3">
-                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-black/40">
+                        <div className="logo-box relative h-14 w-14 shrink-0 overflow-hidden !rounded-lg">
                           <Image
                             src={item.image}
                             alt={item.name}
                             fill
-                            className="object-contain p-1"
+                            className="img-clean p-1"
                             unoptimized
                           />
                         </div>

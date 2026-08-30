@@ -112,8 +112,10 @@ export default function OpsSponsorsPage() {
         <div className="grid grid-cols-2 gap-3">
           {sponsors.map((s) => (
             <article key={s.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="relative mb-3 h-20 w-full">
-                <Image src={s.image} alt={s.name} fill className="object-contain" unoptimized />
+              <div className="logo-box relative mb-3 h-20 w-full">
+                <span className="relative block h-full w-full">
+                  <Image src={s.image} alt={s.name} fill className="img-clean" unoptimized />
+                </span>
               </div>
               <h3 className="text-sm font-semibold">{s.name}</h3>
               <div className="mt-2 flex gap-2">

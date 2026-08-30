@@ -148,21 +148,24 @@ export default async function ShopPage({
                 <Link
                   key={b.name}
                   href={b.href}
-                  className={`group relative min-h-[130px] overflow-hidden rounded-2xl border transition ${
+                  className={`group overflow-hidden rounded-2xl border transition ${
                     active
                       ? "border-red ring-2 ring-red/40"
-                      : "border-white/10 hover:border-red/50"
+                      : "border-white/15 hover:border-red/50"
                   }`}
                 >
-                  <Image
-                    src={b.image}
-                    alt={b.name}
-                    fill
-                    className="img-clean opacity-90 transition group-hover:scale-105"
-                    unoptimized
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-                  <span className="absolute inset-x-0 bottom-0 p-3">
+                  <div className="logo-box relative h-28 w-full">
+                    <span className="relative block h-full w-full">
+                      <Image
+                        src={b.image}
+                        alt={b.name}
+                        fill
+                        className="img-clean transition group-hover:scale-105"
+                        unoptimized
+                      />
+                    </span>
+                  </div>
+                  <span className="block bg-black/80 px-3 py-2">
                     <span className="block text-sm font-semibold text-chalk">
                       {b.name}
                     </span>
@@ -175,17 +178,20 @@ export default async function ShopPage({
             })}
             <Link
               href="/coaching"
-              className="group relative min-h-[130px] overflow-hidden rounded-2xl border border-white/10 hover:border-red/50"
+              className="group overflow-hidden rounded-2xl border border-white/15 hover:border-red/50"
             >
-              <Image
-                src="/images/collections/bowling-lessons.png"
-                alt="Lessons"
-                fill
-                className="img-clean opacity-90 transition group-hover:scale-105"
-                unoptimized
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-              <span className="absolute inset-x-0 bottom-0 p-3 text-sm font-semibold">
+              <div className="logo-box relative h-28 w-full">
+                <span className="relative block h-full w-full">
+                  <Image
+                    src="/images/collections/bowling-lessons.png"
+                    alt="Lessons"
+                    fill
+                    className="img-clean transition group-hover:scale-105"
+                    unoptimized
+                  />
+                </span>
+              </div>
+              <span className="block bg-black/80 px-3 py-2 text-sm font-semibold text-chalk">
                 Lessons
               </span>
             </Link>

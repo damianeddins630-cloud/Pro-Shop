@@ -13,9 +13,9 @@ export function ProductCard({ product }: { product: Product }) {
   const needsWeight = productRequiresWeight(product);
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-white/10 bg-transparent transition hover:border-red/40">
+    <article className="group overflow-hidden rounded-2xl border border-white/15 transition hover:border-red/40">
       <Link href={`/shop/${product.slug}`} className="block">
-        <div className="relative aspect-square overflow-hidden bg-transparent">
+        <div className="media-box relative aspect-square overflow-hidden">
           <Image
             src={product.image}
             alt={product.name}
