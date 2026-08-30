@@ -36,19 +36,17 @@ export function BrandMark({ mode = "logo", size = 52, className = "" }: BrandMar
    * Academy mark has a white disc — never put it in a white box or it looks "broken"
    * (only the red ring remains). Sit it on the dark header instead.
    */
-  const height = Math.round(size * 0.72);
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center ${className}`}
-      style={{ width: size, height }}
+      style={{ width: size, height: size }}
     >
       <Image
-        src="/images/logo.png"
+        src="/images/brand-mark.png"
         alt="Ballard's Bowling Academy"
         width={size}
-        height={height}
+        height={size}
         className="img-clean h-full w-full"
-        style={{ width: size, height: "auto" }}
         priority
         unoptimized
       />

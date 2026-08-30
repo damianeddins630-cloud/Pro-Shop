@@ -42,11 +42,11 @@ function LoginForm() {
       <div className="mb-8 text-center">
         <span className="mx-auto inline-flex items-center justify-center">
           <Image
-            src="/images/logo.png"
+            src="/images/brand-mark.png"
             alt="Ballard's Bowling Academy"
-            width={200}
-            height={140}
-            className="img-clean mx-auto h-auto w-[160px] md:w-[200px]"
+            width={160}
+            height={160}
+            className="img-clean mx-auto h-auto w-[130px] md:w-[160px]"
             priority
             unoptimized
           />
