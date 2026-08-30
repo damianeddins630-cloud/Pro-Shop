@@ -3,19 +3,22 @@
 import Image from "next/image";
 import { useEffect } from "react";
 
-/** Simple click-to-open detail modal — description placeholder for now. */
+/** Click-to-open detail modal — large flyer mode for readable deals. */
 export function ComingSoonModal({
   open,
   onClose,
   title,
   image,
   kind = "details",
+  largeImage = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   image?: string;
   kind?: "coach" | "deal" | "details";
+  /** Show flyer nearly full-screen so text/prices are readable */
+  largeImage?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -39,6 +42,49 @@ export function ComingSoonModal({
       : kind === "deal"
         ? "Deal details"
         : "Details";
+
+  /* Large flyer lightbox — prioritize readable image */
+  if (largeImage && image) {
+    return (
+      <div
+        className="fixed inset-0 z-[120] flex flex-col bg-black/92 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={onClose}
+      >
+        <div
+          className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/80 px-4 py-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="min-w-0">
+            <p className="text-[10px] tracking-[0.2em] text-red uppercase">{label}</p>
+            <h3 className="truncate text-lg font-bold text-white md:text-xl">{title}</h3>
+          </div>
+          <button type="button" className="btn btn-secondary shrink-0" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div
+          className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-3 sm:p-5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="logo-box relative w-full max-w-5xl overflow-hidden rounded-xl shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image}
+              alt={title}
+              className="img-clean mx-auto block h-auto w-full"
+              style={{ maxHeight: "none" }}
+            />
+          </div>
+        </div>
+        <p className="shrink-0 px-4 py-3 text-center text-sm text-mist">
+          Full description coming soon — scroll the flyer to read all details.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

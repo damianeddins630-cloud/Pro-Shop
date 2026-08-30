@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AddItemButton, EditableText, ItemControls } from "@/components/Editable";
@@ -58,59 +57,57 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
   }
 
   return (
-    <div className="grid gap-8">
+    <div className="grid gap-14">
       {deals.map((deal) => (
         <article
           key={deal.id}
-          className="grid overflow-hidden rounded-[2rem] border border-white/15 lg:grid-cols-2"
+          className="overflow-hidden rounded-[2rem] border border-white/15"
         >
           <button
             type="button"
-            className="media-box relative min-h-[280px] w-full text-left"
+            className="media-box mx-auto block w-full max-w-5xl p-3 text-left sm:p-5 md:p-6"
             onClick={() => {
               if (!editMode) setActive(deal);
             }}
+            aria-label={`Open ${deal.title} flyer larger`}
           >
-            <Image
+            {/* Intrinsic size so the full flyer stays readable while scrolling */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={deal.image}
               alt={deal.title}
-              fill
-              className="img-clean p-4"
-              sizes="(max-width:1024px) 100vw, 50vw"
-              unoptimized
+              className="img-clean mx-auto block h-auto w-full"
+              loading="eager"
             />
           </button>
-          <div className="flex flex-col justify-center p-8 md:p-10">
-            {deal.featured && (
-              <span className="mb-3 w-fit rounded-full bg-red/15 px-3 py-1 text-xs tracking-[0.16em] text-red uppercase">
-                Deal of the Month
-              </span>
-            )}
-            <button
-              type="button"
-              className="text-left"
-              onClick={() => {
-                if (!editMode) setActive(deal);
-              }}
-            >
+
+          <div className="flex flex-col items-start justify-center gap-3 border-t border-white/10 bg-black/40 px-6 py-6 md:flex-row md:items-center md:justify-between md:px-8">
+            <div>
+              {deal.featured && (
+                <span className="mb-2 inline-flex w-fit rounded-full bg-red/15 px-3 py-1 text-xs tracking-[0.16em] text-red uppercase">
+                  Deal of the Month
+                </span>
+              )}
               <EditableText
                 as="h2"
-                className="display text-4xl"
+                className="display text-3xl md:text-4xl"
                 value={deal.title}
                 onSave={(title) => rename(deal.id, title)}
               />
-            </button>
-            <p className="mt-4 text-mist">
-              {editMode ? deal.description : "Tap for details — coming soon"}
-            </p>
-            <ItemControls onRemove={() => remove(deal.id)} />
+              <p className="mt-2 text-sm text-mist">
+                {editMode
+                  ? deal.description
+                  : "Scroll the flyer to read prices — or tap to enlarge."}
+              </p>
+              <ItemControls onRemove={() => remove(deal.id)} />
+            </div>
             {!editMode ? (
               <button
                 type="button"
-                className="btn btn-ghost mt-4 w-fit !py-2 text-sm"
+                className="btn btn-primary shrink-0"
                 onClick={() => setActive(deal)}
               >
-                View details
+                Enlarge flyer
               </button>
             ) : null}
           </div>
@@ -123,6 +120,7 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
         title={active?.title || "Deal"}
         image={active?.image}
         kind="deal"
+        largeImage
       />
     </div>
   );
