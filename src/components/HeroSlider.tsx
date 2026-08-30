@@ -19,14 +19,14 @@ export function HeroSlider({
     <section className="relative min-h-[100svh] overflow-hidden">
       <div className="absolute inset-0">
         <Image
-          src="/images/bvbc-flyer.png"
-          alt="Ballard vs The Big C"
+          src="/images/hero/slide-3.jpg"
+          alt="Ballard's Bowling Academy Pro Shop"
           fill
           priority
-          className="object-cover object-top"
+          className="object-cover object-center"
           sizes="100vw"
         />
-        {/* Dark scrims so headline stays readable over the BVBC banner */}
+        {/* Dark scrims so headline stays readable over the pro shop wall */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/88 via-black/65 to-black/45" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/50" />
       </div>
