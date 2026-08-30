@@ -36,7 +36,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/85 backdrop-blur-xl">
       <div className="site-shell flex items-center justify-between gap-4 py-3">
         <Link href="/" className="flex items-center gap-3">
-          <BrandMark mode={shopMode ? "cart" : "logo"} size={shopMode ? 44 : 64} />
+          <BrandMark mode={shopMode ? "cart" : "logo"} size={shopMode ? 44 : 72} />
           <div className="leading-tight">
             <div className="display text-xl text-chalk md:text-2xl">
               Ballard&apos;s

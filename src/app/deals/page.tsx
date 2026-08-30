@@ -46,7 +46,7 @@ export default async function DealsPage() {
         />
       </section>
 
-      <section className="mx-auto w-[min(1280px,calc(100%-1rem))] pb-20 sm:w-[min(1280px,calc(100%-2rem))]">
+      <section className="mx-auto w-[min(1600px,calc(100%-0.75rem))] pb-20 sm:w-[min(1600px,calc(100%-1.5rem))]">
         <EditableDeals initial={deals} />
         {deals.length === 0 && (
           <EditablePageTitle

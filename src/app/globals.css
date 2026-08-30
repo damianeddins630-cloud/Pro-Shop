@@ -189,7 +189,10 @@ a {
   background: transparent !important;
 }
 
-/* White see-through boxes so logos (incl. dark ones) stay fully visible */
+/*
+ * White boxes for product / flyer / sponsor art so dark logos stay visible.
+ * Do NOT wrap the academy brand mark in .logo-box — its white disc vanishes on white.
+ */
 .logo-box,
 .media-box {
   background: #ffffff !important;

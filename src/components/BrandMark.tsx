@@ -32,19 +32,20 @@ export function BrandMark({ mode = "logo", size = 52, className = "" }: BrandMar
     );
   }
 
+  /* No white box — logo has a white disc that vanishes on white backgrounds */
   return (
     <span
-      className={`logo-box inline-flex items-center justify-center !p-1.5 ${className}`}
-      style={{ width: size + 12, height: size + 12 }}
+      className={`inline-flex shrink-0 items-center justify-center ${className}`}
+      style={{ width: size, height: size }}
     >
       <Image
-        src="/images/logo.png"
+        src="/images/ops-logo-badge.png"
         alt="Ballard's Bowling Academy"
         width={size}
         height={size}
-        className="img-clean h-auto w-full"
-        style={{ width: size, height: "auto" }}
+        className="img-clean h-full w-full"
         priority
+        unoptimized
       />
     </span>
   );

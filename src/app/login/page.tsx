@@ -40,14 +40,15 @@ function LoginForm() {
   return (
     <div className="mx-auto flex min-h-[70svh] max-w-md flex-col justify-center">
       <div className="mb-8 text-center">
-        <span className="logo-box mx-auto inline-flex items-center justify-center !p-3">
+        <span className="mx-auto inline-flex items-center justify-center">
           <Image
-            src="/images/logo.png"
+            src="/images/ops-logo-badge.png"
             alt="Ballard's Bowling Academy"
-            width={180}
-            height={120}
-            className="img-clean mx-auto h-auto w-[140px] md:w-[170px]"
+            width={160}
+            height={160}
+            className="img-clean mx-auto h-auto w-[120px] md:w-[150px]"
             priority
+            unoptimized
           />
         </span>
         <p className="mt-4 text-sm tracking-[0.22em] text-red uppercase">

@@ -65,18 +65,18 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
         >
           <button
             type="button"
-            className="media-box mx-auto block w-full p-2 text-left sm:p-4 md:p-5"
+            className="media-box mx-auto block w-full p-1 text-left sm:p-2 md:p-3"
             onClick={() => {
               if (!editMode) setActive(deal);
             }}
             aria-label={`Open ${deal.title} flyer larger`}
           >
-            {/* Intrinsic size so the full flyer stays readable while scrolling */}
+            {/* Full-width natural size so prices stay readable while scrolling */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={deal.image}
               alt={deal.title}
-              className="img-clean mx-auto block h-auto w-full"
+              className="img-clean mx-auto block h-auto w-full max-w-none"
               loading="eager"
             />
           </button>
