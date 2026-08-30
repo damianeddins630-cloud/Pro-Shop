@@ -311,7 +311,7 @@ export default async function HomePage() {
       {deal && (
         <section className="site-shell section-pad">
           <div className="grid items-center gap-8 overflow-hidden rounded-[2rem] border border-red/30 bg-gradient-to-br from-lane/80 to-ink lg:grid-cols-2">
-            <div className="media-box relative min-h-[420px] p-4 md:min-h-[560px] lg:min-h-[640px]">
+            <div className="media-box relative min-h-[280px] p-4 md:min-h-[320px] lg:min-h-[360px]">
               <Image
                 src={deal.image}
                 alt={deal.title}
