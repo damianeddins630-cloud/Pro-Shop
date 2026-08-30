@@ -182,6 +182,40 @@ a {
   border-color: rgba(255, 255, 255, 0.22);
 }
 
+/* Product / coach / deal art: full subject visible, no crop, no filled card bg */
+.img-clean {
+  object-fit: contain !important;
+  object-position: center;
+  background: transparent !important;
+}
+
+.hero-copy-panel {
+  padding: 1.25rem 1.35rem 1.4rem;
+  border-radius: 1.25rem;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.55) 55%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.hero-title-pop {
+  color: #fff !important;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.9),
+    0 8px 28px rgba(0, 0, 0, 0.75),
+    0 0 1px rgba(0, 0, 0, 1);
+}
+
+.hero-sub-pop {
+  color: #f4f4f4 !important;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85);
+}
+
 .ops-pipeline {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

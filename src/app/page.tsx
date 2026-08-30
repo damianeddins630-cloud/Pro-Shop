@@ -160,18 +160,19 @@ export default async function HomePage() {
             />
           </Link>
         </div>
-        <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
           <Link
             href="/coaching"
-            className="group relative min-h-[280px] overflow-hidden rounded-3xl"
+            className="group relative min-h-[280px] overflow-hidden rounded-3xl border border-white/10 bg-transparent"
           >
             <Image
               src="/images/collections/bowling-lessons.png"
               alt="Bowling Lessons"
               fill
-              className="object-cover transition duration-700 group-hover:scale-105"
+              className="img-clean p-4 transition duration-700 group-hover:scale-105"
+              unoptimized
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
             <div className="absolute bottom-0 p-6">
               <EditablePageTitle
                 page="home"
@@ -191,15 +192,16 @@ export default async function HomePage() {
           </Link>
           <Link
             href="/coaching"
-            className="group relative min-h-[280px] overflow-hidden rounded-3xl"
+            className="group relative min-h-[280px] overflow-hidden rounded-3xl border border-white/10 bg-transparent"
           >
             <Image
               src="/images/collections/clinics.jpg"
               alt="Coaching Clinics"
               fill
-              className="object-cover transition duration-700 group-hover:scale-105"
+              className="img-clean p-4 transition duration-700 group-hover:scale-105"
+              unoptimized
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
             <div className="absolute bottom-0 p-6">
               <EditablePageTitle
                 page="home"
@@ -307,8 +309,14 @@ export default async function HomePage() {
       {deal && (
         <section className="site-shell section-pad">
           <div className="grid items-center gap-8 overflow-hidden rounded-[2rem] border border-red/30 bg-gradient-to-br from-lane/80 to-ink lg:grid-cols-2">
-            <div className="relative min-h-[320px]">
-              <Image src={deal.image} alt={deal.title} fill className="object-cover" />
+            <div className="relative min-h-[320px] bg-transparent p-4">
+              <Image
+                src={deal.image}
+                alt={deal.title}
+                fill
+                className="img-clean"
+                unoptimized
+              />
             </div>
             <div className="p-8 md:p-10">
               <EditablePageTitle

@@ -4,10 +4,14 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AddItemButton, EditableText, ItemControls } from "@/components/Editable";
+import { ComingSoonModal } from "@/components/ComingSoonModal";
+import { useEditMode } from "@/lib/edit-mode";
 import type { Deal } from "@/lib/types";
 
 export function EditableDeals({ initial }: { initial: Deal[] }) {
   const [deals, setDeals] = useState(initial);
+  const [active, setActive] = useState<Deal | null>(null);
+  const { editMode } = useEditMode();
   const router = useRouter();
 
   async function rename(id: string, title: string) {
@@ -58,29 +62,68 @@ export function EditableDeals({ initial }: { initial: Deal[] }) {
       {deals.map((deal) => (
         <article
           key={deal.id}
-          className="grid overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] lg:grid-cols-2"
+          className="grid overflow-hidden rounded-[2rem] border border-white/10 bg-transparent lg:grid-cols-2"
         >
-          <div className="relative min-h-[320px]">
-            <Image src={deal.image} alt={deal.title} fill className="object-cover" />
-          </div>
+          <button
+            type="button"
+            className="relative min-h-[280px] w-full bg-transparent text-left"
+            onClick={() => {
+              if (!editMode) setActive(deal);
+            }}
+          >
+            <Image
+              src={deal.image}
+              alt={deal.title}
+              fill
+              className="img-clean"
+              sizes="(max-width:1024px) 100vw, 50vw"
+              unoptimized
+            />
+          </button>
           <div className="flex flex-col justify-center p-8 md:p-10">
             {deal.featured && (
               <span className="mb-3 w-fit rounded-full bg-red/15 px-3 py-1 text-xs tracking-[0.16em] text-red uppercase">
                 Deal of the Month
               </span>
             )}
-            <EditableText
-              as="h2"
-              className="display text-4xl"
-              value={deal.title}
-              onSave={(title) => rename(deal.id, title)}
-            />
-            <p className="mt-4 text-mist">{deal.description}</p>
+            <button
+              type="button"
+              className="text-left"
+              onClick={() => {
+                if (!editMode) setActive(deal);
+              }}
+            >
+              <EditableText
+                as="h2"
+                className="display text-4xl"
+                value={deal.title}
+                onSave={(title) => rename(deal.id, title)}
+              />
+            </button>
+            <p className="mt-4 text-mist">
+              {editMode ? deal.description : "Tap for details — coming soon"}
+            </p>
             <ItemControls onRemove={() => remove(deal.id)} />
+            {!editMode ? (
+              <button
+                type="button"
+                className="btn btn-ghost mt-4 w-fit !py-2 text-sm"
+                onClick={() => setActive(deal)}
+              >
+                View details
+              </button>
+            ) : null}
           </div>
         </article>
       ))}
       <AddItemButton onAdd={addDeal} label="Add deal" />
+      <ComingSoonModal
+        open={Boolean(active)}
+        onClose={() => setActive(null)}
+        title={active?.title || "Deal"}
+        image={active?.image}
+        kind="deal"
+      />
     </div>
   );
 }

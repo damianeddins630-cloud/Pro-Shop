@@ -1,12 +1,13 @@
 import Image from "next/image";
-import Link from "next/link";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
-import { getText } from "@/lib/store";
+import { EditableSponsors } from "@/components/EditableSponsors";
+import { getText, listSponsors } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function BvbcPage() {
   const [
+    sponsors,
     eyebrow,
     title,
     intro,
@@ -23,8 +24,10 @@ export default async function BvbcPage() {
     whereBody,
     teamCta,
     sponsorCta,
-    thanksCta,
+    thanksTitle,
+    thanksIntro,
   ] = await Promise.all([
+    listSponsors(),
     getText("bvbc", "eyebrow", "Charity"),
     getText("bvbc", "title", 'Ballard vs. The Big "C"'),
     getText(
@@ -73,53 +76,58 @@ export default async function BvbcPage() {
     ),
     getText("bvbc", "team_cta", "Team Entry Form"),
     getText("bvbc", "sponsor_cta", "Sponsorship Info"),
-    getText("bvbc", "thanks_cta", "Thank our sponsors →"),
+    getText("bvbc", "thanks_title", "Thank You To All Of Our Sponsors!"),
+    getText(
+      "bvbc",
+      "thanks_intro",
+      'These partners help fuel Ballard\'s Bowling Academy and Ballard vs. The Big "C".'
+    ),
   ]);
 
   return (
     <>
-      <section className="relative min-h-[50vh] overflow-hidden">
-        <Image src="/images/hero/slide-3.jpg" alt="" fill className="object-cover" priority />
-        <div className="absolute inset-0 bg-black/80" />
-        <div className="site-shell relative z-10 flex min-h-[50vh] flex-col justify-end pb-12 pt-28">
-          <div className="mb-4 flex items-center gap-4">
+      <section className="site-shell section-pad pt-24">
+        <div className="flex flex-col items-start gap-6 md:flex-row md:items-center">
+          <div className="relative h-24 w-56 shrink-0 md:h-28 md:w-72">
             <Image
-              src="/images/bvbc-mark.png"
-              alt="Ballard vs The Big C"
-              width={88}
-              height={88}
-              className="rounded-full border-2 border-red/70 bg-black/50 p-2"
+              src="/images/bvbc-logo.png"
+              alt='Ballard vs. The Big "C"'
+              fill
+              className="img-clean"
+              priority
+              sizes="288px"
+              unoptimized
             />
-            <div>
-              <EditablePageTitle
-                page="bvbc"
-                slot="eyebrow"
-                initial={eyebrow}
-                as="p"
-                className="text-sm tracking-[0.22em] text-red uppercase"
-              />
-              <EditablePageTitle
-                page="bvbc"
-                slot="title"
-                initial={title}
-                as="h1"
-                className="display text-4xl md:text-6xl"
-              />
-            </div>
           </div>
-          <EditablePageTitle
-            page="bvbc"
-            slot="intro"
-            initial={intro}
-            as="p"
-            multiline
-            rows={3}
-            className="max-w-2xl text-mist"
-          />
+          <div>
+            <EditablePageTitle
+              page="bvbc"
+              slot="eyebrow"
+              initial={eyebrow}
+              as="p"
+              className="text-sm tracking-[0.22em] text-red uppercase"
+            />
+            <EditablePageTitle
+              page="bvbc"
+              slot="title"
+              initial={title}
+              as="h1"
+              className="display mt-1 text-4xl md:text-6xl"
+            />
+            <EditablePageTitle
+              page="bvbc"
+              slot="intro"
+              initial={intro}
+              as="p"
+              multiline
+              rows={3}
+              className="mt-3 max-w-2xl text-mist"
+            />
+          </div>
         </div>
       </section>
 
-      <section className="site-shell section-pad grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="site-shell section-pad grid gap-10 pt-0 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-5 leading-relaxed text-mist">
           <EditablePageTitle
             page="bvbc"
@@ -172,13 +180,14 @@ export default async function BvbcPage() {
         </div>
 
         <div className="space-y-5">
-          <div className="overflow-hidden rounded-3xl border border-white/10">
+          <div className="overflow-hidden rounded-3xl border border-white/10 bg-transparent p-4">
             <Image
               src="/images/bvbc-flyer.png"
               alt="BVBC Flyer 2026"
               width={900}
               height={1200}
-              className="h-auto w-full"
+              className="img-clean h-auto w-full"
+              unoptimized
             />
           </div>
           <div className="rounded-3xl border border-red/25 bg-lane/40 p-6">
@@ -228,16 +237,24 @@ export default async function BvbcPage() {
         </div>
       </section>
 
-      <section className="site-shell pb-16">
-        <Link href="/sponsors" className="btn btn-ghost">
-          <EditablePageTitle
-            page="bvbc"
-            slot="thanks_cta"
-            initial={thanksCta}
-            as="span"
-            className="inline"
-          />
-        </Link>
+      <section id="sponsors" className="site-shell section-pad scroll-mt-24">
+        <EditablePageTitle
+          page="bvbc"
+          slot="thanks_title"
+          initial={thanksTitle}
+          as="h2"
+          className="display text-4xl md:text-5xl"
+        />
+        <EditablePageTitle
+          page="bvbc"
+          slot="thanks_intro"
+          initial={thanksIntro}
+          as="p"
+          multiline
+          rows={2}
+          className="mt-3 max-w-2xl text-mist"
+        />
+        <EditableSponsors initial={sponsors} />
       </section>
     </>
   );

@@ -196,15 +196,15 @@ export function EditableProductGrid({
           return (
             <article
               key={product.id}
-              className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-red/40 hover:bg-white/[0.05]"
+              className="group overflow-hidden rounded-2xl border border-white/10 bg-transparent transition hover:border-red/40"
             >
               <Link href={`/shop/${product.slug}`} className="block">
-                <div className="relative aspect-square overflow-hidden bg-black/30">
+                <div className="relative aspect-square overflow-hidden bg-transparent">
                   <Image
                     src={product.image}
                     alt={product.name}
                     fill
-                    className="object-contain p-4 transition duration-500 group-hover:scale-105"
+                    className="img-clean p-3 transition duration-500 group-hover:scale-105"
                     sizes="(max-width:768px) 50vw, 25vw"
                     unoptimized
                   />

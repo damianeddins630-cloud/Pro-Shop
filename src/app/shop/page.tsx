@@ -158,9 +158,10 @@ export default async function ShopPage({
                     src={b.image}
                     alt={b.name}
                     fill
-                    className="object-cover opacity-70 transition group-hover:scale-105"
+                    className="img-clean opacity-90 transition group-hover:scale-105"
+                    unoptimized
                   />
-                  <div className="absolute inset-0 bg-black/55" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
                   <span className="absolute inset-x-0 bottom-0 p-3">
                     <span className="block text-sm font-semibold text-chalk">
                       {b.name}
@@ -180,9 +181,10 @@ export default async function ShopPage({
                 src="/images/collections/bowling-lessons.png"
                 alt="Lessons"
                 fill
-                className="object-cover opacity-70 transition group-hover:scale-105"
+                className="img-clean opacity-90 transition group-hover:scale-105"
+                unoptimized
               />
-              <div className="absolute inset-0 bg-black/55" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
               <span className="absolute inset-x-0 bottom-0 p-3 text-sm font-semibold">
                 Lessons
               </span>

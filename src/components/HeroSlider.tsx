@@ -19,64 +19,56 @@ export function HeroSlider({
     <section className="relative min-h-[100svh] overflow-hidden">
       <div className="absolute inset-0">
         <Image
-          src="/images/venue-still.jpg"
-          alt="Ballard's Bowling Academy"
+          src="/images/bvbc-flyer.png"
+          alt="Ballard vs The Big C"
           fill
           priority
-          className="object-cover object-center"
+          className="object-cover object-top"
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-black/15" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/35" />
+        {/* Dark scrims so headline stays readable over the BVBC banner */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/88 via-black/65 to-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/50" />
       </div>
 
       <div className="site-shell relative z-10 flex min-h-[100svh] flex-col justify-end pb-16 pt-28 md:justify-center md:pb-24">
-        <div className="fade-up mb-6">
-          <Image
-            src="/images/logo.png"
-            alt="Ballard's Bowling Academy"
-            width={220}
-            height={150}
-            className="h-auto w-[160px] object-contain md:w-[220px]"
-            priority
+        <div className="hero-copy-panel fade-up max-w-3xl">
+          <EditablePageTitle
+            page="home"
+            slot="hero"
+            initial={heroTitle}
+            as="h1"
+            className="display hero-title-pop max-w-3xl text-5xl md:text-7xl lg:text-8xl"
           />
-        </div>
-
-        <EditablePageTitle
-          page="home"
-          slot="hero"
-          initial={heroTitle}
-          as="h1"
-          className="display fade-up max-w-3xl text-5xl text-white md:text-7xl lg:text-8xl"
-        />
-        <EditablePageTitle
-          page="home"
-          slot="hero_sub"
-          initial={heroSub}
-          as="p"
-          multiline
-          rows={2}
-          className="fade-up-delay mt-5 max-w-xl text-base text-mist md:text-lg"
-        />
-        <div className="fade-up-delay mt-8 flex flex-wrap gap-3">
-          <Link href="/coaching" className="btn btn-primary">
-            <EditablePageTitle
-              page="home"
-              slot="hero_cta_primary"
-              initial={ctaPrimary}
-              as="span"
-              className="inline"
-            />
-          </Link>
-          <Link href="/shop" className="btn btn-ghost">
-            <EditablePageTitle
-              page="home"
-              slot="hero_cta_secondary"
-              initial={ctaSecondary}
-              as="span"
-              className="inline"
-            />
-          </Link>
+          <EditablePageTitle
+            page="home"
+            slot="hero_sub"
+            initial={heroSub}
+            as="p"
+            multiline
+            rows={2}
+            className="hero-sub-pop mt-5 max-w-xl text-base md:text-lg"
+          />
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/coaching" className="btn btn-primary">
+              <EditablePageTitle
+                page="home"
+                slot="hero_cta_primary"
+                initial={ctaPrimary}
+                as="span"
+                className="inline"
+              />
+            </Link>
+            <Link href="/shop" className="btn btn-ghost">
+              <EditablePageTitle
+                page="home"
+                slot="hero_cta_secondary"
+                initial={ctaSecondary}
+                as="span"
+                className="inline"
+              />
+            </Link>
+          </div>
         </div>
       </div>
     </section>

@@ -4,10 +4,14 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AddItemButton, EditableText, ItemControls } from "@/components/Editable";
+import { ComingSoonModal } from "@/components/ComingSoonModal";
+import { useEditMode } from "@/lib/edit-mode";
 import type { Coach } from "@/lib/types";
 
 export function EditableCoaches({ initial }: { initial: Coach[] }) {
   const [coaches, setCoaches] = useState(initial);
+  const [active, setActive] = useState<Coach | null>(null);
+  const { editMode } = useEditMode();
   const router = useRouter();
 
   async function rename(id: string, name: string) {
@@ -57,24 +61,51 @@ export function EditableCoaches({ initial }: { initial: Coach[] }) {
         {coaches.map((coach) => (
           <article
             key={coach.id}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
+            className="overflow-hidden rounded-2xl border border-white/10 bg-transparent"
           >
-            <div className="relative aspect-[3/4]">
-              <Image src={coach.image} alt={coach.name} fill className="object-cover" />
-            </div>
-            <div className="p-3 text-center">
-              <EditableText
-                as="p"
-                className="text-sm font-semibold"
-                value={coach.name}
-                onSave={(name) => rename(coach.id, name)}
-              />
+            <button
+              type="button"
+              className="group w-full text-left"
+              onClick={() => {
+                if (!editMode) setActive(coach);
+              }}
+            >
+              <div className="relative aspect-[3/4] bg-transparent">
+                <Image
+                  src={coach.image}
+                  alt={coach.name}
+                  fill
+                  className="img-clean transition duration-500 group-hover:scale-[1.02]"
+                  sizes="(max-width:768px) 50vw, 25vw"
+                  unoptimized
+                />
+              </div>
+              <div className="p-3 text-center">
+                <EditableText
+                  as="p"
+                  className="text-sm font-semibold"
+                  value={coach.name}
+                  onSave={(name) => rename(coach.id, name)}
+                />
+                {!editMode ? (
+                  <p className="mt-1 text-xs text-mist">Tap for details</p>
+                ) : null}
+              </div>
+            </button>
+            <div className="px-3 pb-3 text-center">
               <ItemControls onRemove={() => remove(coach.id)} />
             </div>
           </article>
         ))}
       </div>
       <AddItemButton onAdd={addCoach} label="Add coach" />
+      <ComingSoonModal
+        open={Boolean(active)}
+        onClose={() => setActive(null)}
+        title={active?.name || "Coach"}
+        image={active?.image}
+        kind="coach"
+      />
     </div>
   );
 }
