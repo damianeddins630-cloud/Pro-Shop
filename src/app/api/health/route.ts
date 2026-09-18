@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAnyPermission } from "@/lib/auth";
 import { isUsingFallbackAuthSecret } from "@/lib/auth";
 import { listProducts, listUsers, storePersistStatus } from "@/lib/store";
 import { loadShopifyRuntimeConfig, shopifyStatus } from "@/lib/shopify";
@@ -6,6 +7,18 @@ import { loadShopifyRuntimeConfig, shopifyStatus } from "@/lib/shopify";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Public: minimal liveness only
+  const session = await requireAnyPermission(
+    "manage_inventory",
+    "manage_users",
+    "manage_roles",
+    "view_orders",
+    "manage_orders"
+  );
+  if (!session) {
+    return NextResponse.json({ ok: true, time: new Date().toISOString() });
+  }
+
   try {
     const [products, users] = await Promise.all([listProducts(), listUsers()]);
     const persist = storePersistStatus();
@@ -26,7 +39,6 @@ export async function GET() {
       warning =
         "No durable storage configured — Ops price/stock/account saves will disappear. Add UPSTASH_REDIS_REST_URL + TOKEN (or BLOB / GITHUB_TOKEN) in Vercel.";
     } else if (!persist.lastPersistOk && !coldUnverified && !anyBackendOk) {
-      // Real write/load failure — not a fresh-instance "not verified yet" false alarm.
       warning = `Durable storage failed (${persist.lastPersistDetail || "unknown"}). Confirm Production env vars BLOB_READ_WRITE_TOKEN + BLOB_STORE_ID on pro-shop-lemon, redeploy, then run /api/persist/self-test while logged into Ops. Redis and GITHUB_TOKEN are optional when Blob works.`;
     } else if (!persist.lastPersistOk && !anyBackendOk && coldUnverified) {
       warning = `Durable storage configured but not confirmed on this instance yet (${persist.lastPersistDetail || "unknown"}). Open Ops → Inventory (loads Blob) or run /api/persist/self-test while logged in. Redis/GitHub are optional backups when Blob is working.`;

@@ -85,6 +85,22 @@ export async function POST(req: Request) {
 
     const documentUrl = body.documentUrl?.trim() || undefined;
     const documentName = body.documentName?.trim() || undefined;
+    if (documentUrl) {
+      try {
+        const u = new URL(documentUrl);
+        if (u.protocol !== "https:") {
+          return NextResponse.json(
+            { error: "Document URL must use https://" },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { error: "Document URL is invalid" },
+          { status: 400 }
+        );
+      }
+    }
 
     let attachments: OutboundAttachment[] | undefined;
     if (body.documentBase64 && documentName) {

@@ -71,11 +71,11 @@ function blobAuthOptions() {
   };
 }
 
-/** Prefer public first for Pro_shop_2026 Public Blob store. */
+/** Prefer private for store JSON (passwords / secrets). Override with BLOB_ACCESS=public only if required. */
 function blobAccessModes(): Array<"public" | "private"> {
   const forced = (process.env.BLOB_ACCESS || "").trim().toLowerCase();
-  if (forced === "private") return ["private", "public"];
-  return ["public", "private"];
+  if (forced === "public") return ["public", "private"];
+  return ["private", "public"];
 }
 
 export function durableStoreConfigured() {

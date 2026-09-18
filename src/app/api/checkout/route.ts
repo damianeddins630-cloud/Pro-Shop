@@ -30,6 +30,7 @@ import {
   productRequiresWeight,
   stockForWeight,
 } from "@/lib/weights";
+import { clientIp, rateLimit, siteOrigin } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +48,8 @@ const schema = z.object({
 });
 
 export async function GET() {
-  await loadShopifyRuntimeConfig();
   return NextResponse.json(
-    { shopify: shopifyStatus() },
+    { ok: true, checkout: "POST /api/checkout requires a signed-in session" },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );
 }
@@ -131,6 +131,13 @@ export async function POST(req: Request) {
     );
   }
 
+  const limited = rateLimit(
+    `checkout:${session.userId}:${clientIp(req)}`,
+    30,
+    10 * 60 * 1000
+  );
+  if (limited) return limited;
+
   try {
     await loadShopifyRuntimeConfig();
     const body = schema.parse(await req.json());
@@ -165,10 +172,7 @@ export async function POST(req: Request) {
       couponNote = couponLabel(coupon);
     }
 
-    const origin =
-      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-      req.headers.get("origin") ||
-      "http://localhost:3000";
+    const origin = siteOrigin(req);
 
     // Free / fully discounted — no Shopify popup. Balls still enter the in-store pipeline.
     if (total <= 0) {

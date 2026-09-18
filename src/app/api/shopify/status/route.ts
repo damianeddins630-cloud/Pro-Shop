@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAnyPermission } from "@/lib/auth";
 import {
   loadShopifyRuntimeConfig,
   pingShopifyAdmin,
@@ -11,6 +12,28 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   await loadShopifyRuntimeConfig();
   const status = shopifyStatus();
+
+  // Public: only whether checkout can take payments — no secrets or recon detail.
+  const staff = await requireAnyPermission(
+    "manage_inventory",
+    "manage_orders",
+    "view_orders",
+    "manage_users"
+  );
+  if (!staff) {
+    return NextResponse.json(
+      {
+        ok: Boolean(status.configured && status.checkoutReady),
+        shopify: {
+          configured: status.configured,
+          checkoutReady: status.checkoutReady,
+          webhookConfigured: status.webhookConfigured,
+        },
+      },
+      { headers: { "Cache-Control": "no-store, max-age=0" } }
+    );
+  }
+
   const persist = storePersistStatus();
   const ping = status.configured ? await pingShopifyAdmin() : null;
 
@@ -45,6 +68,7 @@ export async function GET() {
         "SHOPIFY_WEBHOOK_SECRET",
         "SHOPIFY_API_VERSION",
         "NEXT_PUBLIC_SITE_URL",
+        "AUTH_SECRET",
       ],
       important:
         ping?.canDraftOrders === false

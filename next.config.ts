@@ -1,5 +1,30 @@
 import type { NextConfig } from "next";
 
+const securityHeaders = [
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "form-action 'self' https://*.activehosted.com https://*.myshopify.com https://checkout.shopify.com",
+      "frame-ancestors 'self'",
+      "frame-src 'self' https://*.activehosted.com https://*.myshopify.com https://checkout.shopify.com",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data: https://fonts.bunny.net",
+      "style-src 'self' 'unsafe-inline' https://fonts.bunny.net",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.activehosted.com",
+      "connect-src 'self' https://*.myshopify.com https://*.shopify.com https://*.activehosted.com https://*.vercel-storage.com https://*.blob.vercel-storage.com https://*.upstash.io",
+      "object-src 'none'",
+      "upgrade-insecure-requests",
+    ].join("; "),
+  },
+];
+
 const nextConfig: NextConfig = {
   // Ensure seed/data files are included in Vercel serverless bundles
   outputFileTracingIncludes: {
@@ -24,6 +49,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
       {
         source: "/images/venue-still.jpg",
         headers: [

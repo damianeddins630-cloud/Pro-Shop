@@ -4,8 +4,9 @@ Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, Op
 
 ## Owner login
 
-- Username: `CV_damian`
-- Operations: `/ops`
+Operations: `/ops` (requires a signed-in staff account).
+
+Set a strong `AUTH_SECRET` in Vercel Production before go-live. Never commit secrets.
 
 ## Architecture (important)
 

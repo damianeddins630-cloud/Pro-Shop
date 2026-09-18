@@ -51,11 +51,11 @@ export async function POST(req: Request) {
     "image/webp",
     "image/gif",
   ];
-  if (file.type && !allowed.includes(file.type) && !file.type.startsWith("image/")) {
+  if (!file.type || !allowed.includes(file.type)) {
     return NextResponse.json(
       {
         error:
-          "Unsupported file type. Use PDF, Word, Excel, text, or an image.",
+          "Unsupported file type. Use PDF, Word, Excel, text, or JPEG/PNG/WebP/GIF.",
       },
       { status: 400 }
     );

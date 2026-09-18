@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 function RegisterForm() {
   const router = useRouter();
@@ -33,7 +34,7 @@ function RegisterForm() {
       setError(data.error || "Registration failed");
       return;
     }
-    const dest = next.startsWith("/") ? next : "/profile";
+    const dest = safeRedirectPath(next, "/profile");
     router.push(dest);
     router.refresh();
   }
@@ -67,7 +68,8 @@ function RegisterForm() {
             name="password"
             type="password"
             required
-            minLength={6}
+            minLength={10}
+            placeholder="At least 10 characters"
             className="field"
           />
         </div>

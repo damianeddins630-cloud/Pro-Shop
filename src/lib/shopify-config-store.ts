@@ -99,120 +99,57 @@ async function saveRedisShopify(config: ShopifySiteConfig): Promise<boolean> {
 }
 
 async function loadBlobShopify(): Promise<ShopifySiteConfig | null> {
-  const known =
-    process.env.BBA_SHOPIFY_BLOB_URL?.trim() ||
-    (globalThis as typeof globalThis & { __bba_shopify_blob_url?: string })
-      .__bba_shopify_blob_url;
-  if (known) {
-    try {
-      const res = await fetch(
-        `${known}${known.includes("?") ? "&" : "?"}cache=0`,
-        { cache: "no-store" }
-      );
-      if (res.ok) {
-        return normalizeConfig((await res.json()) as ShopifySiteConfig);
-      }
-    } catch {
-      // continue
-    }
-  }
-
-  // Try listing via blob API pathname guess if token exists
   if (!blobConfigured()) return null;
-  return null;
+  try {
+    const { get } = await import("@vercel/blob");
+    const result = await get(BLOB_SHOPIFY_PATH, {
+      access: "private",
+      useCache: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    if (!result?.stream) {
+      // Fallback: try reading any previously public URL with auth header
+      const known =
+        process.env.BBA_SHOPIFY_BLOB_URL?.trim() ||
+        (globalThis as typeof globalThis & { __bba_shopify_blob_url?: string })
+          .__bba_shopify_blob_url;
+      if (!known) return null;
+      const res = await fetch(known, {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
+        },
+      });
+      if (!res.ok) return null;
+      return normalizeConfig((await res.json()) as ShopifySiteConfig);
+    }
+    const text = await new Response(result.stream).text();
+    return normalizeConfig(JSON.parse(text) as ShopifySiteConfig);
+  } catch {
+    return null;
+  }
 }
 
 async function saveBlobShopify(config: ShopifySiteConfig): Promise<boolean> {
   if (!blobConfigured()) return false;
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN!;
-  const body = JSON.stringify(config);
-
-  // Style A: vercel-storage host with overwrite headers
   try {
-    const res = await fetch(
-      `https://blob.vercel-storage.com/${BLOB_SHOPIFY_PATH}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${blobToken}`,
-          "Content-Type": "application/json",
-          "x-vercel-blob-access": "public",
-          "x-vercel-blob-allow-overwrite": "true",
-        },
-        body,
-        cache: "no-store",
-      }
-    );
-    if (res.ok) {
-      const json = (await res.json()) as { url?: string };
-      if (json.url) {
-        (
-          globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
-        ).__bba_shopify_blob_url = json.url;
-      }
-      return true;
+    const { put } = await import("@vercel/blob");
+    const result = await put(BLOB_SHOPIFY_PATH, JSON.stringify(config), {
+      access: "private",
+      contentType: "application/json",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
+    if (result?.url) {
+      (
+        globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
+      ).__bba_shopify_blob_url = result.url;
     }
+    return true;
   } catch {
-    // continue
+    return false;
   }
-
-  // Style B: query-param legacy
-  try {
-    const res = await fetch(
-      `https://blob.vercel-storage.com/${BLOB_SHOPIFY_PATH}?access=public&addRandomSuffix=false&allowOverwrite=true`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${blobToken}`,
-          "Content-Type": "application/json",
-        },
-        body,
-        cache: "no-store",
-      }
-    );
-    if (res.ok) {
-      const json = (await res.json()) as { url?: string };
-      if (json.url) {
-        (
-          globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
-        ).__bba_shopify_blob_url = json.url;
-      }
-      return true;
-    }
-  } catch {
-    // continue
-  }
-
-  // Style C: vercel.com API
-  try {
-    const res = await fetch(
-      `https://vercel.com/api/blob?filename=${encodeURIComponent(BLOB_SHOPIFY_PATH)}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${blobToken}`,
-          "Content-Type": "application/json",
-          "x-vercel-blob-access": "public",
-          "x-vercel-blob-allow-overwrite": "true",
-        },
-        body,
-        cache: "no-store",
-      }
-    );
-    if (res.ok) {
-      const json = (await res.json()) as { url?: string };
-      if (json.url) {
-        (
-          globalThis as typeof globalThis & { __bba_shopify_blob_url?: string }
-        ).__bba_shopify_blob_url = json.url;
-      }
-      return true;
-    }
-  } catch {
-    // continue
-  }
-
-  return false;
 }
 
 export async function loadDurableShopifyConfig(): Promise<ShopifySiteConfig | null> {

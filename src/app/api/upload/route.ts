@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAnyPermission } from "@/lib/auth";
+import { isAllowedImageMime, sniffImageMime } from "@/lib/security";
 
 const MAX_BYTES = 2_500_000;
 
@@ -23,11 +24,22 @@ export async function POST(req: Request) {
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: "Image too large (max ~2.5MB)" }, { status: 400 });
   }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "File must be an image" }, { status: 400 });
-  }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const dataUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
+  const sniffed = sniffImageMime(buffer);
+  if (!sniffed || !isAllowedImageMime(sniffed)) {
+    return NextResponse.json(
+      { error: "File must be a JPEG, PNG, WebP, or GIF image (SVG not allowed)" },
+      { status: 400 }
+    );
+  }
+  if (file.type && !isAllowedImageMime(file.type) && file.type !== sniffed) {
+    return NextResponse.json(
+      { error: "File type does not match image contents" },
+      { status: 400 }
+    );
+  }
+
+  const dataUrl = `data:${sniffed};base64,${buffer.toString("base64")}`;
   return NextResponse.json({ url: dataUrl });
 }

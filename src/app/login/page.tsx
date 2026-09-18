@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { BrandedPageBackdrop } from "@/components/BrandedPageBackdrop";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 function LoginForm() {
   const router = useRouter();
@@ -32,7 +33,7 @@ function LoginForm() {
       setError(data.error || "Login failed");
       return;
     }
-    const dest = next.startsWith("/") ? next : "/profile";
+    const dest = safeRedirectPath(next, "/profile");
     router.push(dest);
     router.refresh();
   }

@@ -53,15 +53,14 @@ export async function POST(req: Request) {
   const topic = (req.headers.get("x-shopify-topic") || "").toLowerCase();
   const secret = webhookSecret();
 
-  // Production must verify signatures — never accept unsigned webhooks on Vercel.
+  // Always verify Shopify HMAC — never accept unsigned webhooks.
   if (!secret) {
-    if (process.env.VERCEL || process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { error: "SHOPIFY_WEBHOOK_SECRET is not configured" },
-        { status: 503 }
-      );
-    }
-  } else if (!verifyShopifyHmac(rawBody, hmac)) {
+    return NextResponse.json(
+      { error: "SHOPIFY_WEBHOOK_SECRET is not configured" },
+      { status: 503 }
+    );
+  }
+  if (!verifyShopifyHmac(rawBody, hmac)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 

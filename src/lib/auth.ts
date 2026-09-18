@@ -6,12 +6,32 @@ import { findUserById, findUserByLogin, resolveUserRole } from "./store";
 
 const COOKIE_NAME = "bba_session";
 const DEFAULT_DEV_SECRET = "ballards-bowling-academy-dev-secret-change-me";
-const authSecret = process.env.AUTH_SECRET?.trim() || DEFAULT_DEV_SECRET;
-const secret = new TextEncoder().encode(authSecret);
 
-/** True when production is using the built-in fallback secret (login still works). */
+function resolveAuthSecret(): string {
+  const fromEnv = process.env.AUTH_SECRET?.trim();
+  if (fromEnv) return fromEnv;
+  const isProd = Boolean(process.env.VERCEL) || process.env.NODE_ENV === "production";
+  if (isProd) {
+    throw new Error(
+      "AUTH_SECRET is required in production. Set a long random value in Vercel env."
+    );
+  }
+  return DEFAULT_DEV_SECRET;
+}
+
+let cachedSecret: Uint8Array | null = null;
+function secretBytes() {
+  if (!cachedSecret) {
+    cachedSecret = new TextEncoder().encode(resolveAuthSecret());
+  }
+  return cachedSecret;
+}
+
+/** True when production would be using the built-in fallback (should never happen). */
 export function isUsingFallbackAuthSecret() {
-  return authSecret === DEFAULT_DEV_SECRET;
+  const fromEnv = process.env.AUTH_SECRET?.trim();
+  if (fromEnv) return false;
+  return !(process.env.VERCEL || process.env.NODE_ENV === "production");
 }
 
 export async function toPublicUser(
@@ -36,7 +56,7 @@ export async function toPublicUser(
 }
 
 export async function hashPassword(password: string) {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, 12);
 }
 
 export async function verifyPassword(password: string, hash: string) {
@@ -44,19 +64,17 @@ export async function verifyPassword(password: string, hash: string) {
 }
 
 export async function createSession(payload: SessionPayload) {
-  // Login must work even if AUTH_SECRET is not set yet — fall back to the
-  // built-in secret. Ops/health will still warn to set a real AUTH_SECRET.
   const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("14d")
-    .sign(secret);
+    .sign(secretBytes());
 
   const jar = await cookies();
   jar.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL),
     path: "/",
     maxAge: 60 * 60 * 24 * 14,
   });
@@ -78,7 +96,7 @@ export async function destroySession() {
   jar.set(COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL),
     path: "/",
     maxAge: 0,
   });
@@ -89,12 +107,11 @@ export async function getSession(): Promise<SessionPayload | null> {
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secretBytes());
     const userId = String(payload.userId || "");
 
     // Always use the live user record so Ops role changes apply immediately
     // (JWT alone can keep a stale roleId until the next login).
-    // Also resolve by email/username when the cookie still has an old user id.
     const liveUser =
       (userId ? await findUserById(userId) : null) ||
       (await findUserByLogin(String(payload.email || ""))) ||
@@ -110,7 +127,6 @@ export async function getSession(): Promise<SessionPayload | null> {
       };
     }
 
-    // User row missing from store — force re-login instead of trusting stale JWT perms
     return null;
   } catch {
     return null;

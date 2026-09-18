@@ -351,7 +351,11 @@ function migrateUsers(users: User[], roles: Role[]): User[] {
 export const OWNER_USER_ID = "user_owner";
 export const OWNER_EMAIL = "damianeddins630@gmail.com";
 export const OWNER_USERNAME = "CV_damian";
-/** Stable owner password hash — restored on every cold start for recovery */
+/**
+ * Bootstrap hash used ONLY when creating the owner row for the first time.
+ * Existing owner passwords are never overwritten (so Ops password changes stick).
+ * Prefer setting OWNER_BOOTSTRAP_PASSWORD in env for a one-time hash override.
+ */
 export const OWNER_PASSWORD_HASH =
   "$2b$10$7aHB08kNpgY72y/mHpDsp.hv2TtzWd8lX4gTzEsZYKHNmmiiyfujC";
 
@@ -387,14 +391,15 @@ async function ensureAdmin(data: StoreData): Promise<void> {
   const existing = data.users.find(isOwnerUser);
 
   if (existing) {
-    // Keep one stable owner row (same id on every cold start)
+    // Keep one stable owner row — do NOT reset passwordHash on every boot
     existing.id = OWNER_USER_ID;
     existing.username = OWNER_USERNAME;
     existing.email = OWNER_EMAIL;
     existing.roleId = adminRole.id;
     existing.role = "admin";
-    existing.passwordHash = OWNER_PASSWORD_HASH;
-    // Drop duplicate owner rows from older runtimes
+    if (!existing.passwordHash) {
+      existing.passwordHash = OWNER_PASSWORD_HASH;
+    }
     data.users = data.users.filter((u) => u === existing || !isOwnerUser(u));
     return;
   }
@@ -1049,7 +1054,7 @@ export async function updateProduct(id: string, patch: Partial<Product>) {
   await mutate((data) => {
     const idx = data.products.findIndex((p) => p.id === id);
     if (idx === -1) return;
-    let next = normalizeProduct({
+    const next = normalizeProduct({
       ...data.products[idx],
       ...patch,
       id,
