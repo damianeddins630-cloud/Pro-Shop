@@ -431,7 +431,25 @@ function mergeWithSeed(parsed: StoreData): StoreData {
     : seed.coupons || [];
   parsed.shopifyConfig = parsed.shopifyConfig || seed.shopifyConfig;
   ensureCoupons(parsed);
+  ensureSponsorUrls(parsed);
   return parsed;
+}
+
+/** Keep sponsor brand URLs current (High Revs / client corrections). */
+function ensureSponsorUrls(data: StoreData) {
+  const urls: Record<string, string> = {
+    s2: "https://www.stormbowling.com/roto-grip-brand",
+    s3: "https://www.stormbowling.com/900-global-brand",
+    s4: "https://www.platinumford.com",
+    s6: "https://www.dexterbowling.com",
+    s7: "https://www.logoinfusion.com",
+    s8: "https://www.logoinfusion.com",
+    s10: "https://bvl.org",
+  };
+  for (const sponsor of data.sponsors || []) {
+    const next = urls[sponsor.id];
+    if (next && sponsor.url !== next) sponsor.url = next;
+  }
 }
 
 async function loadFromDisk(): Promise<StoreData> {

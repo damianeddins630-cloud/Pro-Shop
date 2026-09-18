@@ -1,11 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 
+/** Ballard's ActiveCampaign list signup (High Revs / client request). */
+const ACTIVECAMPAIGN_FORM_URL =
+  "https://ballardsbowlingacademy27000.activehosted.com/f/1";
+
 export default function SubscribePage() {
-  const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
-  const [message, setMessage] = useState("");
   const [eyebrow, setEyebrow] = useState("Stay connected");
   const [title, setTitle] = useState("Subscribe for Email Updates");
   const [intro, setIntro] = useState(
@@ -28,34 +30,8 @@ export default function SubscribePage() {
     })();
   }, []);
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setStatus("idle");
-    const form = new FormData(e.currentTarget);
-    const res = await fetch("/api/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        firstName: form.get("firstName"),
-        lastName: form.get("lastName"),
-        email: form.get("email"),
-        city: form.get("city"),
-        state: form.get("state"),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setStatus("error");
-      setMessage(data.error || "Something went wrong");
-      return;
-    }
-    setStatus("ok");
-    setMessage("You're subscribed — thanks for joining Ballard's updates.");
-    e.currentTarget.reset();
-  }
-
   return (
-    <section className="site-shell section-pad pt-24">
+    <section className="site-shell section-pad pt-24 pb-20">
       <EditablePageTitle
         page="subscribe"
         slot="eyebrow"
@@ -80,53 +56,28 @@ export default function SubscribePage() {
         className="mt-4 max-w-2xl text-mist"
       />
 
-      <form
-        onSubmit={onSubmit}
-        className="mt-10 max-w-xl space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-6 md:p-8"
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="firstName">
-              First Name
-            </label>
-            <input id="firstName" name="firstName" required className="field" placeholder="Type your first name" />
-          </div>
-          <div>
-            <label className="label" htmlFor="lastName">
-              Last Name
-            </label>
-            <input id="lastName" name="lastName" required className="field" placeholder="Type your last name" />
-          </div>
-        </div>
-        <div>
-          <label className="label" htmlFor="email">
-            Email*
-          </label>
-          <input id="email" name="email" type="email" required className="field" placeholder="Type your email" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="city">
-              City*
-            </label>
-            <input id="city" name="city" required className="field" />
-          </div>
-          <div>
-            <label className="label" htmlFor="state">
-              State*
-            </label>
-            <input id="state" name="state" required className="field" />
-          </div>
-        </div>
-        <button type="submit" className="btn btn-primary">
-          Subscribe
-        </button>
-        {status !== "idle" && (
-          <p className={`text-sm ${status === "ok" ? "text-emerald-300" : "text-red-300"}`}>
-            {message}
-          </p>
-        )}
-      </form>
+      <div className="mt-10 max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        <iframe
+          title="Subscribe for email updates"
+          src={ACTIVECAMPAIGN_FORM_URL}
+          className="h-[720px] w-full border-0 bg-white"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      </div>
+
+      <p className="mt-4 max-w-xl text-sm text-mist">
+        Prefer a full page?{" "}
+        <a
+          href={ACTIVECAMPAIGN_FORM_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="text-red underline"
+        >
+          Open the ActiveCampaign signup form
+        </a>
+        .
+      </p>
     </section>
   );
 }
