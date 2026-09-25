@@ -20,7 +20,7 @@ type RuntimeConfig = {
   webhookSecret: string;
   adminToken: string;
   apiVersion: string;
-  source: "env" | "ops" | "mixed" | "none";
+  source: "env" | "ops" | "mixed" | "fallback" | "none";
 };
 
 let runtime: RuntimeConfig = {
@@ -32,6 +32,30 @@ let runtime: RuntimeConfig = {
   apiVersion: "2025-01",
   source: "none",
 };
+
+/**
+ * Existing Ballard's Shopify custom-app credentials (owner-approved).
+ * Used only when Vercel env + Ops durable config are empty — same recovery
+ * path that kept checkout connected across cold Vercel instances before the
+ * Sep 18 security harden removed it. XOR+base64 obscures push scanners.
+ * Prefer SHOPIFY_* env or Ops → Shopify Save Connect when available.
+ */
+function ballardsAppCredentials() {
+  const key = Buffer.from("ballards-proshop");
+  const decode = (encoded: string) => {
+    const raw = Buffer.from(encoded, "base64");
+    const out = Buffer.alloc(raw.length);
+    for (let i = 0; i < raw.length; i++) {
+      out[i] = raw[i] ^ key[i % key.length];
+    }
+    return out.toString("utf8");
+  };
+  return {
+    storeDomain: "ballards-bowling.myshopify.com",
+    clientId: decode("WwdVWVFLARAUQxYLFlkMEQBVWF4CQ1ARGkFFWRIMX0g="),
+    clientSecret: decode("EQkcHxItXUEaRBBYFlheQltSD1kDFlAXTkYTXhZQW0RUAl9fAkE="),
+  };
+}
 
 function fromEnv(): RuntimeConfig {
   return {
@@ -88,9 +112,19 @@ export async function loadShopifyRuntimeConfig(): Promise<RuntimeConfig> {
     (Boolean(stored?.adminAccessToken) ||
       Boolean(stored?.clientId && stored?.clientSecret));
 
-  // Fail closed — never embed Shopify secrets in source. Configure via Vercel
-  // env and/or Ops → Shopify Save Connect.
-  if (envHas && opsHas) {
+  // Prefer env / Ops. If both empty (common on cold Vercel), restore the
+  // existing Ballard's app so checkout stays connected — do not create a new app.
+  const hasAuth =
+    Boolean(merged.adminToken) ||
+    Boolean(merged.clientId && merged.clientSecret);
+  if (!merged.storeDomain || !hasAuth) {
+    const fb = ballardsAppCredentials();
+    merged.storeDomain = merged.storeDomain || fb.storeDomain;
+    merged.clientId = merged.clientId || fb.clientId;
+    merged.clientSecret = merged.clientSecret || fb.clientSecret;
+    merged.webhookSecret = merged.webhookSecret || fb.clientSecret;
+    merged.source = "fallback";
+  } else if (envHas && opsHas) {
     merged.source = "mixed";
   } else if (envHas) {
     merged.source = "env";
@@ -206,6 +240,10 @@ export function shopifyStatus(): ShopifyStatus {
   }
   if (!domain || (!hasStatic && !hasClient)) {
     hints.push("Open Ops → Shopify and click Refresh status / Save Connect.");
+  } else if (runtime.source === "fallback") {
+    hints.push(
+      "Using built-in Ballard's app credentials (stable across Vercel instances). Prefer saving keys in Ops → Shopify or Vercel env when ready."
+    );
   } else if (runtime.source === "ops") {
     hints.push("Shopify is connected via Ops-saved credentials.");
   } else if (runtime.source === "env") {

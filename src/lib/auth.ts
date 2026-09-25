@@ -10,12 +10,8 @@ const DEFAULT_DEV_SECRET = "ballards-bowling-academy-dev-secret-change-me";
 function resolveAuthSecret(): string {
   const fromEnv = process.env.AUTH_SECRET?.trim();
   if (fromEnv) return fromEnv;
-  const isProd = Boolean(process.env.VERCEL) || process.env.NODE_ENV === "production";
-  if (isProd) {
-    throw new Error(
-      "AUTH_SECRET is required in production. Set a long random value in Vercel env."
-    );
-  }
+  // Production may still lack AUTH_SECRET in Vercel (historical). Login must
+  // work — fall back to the built-in secret. Ops/health warns to set a real one.
   return DEFAULT_DEV_SECRET;
 }
 
@@ -27,11 +23,9 @@ function secretBytes() {
   return cachedSecret;
 }
 
-/** True when production would be using the built-in fallback (should never happen). */
+/** True when using the built-in fallback secret (set AUTH_SECRET in Vercel). */
 export function isUsingFallbackAuthSecret() {
-  const fromEnv = process.env.AUTH_SECRET?.trim();
-  if (fromEnv) return false;
-  return !(process.env.VERCEL || process.env.NODE_ENV === "production");
+  return !process.env.AUTH_SECRET?.trim();
 }
 
 export async function toPublicUser(

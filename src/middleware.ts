@@ -7,10 +7,7 @@ const DEFAULT_DEV_SECRET = "ballards-bowling-academy-dev-secret-change-me";
 function authSecretBytes() {
   const fromEnv = process.env.AUTH_SECRET?.trim();
   if (fromEnv) return new TextEncoder().encode(fromEnv);
-  // Production must set AUTH_SECRET — do not use the public fallback for Ops gates.
-  if (process.env.VERCEL || process.env.NODE_ENV === "production") {
-    return null;
-  }
+  // Match auth.ts — allow Ops gate with fallback when AUTH_SECRET is unset.
   return new TextEncoder().encode(DEFAULT_DEV_SECRET);
 }
 

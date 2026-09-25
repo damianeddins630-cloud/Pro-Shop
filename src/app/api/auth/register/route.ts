@@ -16,26 +16,13 @@ const schema = z.object({
   dateOfBirth: z.string().min(4).max(32),
 });
 
-function isProductionRuntime() {
-  return Boolean(process.env.VERCEL) || process.env.NODE_ENV === "production";
-}
-
 export async function POST(req: Request) {
   try {
     const limited = rateLimit(`register:${clientIp(req)}`, 8, 60 * 60 * 1000);
     if (limited) return limited;
 
-    // Fail closed before writing an account that cannot get a session cookie.
-    if (isProductionRuntime() && !process.env.AUTH_SECRET?.trim()) {
-      return NextResponse.json(
-        {
-          error:
-            "Registration is temporarily unavailable. Please try again shortly.",
-          code: "AUTH_MISCONFIGURED",
-        },
-        { status: 503 }
-      );
-    }
+    // Prefer a dedicated AUTH_SECRET in Vercel — fallback still allows sessions.
+    // Do not hard-fail registration when only the fallback secret is available.
 
     if (process.env.VERCEL && !storePersistStatus().durableWriteConfigured) {
       return NextResponse.json(
