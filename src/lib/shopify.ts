@@ -111,8 +111,14 @@ export type ShopifyCheckoutResult = {
 };
 
 export type ShopifyStatus = {
+  /** Credentials present (store domain + admin token OR client id/secret). */
   configured: boolean;
+  /** Webhook signing secret available (dedicated or client secret fallback). */
   webhookConfigured: boolean;
+  /**
+   * True only after a live Admin API check confirms Draft Order permission.
+   * Static credential presence alone is never enough.
+   */
   checkoutReady: boolean;
   authMode: "admin_token" | "client_credentials" | "none";
   configSource: RuntimeConfig["source"];
@@ -121,6 +127,30 @@ export type ShopifyStatus = {
   missing: string[];
   hints: string[];
 };
+
+/** Public-safe readiness snapshot (no secrets, scopes, or Ops instructions). */
+export type ShopifyPublicReadiness = {
+  configured: boolean;
+  apiReachable: boolean;
+  checkoutReady: boolean;
+  webhookConfigured: boolean;
+  /** Human-safe reason code for Ops; never shown to customers. */
+  reason:
+    | "not_configured"
+    | "api_unreachable"
+    | "missing_draft_orders_scope"
+    | "webhook_missing"
+    | "ready";
+};
+
+type ReadinessCache = {
+  atMs: number;
+  public: ShopifyPublicReadiness;
+  ping: Awaited<ReturnType<typeof pingShopifyAdmin>> | null;
+};
+
+let readinessCache: ReadinessCache | null = null;
+const READINESS_TTL_MS = 30_000;
 
 type TokenCache = { token: string; expiresAtMs: number };
 let tokenCache: TokenCache | null = null;
@@ -198,7 +228,9 @@ export function shopifyStatus(): ShopifyStatus {
   return {
     configured,
     webhookConfigured: isShopifyWebhookConfigured(),
-    checkoutReady: configured,
+    // Never claim checkoutReady from credentials alone — callers must use
+    // assessShopifyReadiness() which pings Admin API + Draft Order scopes.
+    checkoutReady: false,
     authMode,
     configSource: runtime.source,
     storeDomain: domain || null,
@@ -206,6 +238,85 @@ export function shopifyStatus(): ShopifyStatus {
     missing,
     hints,
   };
+}
+
+/**
+ * Live readiness check. Caches briefly so cart/status polls don't hammer Shopify.
+ * checkoutReady requires: configured + Admin API reachable + write_draft_orders
+ * (when scopes are returned). Webhook is tracked separately — checkout invoice
+ * can open without it, but paid inventory settle cannot.
+ */
+export async function assessShopifyReadiness(options?: {
+  force?: boolean;
+}): Promise<{
+  status: ShopifyStatus;
+  public: ShopifyPublicReadiness;
+  ping: Awaited<ReturnType<typeof pingShopifyAdmin>> | null;
+}> {
+  await loadShopifyRuntimeConfig();
+  const status = shopifyStatus();
+  const now = Date.now();
+  if (
+    !options?.force &&
+    readinessCache &&
+    now - readinessCache.atMs < READINESS_TTL_MS
+  ) {
+    return {
+      status: {
+        ...status,
+        checkoutReady: readinessCache.public.checkoutReady,
+      },
+      public: readinessCache.public,
+      ping: readinessCache.ping,
+    };
+  }
+
+  if (!status.configured) {
+    const pub: ShopifyPublicReadiness = {
+      configured: false,
+      apiReachable: false,
+      checkoutReady: false,
+      webhookConfigured: status.webhookConfigured,
+      reason: "not_configured",
+    };
+    readinessCache = { atMs: now, public: pub, ping: null };
+    return { status, public: pub, ping: null };
+  }
+
+  const ping = await pingShopifyAdmin();
+  const apiReachable = Boolean(ping.ok);
+  // Explicit false = missing write_draft_orders. Undefined (common with static
+  // admin tokens that don't return scope on exchange) allows checkoutReady when
+  // the Admin API is reachable; draft create will still fail closed if denied.
+  const draftDenied = ping.canDraftOrders === false;
+  const checkoutReady = apiReachable && !draftDenied;
+
+  let reason: ShopifyPublicReadiness["reason"];
+  if (!apiReachable) reason = "api_unreachable";
+  else if (draftDenied) reason = "missing_draft_orders_scope";
+  else if (!status.webhookConfigured) reason = "webhook_missing";
+  else reason = "ready";
+
+  const pub: ShopifyPublicReadiness = {
+    configured: true,
+    apiReachable,
+    checkoutReady,
+    webhookConfigured: status.webhookConfigured,
+    reason,
+  };
+
+  readinessCache = { atMs: now, public: pub, ping };
+  return {
+    status: { ...status, checkoutReady },
+    public: pub,
+    ping,
+  };
+}
+
+/** Clear cached readiness after Ops Save Connect. */
+export function invalidateShopifyReadinessCache() {
+  readinessCache = null;
+  tokenCache = null;
 }
 
 async function getAdminAccessToken(): Promise<string> {

@@ -7,8 +7,9 @@ import {
   storePersistStatus,
 } from "@/lib/store";
 import {
+  assessShopifyReadiness,
+  invalidateShopifyReadinessCache,
   loadShopifyRuntimeConfig,
-  pingShopifyAdmin,
   shopifyStatus,
 } from "@/lib/shopify";
 
@@ -135,8 +136,8 @@ export async function PUT(req: Request) {
     );
 
     await loadShopifyRuntimeConfig();
-    const ping = await pingShopifyAdmin();
-    const status = shopifyStatus();
+    invalidateShopifyReadinessCache();
+    const assessed = await assessShopifyReadiness({ force: true });
     const persist = storePersistStatus();
 
     const persistDetail = (
@@ -145,19 +146,24 @@ export async function PUT(req: Request) {
 
     return NextResponse.json(
       {
-        ok: Boolean(ping.ok),
+        ok: Boolean(assessed.public.checkoutReady),
         saved: {
           storeDomain: saved.storeDomain,
           clientId: saved.clientId,
           apiVersion: saved.apiVersion,
           updatedAt: saved.updatedAt,
         },
-        status,
-        adminApi: ping,
+        status: assessed.status,
+        public: assessed.public,
+        adminApi: assessed.ping,
         persist: { ...persist, detail: persistDetail },
-        message: ping.ok
-          ? `Connected to ${ping.shopName || "Shopify"}. Tap Refresh status.`
-          : ping.error || "Saved, but Shopify ping failed.",
+        message: assessed.public.checkoutReady
+          ? `Connected to ${assessed.ping?.shopName || "Shopify"}. Checkout is ready.`
+          : assessed.ping?.ok === false
+            ? assessed.ping.error || "Saved, but Shopify Admin API ping failed."
+            : assessed.public.reason === "missing_draft_orders_scope"
+              ? "Saved, but Draft Orders permission is missing on the Shopify app."
+              : "Saved. Refresh status if checkout is still unavailable.",
       },
       { headers: noStore }
     );

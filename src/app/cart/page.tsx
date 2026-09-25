@@ -54,9 +54,7 @@ export default function CartPage() {
   const [couponError, setCouponError] = useState("");
   const [redeeming, setRedeeming] = useState(false);
 
-  const shopifyReady = Boolean(
-    shopify?.checkoutReady ?? shopify?.configured
-  );
+  const shopifyReady = Boolean(shopify?.checkoutReady);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -78,21 +76,19 @@ export default function CartPage() {
       try {
         const res = await fetch("/api/shopify/status", { cache: "no-store" });
         const d = await res.json();
-        const s = (d.shopify || { configured: false }) as ShopifyClientStatus;
-        // Prefer live Admin ping (top-level ok) when present.
-        if (typeof d.ok === "boolean") {
-          s.checkoutReady = d.ok;
-          s.configured = d.ok || Boolean(s.configured);
-        }
-        setShopify(s);
+        const raw = (d.shopify || {}) as ShopifyClientStatus;
+        // Server `ok` is the live readiness gate (Admin API + Draft Orders).
+        // Never treat "configured" alone as checkout-ready.
+        setShopify({
+          configured: Boolean(raw.configured),
+          webhookConfigured: Boolean(raw.webhookConfigured),
+          checkoutReady: Boolean(
+            typeof d.ok === "boolean" ? d.ok : raw.checkoutReady
+          ),
+          storeDomain: raw.storeDomain ?? null,
+        });
       } catch {
-        try {
-          const res = await fetch("/api/checkout", { cache: "no-store" });
-          const d = await res.json();
-          setShopify(d.shopify || { configured: false });
-        } catch {
-          setShopify({ configured: false });
-        }
+        setShopify({ configured: false, checkoutReady: false });
       }
     };
     const onRefresh = () => {

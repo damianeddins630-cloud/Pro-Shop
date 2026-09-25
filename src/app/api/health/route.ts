@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAnyPermission } from "@/lib/auth";
 import { isUsingFallbackAuthSecret } from "@/lib/auth";
 import { listProducts, listUsers, storePersistStatus } from "@/lib/store";
-import { loadShopifyRuntimeConfig, shopifyStatus } from "@/lib/shopify";
+import { loadShopifyRuntimeConfig, assessShopifyReadiness } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,8 @@ export async function GET() {
     const [products, users] = await Promise.all([listProducts(), listUsers()]);
     const persist = storePersistStatus();
     await loadShopifyRuntimeConfig();
-    const shopify = shopifyStatus();
+    const assessed = await assessShopifyReadiness();
+    const shopify = assessed.status;
 
     const backends = persist.backends || {};
     const anyBackendOk = Boolean(
@@ -45,9 +46,14 @@ export async function GET() {
     } else if (!shopify.configured) {
       warning =
         "Shopify is not connected — open Ops → Shopify and click Save Connect / Refresh status.";
+    } else if (!assessed.public.checkoutReady) {
+      warning =
+        assessed.public.reason === "missing_draft_orders_scope"
+          ? "Shopify is connected but missing write_draft_orders — enable Draft Orders on the app scopes."
+          : "Shopify is connected but Admin API checkout is not ready — open Ops → Shopify and Refresh status.";
     } else if (!shopify.webhookConfigured) {
       warning =
-        "Shopify webhook secret is missing — paid orders will not update website inventory until webhook setup is finished.";
+        "Shopify checkout can open, but the webhook secret is missing — paid orders will not update website inventory until webhook setup is finished.";
     }
 
     return NextResponse.json({
@@ -55,7 +61,11 @@ export async function GET() {
       vercel: Boolean(process.env.VERCEL),
       productCount: products.length,
       userCount: users.length,
-      shopify,
+      shopify: {
+        ...shopify,
+        apiReachable: assessed.public.apiReachable,
+        readinessReason: assessed.public.reason,
+      },
       persist,
       auth: {
         customSecret: !isUsingFallbackAuthSecret(),

@@ -36,7 +36,13 @@ export function EditableText({
 
   async function commit() {
     const next = draft.trim();
-    if (!next || next === value) {
+    // Allow clearing optional multiline fields (e.g. coach bio)
+    if (next === value.trim()) {
+      setDraft(value);
+      setError("");
+      return;
+    }
+    if (!next && !multiline) {
       setDraft(value);
       setError("");
       return;

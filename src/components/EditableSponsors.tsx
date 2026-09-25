@@ -39,7 +39,7 @@ export function EditableSponsors({ initial }: { initial: Sponsor[] }) {
       body: JSON.stringify({
         name: name.trim(),
         image: "/images/logo.png",
-        url: "#",
+        url: "",
       }),
     });
     const data = await res.json();

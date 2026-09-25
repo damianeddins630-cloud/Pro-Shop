@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAnyPermission } from "@/lib/auth";
 import {
+  assessShopifyReadiness,
   loadShopifyRuntimeConfig,
-  pingShopifyAdmin,
-  shopifyStatus,
 } from "@/lib/shopify";
 import { storePersistStatus } from "@/lib/store";
 
@@ -11,9 +10,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   await loadShopifyRuntimeConfig();
-  const status = shopifyStatus();
+  const assessed = await assessShopifyReadiness();
+  const { status, public: pub, ping } = assessed;
 
-  // Public: only whether checkout can take payments — no secrets or recon detail.
+  // Public: booleans only — never scopes, env names, Ops hints, or API errors.
   const staff = await requireAnyPermission(
     "manage_inventory",
     "manage_orders",
@@ -23,11 +23,12 @@ export async function GET() {
   if (!staff) {
     return NextResponse.json(
       {
-        ok: Boolean(status.configured && status.checkoutReady),
+        ok: Boolean(pub.checkoutReady),
         shopify: {
-          configured: status.configured,
-          checkoutReady: status.checkoutReady,
-          webhookConfigured: status.webhookConfigured,
+          configured: pub.configured,
+          checkoutReady: pub.checkoutReady,
+          webhookConfigured: pub.webhookConfigured,
+          apiReachable: pub.apiReachable,
         },
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
@@ -35,16 +36,12 @@ export async function GET() {
   }
 
   const persist = storePersistStatus();
-  const ping = status.configured ? await pingShopifyAdmin() : null;
-
-  const draftReady =
-    Boolean(ping?.ok) &&
-    (ping?.canDraftOrders === true || ping?.canDraftOrders === undefined);
 
   return NextResponse.json(
     {
-      ok: status.configured && Boolean(ping?.ok) && draftReady,
+      ok: Boolean(pub.checkoutReady),
       shopify: status,
+      public: pub,
       adminApi: ping,
       persist: {
         durableWriteConfigured: persist.durableWriteConfigured,
@@ -73,7 +70,13 @@ export async function GET() {
       important:
         ping?.canDraftOrders === false
           ? "Shopify app is missing write_draft_orders scope. Enable it in the app Admin API scopes, save, then refresh."
-          : null,
+          : pub.reason === "not_configured"
+            ? "Shopify is not connected — save Client ID + Secret below (or set Vercel env vars), then Refresh status."
+            : pub.reason === "api_unreachable"
+              ? `Shopify Admin API is not reachable${ping?.error ? `: ${ping.error}` : "."}`
+              : pub.reason === "webhook_missing"
+                ? "Checkout can open, but orders/paid webhook secret is missing — inventory will not auto-update after payment."
+                : null,
     },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );

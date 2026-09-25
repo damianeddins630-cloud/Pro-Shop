@@ -26,6 +26,19 @@ export function EditableCoaches({ initial }: { initial: Coach[] }) {
     router.refresh();
   }
 
+  async function saveBio(id: string, bio: string) {
+    const res = await fetch(`/api/coaches/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bio }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Bio save failed");
+    setCoaches((prev) => prev.map((c) => (c.id === id ? data.coach : c)));
+    if (active?.id === id) setActive(data.coach);
+    router.refresh();
+  }
+
   async function remove(id: string) {
     if (!confirm("Remove this coach?")) return;
     const res = await fetch(`/api/coaches/${id}`, { method: "DELETE" });
@@ -93,6 +106,16 @@ export function EditableCoaches({ initial }: { initial: Coach[] }) {
               </div>
             </button>
             <div className="px-3 pb-3 text-center">
+              {editMode ? (
+                <EditableText
+                  as="p"
+                  multiline
+                  rows={4}
+                  className="mt-2 text-left text-xs text-mist"
+                  value={coach.bio || ""}
+                  onSave={(bio) => saveBio(coach.id, bio)}
+                />
+              ) : null}
               <ItemControls onRemove={() => remove(coach.id)} />
             </div>
           </article>

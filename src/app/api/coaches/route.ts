@@ -11,6 +11,7 @@ const schema = z.object({
   name: z.string().min(1),
   image: z.string().default("/images/logo.png"),
   email: z.string().optional(),
+  bio: z.string().max(4000).optional(),
 });
 
 export async function POST(req: Request) {

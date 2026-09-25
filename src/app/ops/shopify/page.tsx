@@ -154,9 +154,17 @@ export default function OpsShopifyPage() {
   }
 
   const shopify = data?.shopify;
-  const ready = Boolean(data?.ok && shopify?.checkoutReady);
+  const pub = (data as StatusPayload & { public?: { checkoutReady?: boolean; reason?: string } })
+    ?.public;
+  const ready = Boolean(
+    data?.ok && (shopify?.checkoutReady || pub?.checkoutReady)
+  );
   const webhookUrl =
     data?.webhookUrl || "https://pro-shop-lemon.vercel.app/api/shopify/webhook";
+  const draftPermissionOk = data?.adminApi?.canDraftOrders === true;
+  const draftPermissionUnknown =
+    data?.adminApi?.ok && data?.adminApi?.canDraftOrders === undefined;
+  const draftPermissionDenied = data?.adminApi?.canDraftOrders === false;
 
   return (
     <div>
@@ -291,14 +299,31 @@ export default function OpsShopifyPage() {
               }
             />
             <Row
-              ok={data?.adminApi?.canDraftOrders !== false}
+              ok={Boolean(
+                draftPermissionOk || (draftPermissionUnknown && data?.ok)
+              )}
               label="Draft Orders permission"
               detail={
-                data?.adminApi?.canDraftOrders === false
+                draftPermissionDenied
                   ? "Missing write_draft_orders — enable it on the Shopify app scopes"
-                  : data?.adminApi?.scopes
-                    ? `Scopes: ${data.adminApi.scopes}`
-                    : "Needed so cart can open Shopify payment"
+                  : draftPermissionOk
+                    ? `Scopes include write_draft_orders${
+                        data?.adminApi?.scopes
+                          ? ` (${data.adminApi.scopes})`
+                          : ""
+                      }`
+                    : draftPermissionUnknown
+                      ? "Admin API reachable; scope string not returned — Draft Order create will confirm"
+                      : "Needed so cart can open Shopify payment (write_draft_orders)"
+              }
+            />
+            <Row
+              ok={ready}
+              label="Checkout ready"
+              detail={
+                ready
+                  ? "Cart can create a Shopify Draft Order invoice"
+                  : "Not ready — fix credentials, API reachability, or Draft Orders scope"
               }
             />
           </div>

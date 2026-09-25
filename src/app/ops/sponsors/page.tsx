@@ -4,7 +4,7 @@ import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { Sponsor } from "@/lib/types";
 
-const empty = { name: "", image: "", url: "#" };
+const empty = { name: "", image: "", url: "" };
 
 export default function OpsSponsorsPage() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
@@ -87,7 +87,7 @@ export default function OpsSponsorsPage() {
           />
           <input
             className="field"
-            placeholder="Website URL"
+            placeholder="https://… (leave blank if no public link yet)"
             value={form.url}
             onChange={(e) => setForm({ ...form, url: e.target.value })}
           />

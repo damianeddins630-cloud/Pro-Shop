@@ -9,6 +9,7 @@ const schema = z.object({
   name: z.string().min(1).optional(),
   image: z.string().optional(),
   email: z.string().optional(),
+  bio: z.string().max(4000).optional(),
 });
 
 async function requireCoachEditor() {
