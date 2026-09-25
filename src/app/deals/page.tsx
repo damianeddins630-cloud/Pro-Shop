@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { EditableDeals } from "@/components/EditableDeals";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 import { getText, listDeals } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Deals & Specials",
+  description:
+    "Deal of the month and seasonal specials from Ballard's Bowling Academy Pro Shop.",
+};
 
 export default async function DealsPage() {
   const [allDeals, eyebrow, title, intro, empty] = await Promise.all([

@@ -59,22 +59,36 @@ export function EditableSponsors({ initial }: { initial: Sponsor[] }) {
             key={sponsor.id}
             className="group flex flex-col items-center rounded-2xl border border-white/15 p-4 transition hover:border-red/40"
           >
-            <a
-              href={sponsor.url || "#"}
-              target={sponsor.url?.startsWith("http") ? "_blank" : undefined}
-              rel="noreferrer"
-              className="logo-box relative mb-4 flex h-28 w-full items-center justify-center"
-            >
-              <span className="relative h-full w-full">
-                <Image
-                  src={sponsor.image}
-                  alt={sponsor.name}
-                  fill
-                  className="img-clean"
-                  unoptimized
-                />
-              </span>
-            </a>
+            {sponsor.url?.startsWith("http") ? (
+              <a
+                href={sponsor.url}
+                target="_blank"
+                rel="noreferrer"
+                className="logo-box relative mb-4 flex h-28 w-full items-center justify-center"
+              >
+                <span className="relative h-full w-full">
+                  <Image
+                    src={sponsor.image}
+                    alt={sponsor.name}
+                    fill
+                    className="img-clean"
+                    unoptimized
+                  />
+                </span>
+              </a>
+            ) : (
+              <div className="logo-box relative mb-4 flex h-28 w-full items-center justify-center">
+                <span className="relative h-full w-full">
+                  <Image
+                    src={sponsor.image}
+                    alt={sponsor.name}
+                    fill
+                    className="img-clean"
+                    unoptimized
+                  />
+                </span>
+              </div>
+            )}
             <EditableText
               as="span"
               className="text-center text-sm font-semibold text-chalk"

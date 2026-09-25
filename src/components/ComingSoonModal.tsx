@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect } from "react";
 
-/** Click-to-open detail modal — large flyer mode for readable deals. */
+/** Click-to-open detail modal — coach bios, deals, or large flyer lightbox. */
 export function ComingSoonModal({
   open,
   onClose,
@@ -11,14 +11,16 @@ export function ComingSoonModal({
   image,
   kind = "details",
   largeImage = false,
+  description,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   image?: string;
   kind?: "coach" | "deal" | "details";
-  /** Show flyer nearly full-screen so text/prices are readable */
   largeImage?: boolean;
+  /** When provided, shown instead of placeholder “Coming soon” copy */
+  description?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -43,7 +45,12 @@ export function ComingSoonModal({
         ? "Deal details"
         : "Details";
 
-  /* Large flyer lightbox — prioritize readable image */
+  const body =
+    (description || "").trim() ||
+    (kind === "coach"
+      ? "Bio coming soon. For private coaching or clinic requests, email Contactus@ballardsbowlingacademy.com."
+      : "Details coming soon. Check back shortly.");
+
   if (largeImage && image) {
     return (
       <div
@@ -79,7 +86,7 @@ export function ComingSoonModal({
           </div>
         </div>
         <p className="shrink-0 px-4 py-3 text-center text-sm text-mist">
-          Full description coming soon — scroll the flyer to read all details.
+          Scroll the flyer to read all details.
         </p>
       </div>
     );
@@ -114,11 +121,16 @@ export function ComingSoonModal({
         <div className="space-y-3 p-6 text-center md:p-8">
           <p className="text-xs tracking-[0.22em] text-red uppercase">{label}</p>
           <h3 className="display text-3xl text-white md:text-4xl">{title}</h3>
-          <p className="text-lg font-semibold text-chalk">Coming soon</p>
-          <p className="text-sm text-mist">
-            Full description will be added here. Check back soon.
-          </p>
-          <button type="button" className="btn btn-primary mt-2" onClick={onClose}>
+          <p className="text-sm leading-relaxed text-mist">{body}</p>
+          {kind === "coach" ? (
+            <a
+              href="mailto:Contactus@ballardsbowlingacademy.com?subject=Private%20Coaching%20Request"
+              className="btn btn-primary mt-2 inline-flex"
+            >
+              Request coaching
+            </a>
+          ) : null}
+          <button type="button" className="btn btn-secondary mt-2" onClick={onClose}>
             Close
           </button>
         </div>

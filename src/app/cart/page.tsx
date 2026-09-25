@@ -293,8 +293,8 @@ export default function CartPage() {
       : due <= 0
         ? "Place free order"
         : shopifyReady
-          ? "Pay with Shopify"
-          : "Shopify not connected";
+          ? "Continue to checkout"
+          : "Checkout unavailable";
 
   return (
     <section className="site-shell section-pad pt-24">
@@ -309,22 +309,17 @@ export default function CartPage() {
       {paidCheckoutBlocked && (
         <div className="mb-6 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
           <p className="font-semibold text-amber-200">
-            Shopify payment is warming up — refresh this page in a moment.
+            Checkout is temporarily unavailable
           </p>
           <p className="mt-2 text-amber-100/90">
-            If this stays blocked, open{" "}
-            <Link href="/ops/shopify" className="underline text-amber-50">
-              Ops → Shopify
-            </Link>{" "}
-            and tap <strong>Refresh status</strong> (or Save Connect). The app
-            needs Shopify Admin scope{" "}
-            <code className="text-amber-50">write_draft_orders</code>.
-          </p>
-          <p className="mt-2">
-            Status:{" "}
-            <Link href="/api/shopify/status" className="underline text-amber-50">
-              /api/shopify/status
-            </Link>
+            Please try again shortly. If you still need help, email{" "}
+            <a
+              className="underline text-amber-50"
+              href="mailto:Contactus@ballardsbowlingacademy.com"
+            >
+              Contactus@ballardsbowlingacademy.com
+            </a>
+            .
           </p>
         </div>
       )}
@@ -333,7 +328,7 @@ export default function CartPage() {
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
           <p className="text-mist">{message || "Your cart is empty."}</p>
           <Link href="/shop" className="btn btn-primary mt-6">
-            Browse inventory
+            Browse the shop
           </Link>
         </div>
       ) : (
@@ -473,23 +468,19 @@ export default function CartPage() {
             </div>
 
             <p className="mt-4 text-sm text-mist">
-              Login required to buy. This website owns the catalog, prices, cart,
-              and stock. Shopify is payment only. Cart items stay until you pay
-              or remove them — stock drops only after a successful purchase.{" "}
+              Sign in to checkout. Catalog prices and stock are managed by
+              Ballard&apos;s. Payment is processed securely at checkout.{" "}
               {due <= 0
-                ? "This is a free coupon order — it records on the website with no Shopify payment page."
+                ? "This is a free coupon order — no payment page is needed."
                 : shopifyReady
-                  ? "Pay with Shopify opens Shopify’s secure payment page using this website’s prices."
-                  : "Paid checkout opens after Shopify status shows Ready — refresh or check Ops → Shopify."}
+                  ? "Continue to our secure payment page to complete your order."
+                  : "Checkout is temporarily unavailable. Please try again shortly."}
             </p>
-            {shopifyReady && shopify?.storeDomain && (
+            {shopifyReady ? (
               <p className="mt-2 text-xs text-emerald-300">
-                Shopify ready · {shopify.storeDomain}
-                {!shopify.webhookConfigured
-                  ? " · webhook secret still missing (inventory after pay needs it)"
-                  : ""}
+                Secure checkout ready
               </p>
-            )}
+            ) : null}
             {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
             {message && <p className="mt-3 text-sm text-emerald-300">{message}</p>}
             <button

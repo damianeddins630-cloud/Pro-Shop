@@ -19,7 +19,6 @@ import {
   deleteShopifyDraftOrder,
   isShopifyConfigured,
   loadShopifyRuntimeConfig,
-  shopifyStatus,
 } from "@/lib/shopify";
 import { effectivePrice } from "@/lib/pricing";
 import type { OrderItem } from "@/lib/types";
@@ -215,13 +214,11 @@ export async function POST(req: Request) {
     // Paid checkout REQUIRES Shopify — never silently place a paid local order on Vercel.
     await loadShopifyRuntimeConfig();
     if (!isShopifyConfigured()) {
-      const status = shopifyStatus();
       return NextResponse.json(
         {
           error:
-            "Shopify payment is not connected yet. Open Ops → Shopify, tap Refresh status or Save Connect, then try checkout again.",
+            "Checkout is temporarily unavailable. Please try again shortly.",
           code: "SHOPIFY_NOT_CONFIGURED",
-          shopify: status,
         },
         { status: 503 }
       );
@@ -287,17 +284,20 @@ export async function POST(req: Request) {
         discountAmount,
         total,
         message:
-          "Redirecting to Shopify with this website’s current prices and discounts. Cart stays until you pay. Stock updates only after payment.",
+          "Redirecting to secure checkout with current prices. Stock updates after payment.",
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Shopify checkout failed";
       await updateOrder(order.id, { status: "cancelled" });
+      const publicError =
+        /draft|scope|permission|configured|secret|token|ops/i.test(message)
+          ? "Checkout is temporarily unavailable. Please try again shortly."
+          : "Checkout is temporarily unavailable. Please try again shortly.";
       return NextResponse.json(
         {
-          error: message,
+          error: publicError,
           code: "SHOPIFY_DRAFT_FAILED",
           orderId: order.id,
-          shopify: shopifyStatus(),
         },
         { status: 502 }
       );

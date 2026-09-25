@@ -1,10 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { EditableCoaches } from "@/components/EditableCoaches";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 import { getText, listCoaches } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Bowling Coaching",
+  description:
+    "Private coaching and group clinics from Ballard's Bowling Academy. Request a lesson or clinic by email.",
+};
 
 export default async function CoachingPage() {
   const [
@@ -19,6 +26,9 @@ export default async function CoachingPage() {
     shopCta,
     videoCaption,
     coachesTitle,
+    privateTitle,
+    privateBody,
+    privateCta,
   ] = await Promise.all([
     listCoaches(),
     getText("coaching", "eyebrow", "Coaching"),
@@ -32,17 +42,24 @@ export default async function CoachingPage() {
     getText(
       "coaching",
       "body1",
-      "Ballard's Bowling Academy offers quality coaching and seminars to bowlers and coaches to help enhance the bowling and coaching experience."
+      "Ballard's Bowling Academy offers quality coaching and seminars to bowlers and coaches to help enhance the bowling experience."
     ),
     getText(
       "coaching",
       "body2",
-      "Please reach out to us via email — Contactus@ballardsbowlingacdemy.com"
+      "Please reach out to us via email — Contactus@ballardsbowlingacademy.com"
     ),
     getText("coaching", "request_cta", "Request a Clinic"),
     getText("coaching", "shop_cta", "Shop pro shop gear"),
     getText("coaching", "video_caption", "Watch Ballard's Academy in action."),
     getText("coaching", "coaches_title", "Our Coaches"),
+    getText("coaching", "private_title", "Private Coaching"),
+    getText(
+      "coaching",
+      "private_body",
+      "Looking for one-on-one lessons? Email us with your name, preferred location or center, skill level, and goals. We will follow up to schedule with a Ballard's coach — there is no online calendar booking on this site yet."
+    ),
+    getText("coaching", "private_cta", "Request a private lesson"),
   ]);
 
   return (
@@ -83,6 +100,37 @@ export default async function CoachingPage() {
         </div>
       </section>
 
+      <section className="site-shell section-pad border-b border-white/10">
+        <EditablePageTitle
+          page="coaching"
+          slot="private_title"
+          initial={privateTitle}
+          as="h2"
+          className="display text-4xl"
+        />
+        <EditablePageTitle
+          page="coaching"
+          slot="private_body"
+          initial={privateBody}
+          as="p"
+          multiline
+          rows={4}
+          className="mt-4 max-w-3xl leading-relaxed text-mist"
+        />
+        <a
+          href="mailto:Contactus@ballardsbowlingacademy.com?subject=Private%20Coaching%20Request"
+          className="btn btn-primary mt-6"
+        >
+          <EditablePageTitle
+            page="coaching"
+            slot="private_cta"
+            initial={privateCta}
+            as="span"
+            className="inline"
+          />
+        </a>
+      </section>
+
       <section className="site-shell section-pad grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
           <EditablePageTitle
@@ -112,7 +160,7 @@ export default async function CoachingPage() {
           />
           <div className="mt-8 flex flex-wrap gap-3">
             <a
-              href="mailto:Contactus@ballardsbowlingacdemy.com?subject=Clinic%20Request"
+              href="mailto:Contactus@ballardsbowlingacademy.com?subject=Clinic%20Request"
               className="btn btn-primary"
             >
               <EditablePageTitle

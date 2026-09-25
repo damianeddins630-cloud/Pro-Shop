@@ -1,9 +1,16 @@
 import Image from "next/image";
+import type { Metadata } from "next";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 import { EditableSponsors } from "@/components/EditableSponsors";
 import { getText, listSponsors } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Ballard vs The Big C",
+  description:
+    "Ballard vs. The Big C charity event supporting cancer fighting — Del and Carolyn Ballard.",
+};
 
 export default async function BvbcPage() {
   const [
@@ -212,7 +219,7 @@ export default async function BvbcPage() {
             <div className="mt-5 flex flex-wrap gap-3">
               <a
                 className="btn btn-primary !text-sm"
-                href="mailto:Contactus@ballardsbowlingacdemy.com?subject=BVBC%20Team%20Entry"
+                href="mailto:Contactus@ballardsbowlingacademy.com?subject=BVBC%20Team%20Entry"
               >
                 <EditablePageTitle
                   page="bvbc"
@@ -224,7 +231,7 @@ export default async function BvbcPage() {
               </a>
               <a
                 className="btn btn-ghost !text-sm"
-                href="mailto:Contactus@ballardsbowlingacdemy.com?subject=BVBC%20Sponsorship"
+                href="mailto:Contactus@ballardsbowlingacademy.com?subject=BVBC%20Sponsorship"
               >
                 <EditablePageTitle
                   page="bvbc"

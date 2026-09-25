@@ -42,8 +42,21 @@ a {
 }
 
 .site-shell {
-  width: min(1180px, calc(100% - 2rem));
+  width: min(1180px, calc(100% - 1.25rem));
   margin-inline: auto;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .site-shell {
+    width: min(1180px, calc(100% - 2rem));
+  }
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .section-pad {

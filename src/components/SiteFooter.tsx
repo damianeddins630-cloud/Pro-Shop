@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { BrandMark } from "./BrandMark";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 
+const CONTACT_EMAIL = "Contactus@ballardsbowlingacademy.com";
+
 const defaults = {
   brand: "Ballard's Bowling Academy",
   tagline: "Elite coaching. Family. Passion.",
@@ -12,7 +14,9 @@ const defaults = {
     "World-class coaching and pro shop support for bowlers at every level — on and off the lanes.",
   explore: "Explore",
   contact: "Contact",
-  contact_lead: "Coaching inquiries:",
+  contact_lead: "Email:",
+  pickup:
+    "Pickup only — no shipping. Buy online, then come in for drilling and pickup at Ballard's Bowling Academy Pro Shop.",
   subscribe_cta: "Subscribe for updates",
   copyright: `© ${new Date().getFullYear()} Ballard's Bowling Academy Pro Shop`,
 };
@@ -71,6 +75,15 @@ export function SiteFooter() {
             rows={3}
             className="max-w-md text-sm leading-relaxed text-mist"
           />
+          <EditablePageTitle
+            page="footer"
+            slot="pickup"
+            initial={t.pickup}
+            as="p"
+            multiline
+            rows={3}
+            className="mt-4 max-w-md text-sm leading-relaxed text-chalk"
+          />
         </div>
         <div>
           <EditablePageTitle
@@ -85,6 +98,9 @@ export function SiteFooter() {
             <Link href="/shop">Pro Shop</Link>
             <Link href="/deals">Deal of the Month</Link>
             <Link href="/bvbc">Ballard vs. The Big C</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/terms">Terms of Service</Link>
+            <Link href="/returns">Returns & Pickup</Link>
           </div>
         </div>
         <div>
@@ -104,11 +120,15 @@ export function SiteFooter() {
               className="inline"
             />{" "}
             <a
-              className="text-chalk underline decoration-red/50"
-              href="mailto:Contactus@ballardsbowlingacdemy.com"
+              className="break-all text-chalk underline decoration-red/50"
+              href={`mailto:${CONTACT_EMAIL}`}
             >
-              Contactus@ballardsbowlingacdemy.com
+              {CONTACT_EMAIL}
             </a>
+          </p>
+          <p className="mt-3 text-sm text-mist">
+            Phone and store hours: contact us by email — we will confirm the best
+            location and time for pickup or lessons.
           </p>
           <Link href="/subscribe" className="btn btn-ghost mt-4 !px-4 !py-2 text-sm">
             <EditablePageTitle

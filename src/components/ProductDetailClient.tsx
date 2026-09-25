@@ -128,6 +128,21 @@ export function ProductDetailClient({
           </p>
           <p className="mt-6 leading-relaxed text-mist">{product.description}</p>
 
+          {!needsWeight &&
+          /insert|quad/i.test(`${product.name} ${product.category}`) ? (
+            <p className="mt-4 text-sm text-mist">
+              Color is selected by product. Insert sizing is fitted in the pro
+              shop — tell the technician your preferred size at pickup.
+            </p>
+          ) : null}
+
+          {!needsWeight && /bowling ball/i.test(product.category || "") ? (
+            <p className="mt-4 text-sm text-mist">
+              Ball weight is confirmed at Ballard&apos;s during drilling and
+              pickup. In-store only — we do not ship.
+            </p>
+          ) : null}
+
           {needsWeight && !out ? (
             <div className="mt-8">
               <p className="text-sm font-medium text-chalk">

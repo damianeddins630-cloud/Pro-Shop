@@ -19,7 +19,7 @@ export const CUSTOMER_JOURNEY: JourneyStep[] = [
   {
     n: "01",
     title: "Buy online",
-    text: "Choose your ball and weight. Pay on this site.",
+    text: "Choose your gear online and check out securely.",
   },
   {
     n: "02",

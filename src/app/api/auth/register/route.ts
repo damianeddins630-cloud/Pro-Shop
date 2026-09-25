@@ -26,18 +26,43 @@ export async function POST(req: Request) {
         { status: 503 }
       );
     }
-    const body = schema.parse(await req.json());
-    const user = await createUser(body);
+    const parsed = schema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error:
+            "Please provide a valid email, username (3+ characters), password (10+ characters), phone number, and date of birth.",
+        },
+        { status: 400 }
+      );
+    }
+    const user = await createUser(parsed.data);
     await createSessionForUser(user);
     return NextResponse.json(
       { user: await toPublicUser(user) },
       { status: 201 }
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Registration failed";
-    const missingPersist = message.toLowerCase().includes("github_token");
+    const raw = e instanceof Error ? e.message : "Registration failed";
+    const lower = raw.toLowerCase();
+    const missingPersist =
+      lower.includes("github_token") ||
+      lower.includes("durable") ||
+      lower.includes("blob") ||
+      lower.includes("persist");
+    const duplicate =
+      lower.includes("already registered") || lower.includes("already exists");
+    const publicError = missingPersist
+      ? "Account saving is not set up yet. Please contact the site owner."
+      : duplicate
+        ? "An account with that email or username already exists."
+        : raw.includes("AUTH_SECRET") ||
+            lower.includes("ops") ||
+            lower.includes("env")
+          ? "Registration is temporarily unavailable. Please try again shortly."
+          : raw;
     return NextResponse.json(
-      { error: message },
+      { error: publicError },
       { status: missingPersist ? 503 : 400 }
     );
   }

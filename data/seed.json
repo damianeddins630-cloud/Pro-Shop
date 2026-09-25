@@ -4,7 +4,7 @@
       "id": "8945599381658",
       "name": "Vengeance",
       "slug": "vengeance",
-      "description": "The oil didn\u2019t get lighter. Your ball choice just got smarter. The Vengeance was built for medium\u2013heavy to heavy oil conditions, delivering strength without overreaction. This all-new core and cover combination produces one of the most dynamic symmetrical balls in 900 Global history, creating a readable, confident shape that holds up from the first frame to the last. It picks up in the mid-lane, stays smooth as the lanes transition, and still finishes with purpose downlane. Strong enough to star",
+      "description": "The oil didn\u2019t get lighter. Your ball choice just got smarter. The Vengeance was built for medium\u2013heavy to heavy oil conditions, delivering strength without overreaction. This all-new core and cover combination produces one of the most dynamic symmetrical balls in 900 Global history, creating a readable, confident shape that holds up from the first frame to the last. It picks up in the mid-lane, stays smooth as the lanes transition, and still finishes with purpose downlane. Strong enough to start league. Stable and predictable enough to last. Engineered for medium/heavy\u2013heavy oil. Surprisingly good at everything else.",
       "price": 2000,
       "stock": 3,
       "category": "Bowling Ball",
@@ -17,7 +17,7 @@
       "id": "8903923761306",
       "name": "Ember",
       "slug": "ember",
-      "description": ";sdkhsdf;lkfd;kh",
+      "description": "The Ember joins the 800 Series and is designed to complement the Cove to handle medium conditions. It utilizes the same Magna A.I. Core as the Cove with the RB 82 Pearl Reactive coverstock for stronger backend motion when you need it \u2014 clean through the front with a confident finish downlane.",
       "price": 130,
       "stock": 10,
       "category": "Bowling Ball",
@@ -535,7 +535,7 @@
       "id": "s9",
       "name": "InLinq",
       "image": "/images/sponsors/inlinq2_480x480.jpg",
-      "url": "#"
+      "url": ""
     },
     {
       "id": "s10",
@@ -587,25 +587,29 @@
       "id": "c1",
       "name": "Carolyn Dorin-Ballard",
       "image": "/images/coaches/BBA-Coaches-CDB.png",
-      "email": "Carolynballard.bba@gmail.com"
+      "email": "Carolynballard.bba@gmail.com",
+      "bio": "At 25, Carolyn joined the LPBT tour (later PWBA) and won 20 national championships, including three majors in her career. She also captured two USBC/PBA Women's World Series titles as well as the World Tour Championship in 2011. This 2008 USBC Hall of Famer admits she was never the most talented, but credits hard work and determination for her success."
     },
     {
       "id": "c2",
       "name": "Del Ballard, Jr.",
       "image": "/images/coaches/BBA-Coaches-DB.png",
-      "email": "delballard.bba@gmail.com"
+      "email": "delballard.bba@gmail.com",
+      "bio": "At 18 years of age, Del joined the PBA and earned 13 titles which included four major championships of which two were U.S. Open titles. He is ranked 29th among the greatest of all time and is currently one of the top national and international bowling coaches in the world. This 2009 USBC Hall of Famer is currently the Storm/Roto Grip PBA Tour rep as well as an international coach for Team Hong Kong."
     },
     {
       "id": "c3",
       "name": "Paul Fleming",
       "image": "/images/coaches/BBA-Coaches-PF.png",
-      "email": ""
+      "email": "",
+      "bio": ""
     },
     {
       "id": "c4",
       "name": "Chris Moore",
       "image": "/images/coaches/BBA-Coaches-CM.png",
-      "email": ""
+      "email": "",
+      "bio": ""
     }
   ],
   "texts": [

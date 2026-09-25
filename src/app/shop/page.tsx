@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { BrandMark } from "@/components/BrandMark";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
 import { EditableProductGrid } from "@/components/EditableProductGrid";
@@ -8,6 +9,12 @@ import { brandImage, FEATURED_BRANDS } from "@/lib/shop-nav";
 import { getText, listProducts } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Shop",
+  description:
+    "Shop bowling balls, bags, and accessories at Ballard's Bowling Academy Pro Shop. Pickup in store — no shipping.",
+};
 
 export default async function ShopPage({
   searchParams,
@@ -18,11 +25,11 @@ export default async function ShopPage({
   const [products, eyebrow, title, intro] = await Promise.all([
     listProducts(),
     getText("shop", "eyebrow", "Pro Shop"),
-    getText("shop", "title", "Inventory & Gear"),
+    getText("shop", "title", "Pro Shop Gear"),
     getText(
       "shop",
       "intro",
-      "Buy online, then come in for drilling and pickup. In-store only — no shipping. Live inventory from Ballard's pro shop."
+      "Buy online, then come in for drilling and pickup. In-store only — we do not ship."
     ),
   ]);
 
@@ -46,7 +53,7 @@ export default async function ShopPage({
     brandCounts.set(p.brand, (brandCounts.get(p.brand) || 0) + 1);
   }
 
-  // Featured brands first (even if 0), then any other brands with stock.
+  // Featured brands with products only — never show empty brand tiles.
   const brandTiles: { name: string; count: number; href: string; image: string }[] =
     [];
   const seen = new Set<string>();
@@ -54,14 +61,15 @@ export default async function ShopPage({
     const hit = [...brandCounts.keys()].find(
       (b) => b.toLowerCase() === name.toLowerCase()
     );
-    const display = hit || name;
+    const count = hit ? brandCounts.get(hit) || 0 : 0;
+    if (!hit || count <= 0) continue;
     brandTiles.push({
-      name: display,
-      count: hit ? brandCounts.get(hit) || 0 : 0,
-      href: `/shop?brand=${encodeURIComponent(display)}#inventory`,
-      image: brandImage(display),
+      name: hit,
+      count,
+      href: `/shop?brand=${encodeURIComponent(hit)}#inventory`,
+      image: brandImage(hit),
     });
-    seen.add(display.toLowerCase());
+    seen.add(hit.toLowerCase());
   }
   for (const [name, count] of [...brandCounts.entries()].sort((a, b) =>
     a[0].localeCompare(b[0])

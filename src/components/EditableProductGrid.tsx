@@ -186,7 +186,7 @@ export function EditableProductGrid({
     <div>
       {source === "local" && (
         <p className="mb-4 text-xs text-emerald-300">
-          Showing your latest inventory updates.
+          Showing the latest products available in the shop.
         </p>
       )}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

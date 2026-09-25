@@ -20,11 +20,24 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Ballard's Bowling Academy | Pro Shop & Elite Coaching",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+      "https://pro-shop-lemon.vercel.app"
+  ),
+  title: {
+    default: "Ballard's Bowling Academy | Pro Shop & Elite Coaching",
+    template: "%s | Ballard's Bowling Academy",
+  },
   description:
-    "World-class bowling coaching and pro shop from Ballard's Bowling Academy. Lessons, clinics, Storm, Roto Grip, 900 Global, and Ballard vs. The Big C.",
+    "World-class bowling coaching and pro shop from Ballard's Bowling Academy. Lessons, clinics, and gear — pickup in store, no shipping.",
   icons: {
     icon: "/images/logo.png",
+  },
+  openGraph: {
+    title: "Ballard's Bowling Academy | Pro Shop & Elite Coaching",
+    description:
+      "Hall of Fame coaching and a full-service pro shop. Shop gear online, pick up in store.",
+    type: "website",
   },
 };
 

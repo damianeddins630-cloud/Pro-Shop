@@ -105,6 +105,7 @@ export function EditableCoaches({ initial }: { initial: Coach[] }) {
         title={active?.name || "Coach"}
         image={active?.image}
         kind="coach"
+        description={active?.bio}
       />
     </div>
   );

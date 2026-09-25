@@ -87,7 +87,16 @@ function LoginForm() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-mist">
+        <p className="mt-4 text-center text-sm text-mist">
+          Forgot password?{" "}
+          <a
+            href="mailto:Contactus@ballardsbowlingacademy.com?subject=Password%20reset%20request"
+            className="text-red underline"
+          >
+            Email us for a reset
+          </a>
+        </p>
+        <p className="mt-3 text-center text-sm text-mist">
           Need an account?{" "}
           <Link
             href={`/register?next=${encodeURIComponent(next)}`}

@@ -154,6 +154,8 @@ export interface Coach {
   name: string;
   image: string;
   email?: string;
+  /** Optional public bio — when empty, UI invites contact instead of inventing copy */
+  bio?: string;
 }
 
 export interface PageText {

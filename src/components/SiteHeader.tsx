@@ -34,14 +34,14 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/85 backdrop-blur-xl">
-      <div className="site-shell flex items-center justify-between gap-4 py-3">
-        <Link href="/" className="flex items-center gap-3">
-          <BrandMark mode={shopMode ? "cart" : "logo"} size={shopMode ? 44 : 88} />
-          <div className="leading-tight">
-            <div className="display text-xl text-chalk md:text-2xl">
+      <div className="site-shell flex min-w-0 items-center justify-between gap-2 py-3 sm:gap-4">
+        <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <BrandMark mode={shopMode ? "cart" : "logo"} size={shopMode ? 40 : 56} />
+          <div className="min-w-0 leading-tight">
+            <div className="display truncate text-lg text-chalk sm:text-xl md:text-2xl">
               Ballard&apos;s
             </div>
-            <div className="text-xs tracking-[0.18em] text-red uppercase">
+            <div className="hidden text-[10px] tracking-[0.18em] text-red uppercase sm:block sm:text-xs">
               Bowling Academy
             </div>
           </div>
@@ -66,23 +66,23 @@ export function SiteHeader() {
           })}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {canEdit && (
             <button
               type="button"
               onClick={() => setEditMode(!editMode)}
-              className={`rounded-full px-3 py-2 text-sm font-bold ${
+              className={`hidden rounded-full px-3 py-2 text-sm font-bold md:inline-flex ${
                 editMode
                   ? "bg-white text-black"
                   : "bg-red text-white hover:bg-red-deep"
               }`}
             >
-              {editMode ? "Done editing" : "Edit all text"}
+              {editMode ? "Done" : "Edit"}
             </button>
           )}
           <Link
             href="/cart"
-            className="relative rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-red/60"
+            className="relative rounded-full border border-white/15 px-2.5 py-2 text-sm text-chalk hover:border-red/60 sm:px-3"
           >
             Cart
             {count > 0 && (
@@ -96,28 +96,32 @@ export function SiteHeader() {
               {showAdmin && (
                 <Link
                   href="/ops"
-                  className="hidden rounded-full bg-red px-3 py-2 text-sm font-bold text-white sm:inline-flex"
+                  className="hidden rounded-full bg-red px-3 py-2 text-sm font-bold text-white lg:inline-flex"
                 >
-                  Operations
+                  Ops
                 </Link>
               )}
               <Link
                 href="/profile"
-                className="rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-red/60"
+                className="hidden rounded-full border border-white/15 px-3 py-2 text-sm text-chalk hover:border-red/60 sm:inline-flex"
               >
                 Profile
               </Link>
             </>
           ) : (
-            <Link href="/login" className="btn btn-primary !px-3 !py-2 text-sm">
+            <Link
+              href="/login"
+              className="btn btn-primary !px-2.5 !py-2 text-sm sm:!px-3"
+            >
               Login
             </Link>
           )}
           <button
             type="button"
-            className="rounded-full border border-white/15 px-3 py-2 text-sm lg:hidden"
+            className="rounded-full border border-white/15 px-2.5 py-2 text-sm lg:hidden sm:px-3"
             onClick={() => setOpen((v) => !v)}
             aria-label="Menu"
+            aria-expanded={open}
           >
             Menu
           </button>
@@ -137,6 +141,15 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
+            {user ? (
+              <Link
+                href="/profile"
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-2 text-mist hover:bg-white/5 hover:text-chalk sm:hidden"
+              >
+                Profile
+              </Link>
+            ) : null}
             {canEdit && (
               <button
                 type="button"
@@ -144,7 +157,7 @@ export function SiteHeader() {
                   setEditMode(!editMode);
                   setOpen(false);
                 }}
-                className="rounded-lg px-3 py-2 text-left text-red"
+                className="rounded-lg px-3 py-2 text-left text-red md:hidden"
               >
                 {editMode ? "Done editing" : "Edit all text"}
               </button>

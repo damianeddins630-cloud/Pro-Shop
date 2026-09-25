@@ -437,6 +437,7 @@ function mergeWithSeed(parsed: StoreData): StoreData {
   parsed.shopifyConfig = parsed.shopifyConfig || seed.shopifyConfig;
   ensureCoupons(parsed);
   ensureSponsorUrls(parsed);
+  ensureCatalogCopy(parsed);
   return parsed;
 }
 
@@ -454,6 +455,42 @@ function ensureSponsorUrls(data: StoreData) {
   for (const sponsor of data.sponsors || []) {
     const next = urls[sponsor.id];
     if (next && sponsor.url !== next) sponsor.url = next;
+    // Never leave placeholder hash links on the public site
+    if (sponsor.url === "#") sponsor.url = "";
+  }
+}
+
+/** Repair known corrupted / truncated catalog copy on load. */
+function ensureCatalogCopy(data: StoreData) {
+  const fixes: Record<string, string> = {
+    vengeance:
+      "The oil didn’t get lighter. Your ball choice just got smarter. The Vengeance was built for medium–heavy to heavy oil conditions, delivering strength without overreaction. This all-new core and cover combination produces one of the most dynamic symmetrical balls in 900 Global history, creating a readable, confident shape that holds up from the first frame to the last. It picks up in the mid-lane, stays smooth as the lanes transition, and still finishes with purpose downlane. Strong enough to start league. Stable and predictable enough to last. Engineered for medium/heavy–heavy oil. Surprisingly good at everything else.",
+    ember:
+      "The Ember joins the 800 Series and is designed to complement the Cove to handle medium conditions. It utilizes the same Magna A.I. Core as the Cove with the RB 82 Pearl Reactive coverstock for stronger backend motion when you need it — clean through the front with a confident finish downlane.",
+  };
+  for (const product of data.products || []) {
+    const key = (product.slug || product.name || "").toLowerCase();
+    const fix = fixes[key] || fixes[product.name?.toLowerCase() || ""];
+    if (!fix) continue;
+    const desc = (product.description || "").trim();
+    if (
+      !desc ||
+      desc.includes("sdkhsdf") ||
+      desc.endsWith("Strong enough to star") ||
+      desc.length < 40
+    ) {
+      product.description = fix;
+    }
+  }
+
+  const delBio =
+    "At 18 years of age, Del joined the PBA and earned 13 titles which included four major championships of which two were U.S. Open titles. He is ranked 29th among the greatest of all time and is currently one of the top national and international bowling coaches in the world. This 2009 USBC Hall of Famer is currently the Storm/Roto Grip PBA Tour rep as well as an international coach for Team Hong Kong.";
+  const carolynBio =
+    "At 25, Carolyn joined the LPBT tour (later PWBA) and won 20 national championships, including three majors in her career. She also captured two USBC/PBA Women's World Series titles as well as the World Tour Championship in 2011. This 2008 USBC Hall of Famer admits she was never the most talented, but credits hard work and determination for her success.";
+  for (const coach of data.coaches || []) {
+    if (/del/i.test(coach.name) && !(coach.bio || "").trim()) coach.bio = delBio;
+    if (/carolyn/i.test(coach.name) && !(coach.bio || "").trim())
+      coach.bio = carolynBio;
   }
 }
 
