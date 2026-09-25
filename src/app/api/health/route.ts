@@ -54,6 +54,9 @@ export async function GET() {
     } else if (!shopify.webhookConfigured) {
       warning =
         "Shopify checkout can open, but the webhook secret is missing — paid orders will not update website inventory until webhook setup is finished.";
+    } else if (isUsingFallbackAuthSecret()) {
+      warning =
+        "AUTH_SECRET is not set in Vercel — login works with the built-in fallback. Set a long random AUTH_SECRET in Production and redeploy.";
     }
 
     return NextResponse.json({
