@@ -25,9 +25,13 @@ html {
 
 body {
   color: var(--foreground);
-  /* Solid black — no scrolling/animated site background */
+  /* Deep black with a quiet radial atmosphere — no busy scrolling pattern */
   background-color: #000;
-  background-image: none;
+  background-image:
+    radial-gradient(1200px 600px at 12% -10%, rgba(225, 6, 0, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 88% 0%, rgba(255, 255, 255, 0.04), transparent 50%),
+    linear-gradient(180deg, #050505 0%, #000 40%, #000 100%);
+  background-attachment: fixed;
   min-height: 100vh;
 }
 
@@ -222,18 +226,52 @@ body {
   border-radius: 1.25rem;
 }
 
+.brand-kicker {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #e10600;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.85);
+}
+
+.hero-media {
+  animation: heroKenBurns 28s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.hero-vignette {
+  background:
+    radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.55) 100%);
+  pointer-events: none;
+}
+
 .hero-copy-panel {
-  padding: 1.25rem 1.35rem 1.4rem;
-  border-radius: 1.25rem;
+  padding: 1.35rem 1.5rem 1.55rem;
+  border-radius: 1.35rem;
   background: linear-gradient(
     135deg,
-    rgba(0, 0, 0, 0.72) 0%,
-    rgba(0, 0, 0, 0.55) 55%,
-    rgba(0, 0, 0, 0.4) 100%
+    rgba(0, 0, 0, 0.78) 0%,
+    rgba(0, 0, 0, 0.58) 55%,
+    rgba(0, 0, 0, 0.42) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.site-header {
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+.site-footer a {
+  transition: color 0.2s ease;
+}
+
+.site-footer a:hover {
+  color: #fff;
 }
 
 .hero-title-pop {
@@ -364,6 +402,24 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes heroKenBurns {
+  from {
+    transform: scale(1.04) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.12) translate3d(-1.5%, -1%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-media,
+  .fade-up,
+  .fade-up-delay,
+  .pulse-glow {
+    animation: none !important;
   }
 }
 

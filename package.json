@@ -1,7 +1,8 @@
 {
-  "name": "ballards-pro-shop",
-  "version": "0.1.0",
+  "name": "ballards-new-pro-shop",
+  "version": "1.0.0",
   "private": true,
+  "description": "Ballard's Bowling Academy Pro Shop — website catalog with Shopify checkout",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

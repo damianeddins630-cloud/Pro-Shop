@@ -11,12 +11,12 @@ const defaults = {
   brand: "Ballard's Bowling Academy",
   tagline: "Elite coaching. Family. Passion.",
   blurb:
-    "World-class coaching and pro shop support for bowlers at every level — on and off the lanes.",
+    "World-class coaching and a full-service pro shop — built for champions at every level, on and off the lanes.",
   explore: "Explore",
   contact: "Contact",
   contact_lead: "Email:",
   pickup:
-    "Pickup only — no shipping. Buy online, then come in for drilling and pickup at Ballard's Bowling Academy Pro Shop.",
+    "In-store pickup only — we do not ship. Buy online, then visit Ballard's for drilling and pickup.",
   subscribe_cta: "Subscribe for updates",
   copyright: `© ${new Date().getFullYear()} Ballard's Bowling Academy Pro Shop`,
 };
@@ -44,10 +44,10 @@ export function SiteFooter() {
   }, []);
 
   return (
-    <footer className="mt-10 border-t border-white/10 bg-black/80">
-      <div className="site-shell section-pad grid gap-8 md:grid-cols-[1.3fr_1fr_1fr]">
+    <footer className="site-footer mt-12 border-t border-white/10 bg-gradient-to-b from-black to-[#070707]">
+      <div className="site-shell section-pad grid gap-10 md:grid-cols-[1.35fr_1fr_1fr]">
         <div>
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-5 flex items-center gap-3">
             <BrandMark mode="logo" size={56} />
             <div>
               <EditablePageTitle
@@ -55,14 +55,14 @@ export function SiteFooter() {
                 slot="brand"
                 initial={t.brand}
                 as="h2"
-                className="display text-2xl"
+                className="display text-2xl md:text-3xl"
               />
               <EditablePageTitle
                 page="footer"
                 slot="tagline"
                 initial={t.tagline}
                 as="p"
-                className="text-sm text-mist"
+                className="mt-1 text-sm tracking-wide text-mist"
               />
             </div>
           </div>

@@ -23,22 +23,23 @@ export function HeroSlider({
           alt="Ballard's Bowling Academy Pro Shop"
           fill
           priority
-          className="object-cover object-center"
+          className="hero-media object-cover object-center"
           sizes="100vw"
         />
-        {/* Dark scrims so headline stays readable over the pro shop wall */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/88 via-black/65 to-black/45" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/50" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/55" />
+        <div className="hero-vignette absolute inset-0" />
       </div>
 
       <div className="site-shell relative z-10 flex min-h-[100svh] flex-col justify-end pb-16 pt-28 md:justify-center md:pb-24">
         <div className="hero-copy-panel fade-up max-w-3xl">
+          <p className="brand-kicker fade-up-delay">Ballard&apos;s Bowling Academy</p>
           <EditablePageTitle
             page="home"
             slot="hero"
             initial={heroTitle}
             as="h1"
-            className="display hero-title-pop max-w-3xl text-5xl md:text-7xl lg:text-8xl"
+            className="display hero-title-pop mt-3 max-w-3xl text-5xl md:text-7xl lg:text-8xl"
           />
           <EditablePageTitle
             page="home"

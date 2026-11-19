@@ -12,7 +12,8 @@ export default async function HomePage() {
   let deals: Awaited<ReturnType<typeof listDeals>> = [];
   const defaults = {
     hero: "Perfect Your Game",
-    heroSub: "Hall of Fame coaching and a state-of-the-art pro shop.",
+    heroSub:
+      "Hall of Fame coaching and a full-service pro shop — buy online, drill and pick up in store.",
     heroCta1: "Book a Lesson →",
     heroCta2: "Shop gear →",
     trainingEyebrow: "Training",

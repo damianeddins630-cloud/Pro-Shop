@@ -29,15 +29,16 @@ export const metadata: Metadata = {
     template: "%s | Ballard's Bowling Academy",
   },
   description:
-    "World-class bowling coaching and pro shop from Ballard's Bowling Academy. Lessons, clinics, and gear — pickup in store, no shipping.",
+    "Ballard's Bowling Academy — Hall of Fame coaching and a full-service pro shop. Shop gear online, drill and pick up in store.",
   icons: {
     icon: "/images/logo.png",
   },
   openGraph: {
     title: "Ballard's Bowling Academy | Pro Shop & Elite Coaching",
     description:
-      "Hall of Fame coaching and a full-service pro shop. Shop gear online, pick up in store.",
+      "Elite coaching and a full-service pro shop. Shop online, pick up in store — no shipping.",
     type: "website",
+    siteName: "Ballard's Bowling Academy Pro Shop",
   },
 };
 

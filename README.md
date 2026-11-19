@@ -1,6 +1,8 @@
-# Ballard's Bowling Academy Pro Shop
+# Ballard's New Pro Shop
 
-Next.js website for Ballard's Bowling Academy with inventory, cart, accounts, Operations admin, and Shopify **checkout-only** payments.
+Premium Next.js website for **Ballard's Bowling Academy** — coaching, inventory, accounts, Operations admin, and Shopify **checkout-only** payments.
+
+Live: [pro-shop-lemon.vercel.app](https://pro-shop-lemon.vercel.app)
 
 ## Owner login
 
@@ -53,7 +55,7 @@ Keep this custom app — it is required for Draft Order checkout.
 
 ### 2) Vercel environment variables
 
-Project → **Settings → Environment Variables** (Production) for **pro-shop-lemon** (this Pro Shop repo):
+Project → **Settings → Environment Variables** (Production):
 
 ```
 AUTH_SECRET=long-random-secret
@@ -61,7 +63,7 @@ NEXT_PUBLIC_SITE_URL=https://pro-shop-lemon.vercel.app
 
 # REQUIRED so accounts, inventory, and role changes survive on Vercel
 GITHUB_TOKEN=ghp_xxx
-GITHUB_REPO=damianeddins630-cloud/Pro-Shop
+GITHUB_REPO=lupooperationsmanager-commits/Ballards-New-Pro-Shop
 GITHUB_BRANCH=main
 
 # Shopify checkout-only
@@ -69,9 +71,12 @@ SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 SHOPIFY_ADMIN_ACCESS_TOKEN=shpat_...
 SHOPIFY_API_VERSION=2025-01
 SHOPIFY_WEBHOOK_SECRET=...   # required for inventory after payment
+
+# Optional durable blob for media / large state
+BLOB_READ_WRITE_TOKEN=...
 ```
 
-**Without `GITHUB_TOKEN`, new customer accounts can disappear** after a new server starts (Vercel’s disk is temporary).
+**Without durable storage (`GITHUB_TOKEN` or Blob), new customer accounts can disappear** after a new server starts (Vercel’s disk is temporary).
 
 Do **not** add a Storefront API token. This site does not use it.
 
@@ -94,13 +99,13 @@ npm run dev
 
 ## Vercel checklist
 
-1. Import GitHub repo `damianeddins630-cloud/Pro-Shop`
+1. Import GitHub repo `lupooperationsmanager-commits/Ballards-New-Pro-Shop`
 2. Framework: **Next.js**
 3. Deploy from **`main`**
-4. Set env vars above on the **pro-shop-lemon** project (not City View Lanes)
+4. Set env vars above
 5. Turn OFF Vercel Deployment Protection / Authentication so customers can use the site
 6. Health check: `https://YOUR-DOMAIN/api/health`
 
-## Future note
+## Contact
 
-`live-store.json` (+ GitHub durable writes) works for this shop today. A real database (PostgreSQL) can come later if many staff edit inventory at once — not required to launch Shopify payments.
+Customer contact: **Contactus@ballardsbowlingacademy.com**

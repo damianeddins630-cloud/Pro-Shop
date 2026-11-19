@@ -29,7 +29,7 @@ export default async function ShopPage({
     getText(
       "shop",
       "intro",
-      "Buy online, then come in for drilling and pickup. In-store only — we do not ship."
+      "Curated gear from Ballard's Pro Shop. Buy online, then come in for drilling and pickup — in-store only, we do not ship."
     ),
   ]);
 
