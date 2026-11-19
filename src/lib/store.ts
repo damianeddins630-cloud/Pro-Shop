@@ -339,7 +339,8 @@ function migrateUsers(users: User[], roles: Role[]): User[] {
       next.roleId =
         next.role === "admin" ||
         next.username?.toLowerCase() === "cv_damian" ||
-        next.username?.toLowerCase() === "damian_e"
+        next.username?.toLowerCase() === "damian_e" ||
+        next.username?.toLowerCase() === "amf_damian_e"
           ? adminId
           : customerId;
     }
@@ -350,16 +351,20 @@ function migrateUsers(users: User[], roles: Role[]): User[] {
 /** Stable across Vercel serverless instances so login cookies keep working */
 export const OWNER_USER_ID = "user_owner";
 export const OWNER_EMAIL = "damianeddins630@gmail.com";
-export const OWNER_USERNAME = "CV_damian";
+export const OWNER_USERNAME = "AMF_Damian_E";
 /**
- * Bootstrap hash used ONLY when creating the owner row for the first time.
- * Existing owner passwords are never overwritten (so Ops password changes stick).
+ * Owner password hash (source of truth). Synced onto the owner row on boot so
+ * credential rotations in code reach durable production storage.
  * Prefer setting OWNER_BOOTSTRAP_PASSWORD in env for a one-time hash override.
  */
 export const OWNER_PASSWORD_HASH =
-  "$2b$10$7aHB08kNpgY72y/mHpDsp.hv2TtzWd8lX4gTzEsZYKHNmmiiyfujC";
+  "$2b$10$Rz/nmUb2QCMAAULMl11IN.gHjfFaGmy1Dc//pdbEwjkz5JYNtNnEC";
 
-const OWNER_USERNAME_ALIASES = new Set(["cv_damian", "damian_e"]);
+const OWNER_USERNAME_ALIASES = new Set([
+  "amf_damian_e",
+  "cv_damian",
+  "damian_e",
+]);
 
 function isOwnerUser(u: { id: string; username: string; email: string }) {
   return (
@@ -369,7 +374,8 @@ function isOwnerUser(u: { id: string; username: string; email: string }) {
   );
 }
 
-async function ensureAdmin(data: StoreData): Promise<void> {
+/** Returns true when owner credentials were created or rotated (needs durable persist). */
+async function ensureAdmin(data: StoreData): Promise<boolean> {
   data.roles = data.roles?.length ? data.roles : defaultRoles();
   data.orders = data.orders || [];
   ensureRoleRanks(data);
@@ -391,17 +397,21 @@ async function ensureAdmin(data: StoreData): Promise<void> {
   const existing = data.users.find(isOwnerUser);
 
   if (existing) {
-    // Keep one stable owner row — do NOT reset passwordHash on every boot
+    const changed =
+      existing.id !== OWNER_USER_ID ||
+      existing.username !== OWNER_USERNAME ||
+      existing.email !== OWNER_EMAIL ||
+      existing.passwordHash !== OWNER_PASSWORD_HASH ||
+      existing.roleId !== adminRole.id;
+    // Keep one stable owner row; sync username/email/password from constants
     existing.id = OWNER_USER_ID;
     existing.username = OWNER_USERNAME;
     existing.email = OWNER_EMAIL;
     existing.roleId = adminRole.id;
     existing.role = "admin";
-    if (!existing.passwordHash) {
-      existing.passwordHash = OWNER_PASSWORD_HASH;
-    }
+    existing.passwordHash = OWNER_PASSWORD_HASH;
     data.users = data.users.filter((u) => u === existing || !isOwnerUser(u));
-    return;
+    return changed;
   }
 
   data.users.push({
@@ -415,6 +425,7 @@ async function ensureAdmin(data: StoreData): Promise<void> {
     role: "admin",
     createdAt: new Date().toISOString(),
   });
+  return true;
 }
 
 function mergeWithSeed(parsed: StoreData): StoreData {
@@ -651,7 +662,7 @@ export async function getStore(): Promise<StoreData> {
     }
 
     const merged = mergeWithSeed(remote);
-    await ensureAdmin(merged);
+    let ownerCredsChanged = await ensureAdmin(merged);
     const remoteTs = storeUpdatedAtMs(merged);
     const memTs = storeUpdatedAtMs(store.data);
     // Keep in-memory copy when this instance just saved something newer,
@@ -668,6 +679,11 @@ export async function getStore(): Promise<StoreData> {
         ...(merged.shopifyConfig || {}),
         ...(store.data.shopifyConfig || {}),
       };
+      ownerCredsChanged =
+        (await ensureAdmin(store.data)) || ownerCredsChanged;
+      if (ownerCredsChanged) {
+        await persist(store.data);
+      }
       return store.data;
     }
     if (store.data) {
@@ -679,6 +695,9 @@ export async function getStore(): Promise<StoreData> {
       };
     }
     store.data = merged;
+    if (ownerCredsChanged) {
+      await persist(merged);
+    }
     return merged;
   }
 
@@ -736,7 +755,8 @@ export async function resolveUserRole(user: User): Promise<Role> {
   if (
     user.role === "admin" ||
     isOwnerUser(user) ||
-    user.username.toLowerCase() === "damian_e"
+    user.username.toLowerCase() === "damian_e" ||
+    user.username.toLowerCase() === "amf_damian_e"
   ) {
     return normalizeRole(
       data.roles.find((r) => r.id === OWNER_ROLE_ID) || defaultRoles()[0]

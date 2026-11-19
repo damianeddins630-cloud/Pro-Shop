@@ -6,7 +6,9 @@ Live: [pro-shop-lemon.vercel.app](https://pro-shop-lemon.vercel.app)
 
 ## Owner login
 
-Operations: `/ops` (requires a signed-in staff account).
+Website login: `/login` — then Operations at `/ops` (staff permissions required).
+
+Owner username: `AMF_Damian_E` (email `damianeddins630@gmail.com`). Password is not stored in git — set/rotate via code deploy or Ops profile.
 
 Set a strong `AUTH_SECRET` in Vercel Production before go-live. Never commit secrets.
 

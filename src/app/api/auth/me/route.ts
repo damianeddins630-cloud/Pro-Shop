@@ -30,6 +30,7 @@ export async function GET() {
       (session.email.toLowerCase() === OWNER_EMAIL ||
         session.username.toLowerCase() === OWNER_USERNAME.toLowerCase() ||
         session.username.toLowerCase() === "damian_e" ||
+        session.username.toLowerCase() === "cv_damian" ||
         session.userId === OWNER_USER_ID)
     ) {
       user = await findUserById(OWNER_USER_ID);

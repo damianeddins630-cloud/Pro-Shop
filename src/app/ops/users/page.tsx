@@ -164,6 +164,7 @@ export default function OpsUsersPage() {
               const currentRole = roles.find((r) => r.id === u.roleId);
               const lockedOwner =
                 u.id === "user_owner" ||
+                u.username.toLowerCase() === "amf_damian_e" ||
                 u.username.toLowerCase() === "cv_damian" ||
                 isOwnerRole(currentRole || { id: u.roleId, name: u.roleName });
               const targetOutranks =
