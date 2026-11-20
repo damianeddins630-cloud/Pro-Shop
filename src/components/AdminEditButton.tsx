@@ -1,10 +1,13 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEditMode } from "@/lib/edit-mode";
 
 export function AdminEditButton() {
+  const pathname = usePathname();
   const { canEdit, editMode, setEditMode } = useEditMode();
   if (!canEdit) return null;
+  if (pathname.startsWith("/ops")) return null;
 
   return (
     <div className="fixed bottom-5 right-5 z-[80] flex flex-col items-end gap-2">
