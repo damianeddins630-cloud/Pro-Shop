@@ -11,68 +11,140 @@ import type { Permission } from "@/lib/types";
 type NavItem = {
   href: string;
   label: string;
+  icon: string;
   perms: Permission[];
-  group: "shop" | "sales" | "system";
+  match?: (path: string) => boolean;
 };
 
-const nav: NavItem[] = [
-  { href: "/ops", label: "Home", perms: [], group: "shop" },
+type NavGroup = {
+  id: string;
+  label: string;
+  items: NavItem[];
+};
+
+const GROUPS: NavGroup[] = [
   {
-    href: "/ops/inventory",
-    label: "Inventory",
-    perms: ["manage_inventory", "edit_pages"],
-    group: "shop",
+    id: "overview",
+    label: "Overview",
+    items: [
+      {
+        href: "/ops",
+        label: "Dashboard",
+        icon: "▣",
+        perms: [],
+        match: (p) => p === "/ops" || p === "/ops/",
+      },
+    ],
   },
   {
-    href: "/ops/deals",
-    label: "Deals",
-    perms: ["manage_deals", "edit_pages"],
-    group: "shop",
+    id: "sales",
+    label: "Sales",
+    items: [
+      {
+        href: "/ops/orders",
+        label: "Sales & Orders",
+        icon: "◎",
+        perms: ["view_orders", "manage_orders"],
+        match: (p) => p.startsWith("/ops/orders"),
+      },
+      {
+        href: "/ops/inventory",
+        label: "Inventory",
+        icon: "▤",
+        perms: ["manage_inventory", "edit_pages"],
+        match: (p) => p.startsWith("/ops/inventory"),
+      },
+    ],
   },
   {
-    href: "/ops/coupons",
-    label: "Coupons",
-    perms: ["manage_deals", "manage_inventory", "edit_pages"],
-    group: "shop",
+    id: "people",
+    label: "People",
+    items: [
+      {
+        href: "/ops/coaching",
+        label: "Coaching",
+        icon: "◈",
+        perms: [],
+        match: (p) => p.startsWith("/ops/coaching"),
+      },
+      {
+        href: "/ops/memberships",
+        label: "Memberships",
+        icon: "◇",
+        perms: [],
+        match: (p) => p.startsWith("/ops/memberships"),
+      },
+      {
+        href: "/ops/customers",
+        label: "Customers",
+        icon: "◉",
+        perms: ["manage_users", "view_orders", "manage_orders"],
+        match: (p) => p.startsWith("/ops/customers"),
+      },
+    ],
   },
   {
-    href: "/ops/sponsors",
-    label: "Sponsors",
-    perms: ["manage_sponsors", "edit_pages"],
-    group: "shop",
+    id: "business",
+    label: "Business",
+    items: [
+      {
+        href: "/ops/finances",
+        label: "Finances",
+        icon: "⬡",
+        perms: ["view_orders", "manage_orders", "manage_inventory"],
+        match: (p) => p.startsWith("/ops/finances"),
+      },
+      {
+        href: "/ops/marketing",
+        label: "Marketing",
+        icon: "✦",
+        perms: [
+          "manage_deals",
+          "manage_sponsors",
+          "manage_subscribers",
+          "edit_pages",
+        ],
+        match: (p) =>
+          p.startsWith("/ops/marketing") ||
+          p.startsWith("/ops/deals") ||
+          p.startsWith("/ops/coupons") ||
+          p.startsWith("/ops/sponsors") ||
+          p.startsWith("/ops/subscribers"),
+      },
+      {
+        href: "/ops/reports",
+        label: "Reports & Analytics",
+        icon: "▦",
+        perms: ["view_orders", "manage_orders", "manage_inventory"],
+        match: (p) => p.startsWith("/ops/reports"),
+      },
+    ],
   },
   {
-    href: "/ops/orders",
-    label: "Orders",
-    perms: ["view_orders", "manage_orders"],
-    group: "sales",
-  },
-  {
-    href: "/ops/subscribers",
-    label: "Subscribers",
-    perms: ["manage_subscribers", "edit_pages", "manage_users"],
-    group: "sales",
-  },
-  {
-    href: "/ops/shopify",
-    label: "Shopify",
-    perms: ["manage_inventory", "manage_orders", "manage_roles", "manage_users"],
-    group: "system",
-  },
-  { href: "/ops/roles", label: "Roles", perms: ["manage_roles"], group: "system" },
-  {
-    href: "/ops/users",
-    label: "Users",
-    perms: ["manage_users", "manage_roles"],
-    group: "system",
+    id: "system",
+    label: "System",
+    items: [
+      {
+        href: "/ops/backups",
+        label: "Backups & System",
+        icon: "↻",
+        perms: ["manage_roles", "manage_users", "manage_inventory"],
+        match: (p) => p.startsWith("/ops/backups"),
+      },
+      {
+        href: "/ops/admin",
+        label: "Administration",
+        icon: "⚙",
+        perms: ["manage_roles", "manage_users"],
+        match: (p) =>
+          p.startsWith("/ops/admin") ||
+          p.startsWith("/ops/users") ||
+          p.startsWith("/ops/roles") ||
+          p.startsWith("/ops/shopify"),
+      },
+    ],
   },
 ];
-
-const groupLabel = {
-  shop: "Shop",
-  sales: "Sales",
-  system: "System",
-} as const;
 
 function canSee(userPerms: Permission[] | undefined, needed: Permission[]) {
   if (!needed.length) return true;
@@ -93,6 +165,7 @@ export function OpsShell({ children }: { children: ReactNode }) {
   const [health, setHealth] = useState<HealthSnap | null>(null);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState("");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const allowed =
     can("manage_inventory") ||
@@ -111,8 +184,12 @@ export function OpsShell({ children }: { children: ReactNode }) {
       const d = await res.json();
       setHealth({
         warning: typeof d.warning === "string" ? d.warning : null,
-        shopifyReady: Boolean(d.shopify?.checkoutReady ?? d.shopify?.configured),
-        durableOk: Boolean(d.persist?.lastPersistOk ?? d.persist?.durableWriteConfigured),
+        shopifyReady: Boolean(
+          d.shopify?.checkoutReady ?? d.shopify?.configured
+        ),
+        durableOk: Boolean(
+          d.persist?.lastPersistOk ?? d.persist?.durableWriteConfigured
+        ),
         productCount:
           typeof d.productCount === "number" ? d.productCount : null,
       });
@@ -125,6 +202,10 @@ export function OpsShell({ children }: { children: ReactNode }) {
     if (!user || !allowed) return;
     void refreshHealth();
   }, [user, allowed, refreshHealth]);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   async function runSelfTest() {
     setTesting(true);
@@ -180,129 +261,167 @@ export function OpsShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const items = nav.filter((item) => canSee(user.permissions, item.perms));
-  const groups = (["shop", "sales", "system"] as const).filter((g) =>
-    items.some((i) => i.group === g)
-  );
+  const visibleGroups = GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canSee(user.permissions, item.perms)),
+  })).filter((group) => group.items.length > 0);
+
+  const activeLabel =
+    visibleGroups
+      .flatMap((g) => g.items)
+      .find((item) =>
+        item.match ? item.match(pathname) : pathname.startsWith(item.href)
+      )?.label || "Operations";
 
   return (
-    <BrandedPageBackdrop tone="ops">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
-        <div className="flex min-w-0 items-center gap-4">
-          <OpsLogo size="md" />
-          <div className="min-w-0">
-            <p className="text-xs tracking-[0.22em] text-red uppercase">
-              Ballard&apos;s Bowling Academy
-            </p>
-            <h1 className="display truncate text-4xl md:text-5xl">Operations</h1>
-            <p className="mt-1 text-sm text-mist">
-              {user.username} · {user.roleName}
-            </p>
+    <div className="ops-shell">
+      <aside className={`ops-sidebar ${mobileOpen ? "open" : ""}`}>
+        <div className="ops-brand">
+          <Link href="/" className="ops-brand-mark" aria-label="Ballard's home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/ops-logo.png" alt="" width={44} height={44} />
+          </Link>
+          <div>
+            <p className="ops-brand-kicker">Ballard&apos;s Bowling Academy</p>
+            <p className="ops-brand-title">Operations Center</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {health && (
-            <>
-              <span
-                className={`rounded-full border px-3 py-1.5 text-xs ${
-                  health.durableOk
-                    ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
-                    : "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                }`}
-              >
-                {health.durableOk ? "Saves OK" : "Saves need fix"}
+
+        <nav className="ops-nav" aria-label="Operations">
+          {visibleGroups.map((group) => (
+            <div key={group.id} className="ops-nav-group">
+              <p className="ops-nav-group-label">{group.label}</p>
+              <ul>
+                {group.items.map((item) => {
+                  const active = item.match
+                    ? item.match(pathname)
+                    : pathname.startsWith(item.href);
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={`ops-nav-link ${active ? "active" : ""}`}
+                      >
+                        <span className="ops-nav-icon" aria-hidden>
+                          {item.icon}
+                        </span>
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        <div className="ops-sidebar-foot">
+          <div className="ops-status-chip">
+            <span
+              className="ops-status-dot"
+              style={{
+                background: health?.durableOk ? "#22c55e" : "#eab308",
+                boxShadow: health?.durableOk
+                  ? "0 0 0 4px rgba(34, 197, 94, 0.15)"
+                  : "0 0 0 4px rgba(234, 179, 8, 0.15)",
+              }}
+              aria-hidden
+            />
+            <div>
+              <strong>
+                {health?.durableOk ? "Systems online" : "Setup needed"}
+              </strong>
+              <span>
+                {health?.productCount != null
+                  ? `${health.productCount} products`
+                  : "Checking store…"}
+                {health?.shopifyReady ? " · Checkout ready" : " · Shopify setup"}
               </span>
-              <span
-                className={`rounded-full border px-3 py-1.5 text-xs ${
-                  health.shopifyReady
-                    ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
-                    : "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                }`}
-              >
-                {health.shopifyReady ? "Checkout ready" : "Shopify setup"}
-              </span>
-              {health.productCount != null && (
-                <span className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-mist">
-                  {health.productCount} products
-                </span>
-              )}
-            </>
-          )}
+            </div>
+          </div>
+          <div className="ops-user-chip">
+            <div className="ops-user-avatar" aria-hidden>
+              {(user.username || "A").slice(0, 1).toUpperCase()}
+            </div>
+            <div>
+              <strong>{user.username}</strong>
+              <span>{user.roleName || "staff"}</span>
+            </div>
+          </div>
+          <div className="ops-sidebar-actions">
+            <Link href="/">← Storefront</Link>
+            <button type="button" onClick={() => void runSelfTest()} disabled={testing}>
+              {testing ? "Testing…" : "Test save"}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {mobileOpen ? (
+        <button
+          type="button"
+          className="ops-backdrop"
+          aria-label="Close menu"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+
+      <div className="ops-main">
+        <header className="ops-topbar">
           <button
             type="button"
-            onClick={() => void runSelfTest()}
-            disabled={testing}
-            className="btn btn-ghost !px-3 !py-2 text-xs"
+            className="ops-menu-btn"
+            aria-label="Open menu"
+            onClick={() => setMobileOpen(true)}
           >
-            {testing ? "Testing…" : "Test save/load"}
+            ☰
           </button>
-          <Link href="/shop" className="btn btn-ghost !px-3 !py-2 text-xs">
-            View shop
-          </Link>
-        </div>
-      </header>
-
-      {(health?.warning || testMsg) && (
-        <div className="mb-5 space-y-2">
-          {health?.warning && (
-            <p className="rounded-2xl border border-amber-400/35 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-              {health.warning}
+          <div className="ops-topbar-copy">
+            <p className="ops-crumb">Operations Center · {activeLabel}</p>
+            <h1>OPERATIONS CENTER</h1>
+            <p className="ops-subtitle">
+              Ballard&apos;s Bowling Academy business command center — paid sales,
+              inventory, and system health.
             </p>
-          )}
-          {testMsg && (
-            <p
-              className={`rounded-2xl border px-4 py-3 text-sm ${
-                testMsg.toLowerCase().includes("fail") ||
-                testMsg.toLowerCase().includes("not")
-                  ? "border-amber-400/35 bg-amber-400/10 text-amber-100"
-                  : "border-emerald-400/35 bg-emerald-400/10 text-emerald-100"
-              }`}
-            >
-              {testMsg}
-            </p>
-          )}
-        </div>
-      )}
+          </div>
+          <div className="ops-topbar-actions">
+            <Link href="/shop" className="ops-ghost-btn">
+              View shop
+            </Link>
+            <Link href="/ops/orders" className="ops-primary-btn">
+              Sales & Orders
+            </Link>
+          </div>
+        </header>
 
-      <div className="grid gap-6 lg:grid-cols-[200px_1fr]">
-        <aside className="h-fit rounded-2xl border border-white/12 bg-black/50 p-3">
-          <nav className="flex flex-col gap-4">
-            {groups.map((group) => (
-              <div key={group}>
-                <p className="mb-1.5 px-2 text-[10px] font-semibold tracking-[0.18em] text-steel uppercase">
-                  {groupLabel[group]}
-                </p>
-                <div className="flex flex-col gap-0.5">
-                  {items
-                    .filter((i) => i.group === group)
-                    .map((item) => {
-                      const active =
-                        item.href === "/ops"
-                          ? pathname === "/ops"
-                          : pathname.startsWith(item.href);
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`rounded-lg px-3 py-2 text-sm transition ${
-                            active
-                              ? "bg-red font-semibold text-white"
-                              : "text-mist hover:bg-white/5 hover:text-chalk"
-                          }`}
-                        >
-                          {item.label}
-                        </Link>
-                      );
-                    })}
-                </div>
-              </div>
-            ))}
-          </nav>
-        </aside>
-        <div className="min-w-0 rounded-2xl border border-white/12 bg-black/40 p-5 md:p-6">
-          {children}
-        </div>
+        {(health?.warning || testMsg) && (
+          <div className="ops-content" style={{ paddingBottom: 0 }}>
+            {health?.warning ? (
+              <p className="ops-stage-banner" role="status">
+                {health.warning}
+              </p>
+            ) : null}
+            {testMsg ? (
+              <p
+                className="ops-stage-banner"
+                role="status"
+                style={{
+                  borderColor: testMsg.toLowerCase().includes("fail")
+                    ? "rgba(225, 6, 0, 0.35)"
+                    : "rgba(34, 197, 94, 0.35)",
+                  background: testMsg.toLowerCase().includes("fail")
+                    ? "rgba(225, 6, 0, 0.08)"
+                    : "rgba(34, 197, 94, 0.08)",
+                }}
+              >
+                {testMsg}
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        <div className="ops-content">{children}</div>
       </div>
-    </BrandedPageBackdrop>
+    </div>
   );
 }
