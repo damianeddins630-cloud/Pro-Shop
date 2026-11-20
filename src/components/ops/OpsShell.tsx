@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Shared Operations Center chrome (sidebar + topbar + gate screens).
+ *
+ * Keep business logic in page/API modules. Do not replace this file with the
+ * older BrandedPageBackdrop/welcome-card shell when changing inventory,
+ * Shopify, or catalog flows — that is what made production look "reverted".
+ */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
