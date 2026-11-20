@@ -1,74 +1,99 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 
-type Health = {
-  warning?: string;
-  productCount?: number;
-  persist?: {
-    durableWriteConfigured?: boolean;
-    lastPersistOk?: boolean;
-    lastPersistDetail?: string;
-    backends?: {
-      blob?: { ok?: boolean; detail?: string };
-      redis?: { ok?: boolean; detail?: string };
-      github?: { ok?: boolean; detail?: string };
-    };
-  };
-  shopify?: {
-    checkoutReady?: boolean;
-    configured?: boolean;
-    webhookConfigured?: boolean;
-  };
+type Attempt = {
+  id: string;
+  at: string;
+  status: string;
+  destination: string;
+  detail: string;
+  recordCounts?: Record<string, number>;
 };
 
 export default function OpsBackupsPage() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testMsg, setTestMsg] = useState("");
+  const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [sheets, setSheets] = useState<{
+    connected?: boolean;
+    spreadsheetId?: string;
+    spreadsheetName?: string;
+    envReady?: boolean;
+    lastBackupDetail?: string;
+    serviceAccountEmail?: string;
+  }>({});
+  const [persist, setPersist] = useState<{
+    durableWriteConfigured?: boolean;
+    lastPersistOk?: boolean;
+    lastPersistDetail?: string;
+  }>({});
+  const [requiredEnv, setRequiredEnv] = useState<string[]>([]);
+  const [spreadsheetId, setSpreadsheetId] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/health", { cache: "no-store" });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Health check failed");
-      setHealth(d);
-      setError("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load");
+    const res = await fetch("/api/ops/backups", { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "Could not load backups");
+      return;
     }
+    setAttempts(data.attempts || []);
+    setSheets(data.googleSheets || {});
+    setPersist(data.persist || {});
+    setRequiredEnv(data.requiredEnv || []);
+    setSpreadsheetId(data.googleSheets?.spreadsheetId || "");
+    setError("");
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  async function runSelfTest() {
-    setTesting(true);
-    setTestMsg("");
-    try {
-      const res = await fetch("/api/persist/self-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-      const d = await res.json();
-      setTestMsg(
-        d.ok
-          ? d.help || "Save/load OK."
-          : d.help || d.detail || "Save/load failed."
-      );
-      await load();
-    } catch {
-      setTestMsg("Could not reach save/load self-test.");
-    } finally {
-      setTesting(false);
+  async function saveConfig(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setMessage("");
+    const res = await fetch("/api/ops/backups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "save_sheets_config",
+        spreadsheetId,
+        spreadsheetName:
+          "Ballard's Bowling Academy — Business Management & Backup",
+        connected: Boolean(spreadsheetId.trim()),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Save failed");
+      return;
     }
+    setMessage("Sheets spreadsheet ID saved. Durable store remains source of truth.");
+    await load();
   }
 
-  const persist = health?.persist;
+  async function runAction(action: string) {
+    setBusy(true);
+    setMessage("");
+    const res = await fetch("/api/ops/backups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setError(data.error || "Action failed");
+      return;
+    }
+    setMessage(data.message || data.attempt?.detail || "Done");
+    await load();
+  }
 
   return (
     <div className="ops-dash-grid">
@@ -77,9 +102,9 @@ export default function OpsBackupsPage() {
           Backups & System
         </h2>
         <p className="ops-note" style={{ marginTop: 0 }}>
-          Protect business information. The durable store (Blob / Redis / GitHub)
-          is the source of truth today. Google Sheets backup comes in a later
-          stage and will never replace the main database.
+          Protect business information. The durable store is the source of truth.
+          Google Sheets is a secondary backup — if Sheets is down, the site keeps
+          working and queues retry jobs.
         </p>
       </div>
 
@@ -88,127 +113,158 @@ export default function OpsBackupsPage() {
           {error}
         </div>
       ) : null}
-      {health?.warning ? (
+      {message ? (
         <div className="ops-stage-banner" role="status">
-          {health.warning}
+          {message}
         </div>
       ) : null}
-      {testMsg ? (
+      {!persist.durableWriteConfigured ? (
         <div className="ops-stage-banner" role="status">
-          {testMsg}
+          Durable write is not configured on this environment. Set Blob / Redis /
+          GitHub token in Vercel before trusting production records.
         </div>
       ) : null}
 
       <section className="ops-kpi-row">
         <article className="ops-card">
           <p className="ops-kpi-label">Durable write</p>
-          <p className="ops-kpi-value" style={{ fontSize: "1.15rem" }}>
-            {persist?.durableWriteConfigured ? "Configured" : "Not set"}
+          <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>
+            {persist.durableWriteConfigured ? "Configured" : "Not set"}
+          </p>
+          <p className="ops-kpi-meta">{persist.lastPersistDetail || "—"}</p>
+        </article>
+        <article className="ops-card">
+          <p className="ops-kpi-label">Sheets env</p>
+          <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>
+            {sheets.envReady ? "Credentials present" : "Needs env"}
           </p>
           <p className="ops-kpi-meta">
-            {persist?.lastPersistDetail || "No detail yet"}
+            {sheets.connected ? "Spreadsheet linked" : "No spreadsheet ID yet"}
           </p>
         </article>
         <article className="ops-card">
-          <p className="ops-kpi-label">Last persist</p>
-          <p className="ops-kpi-value" style={{ fontSize: "1.15rem" }}>
-            {persist?.lastPersistOk === true
-              ? "OK"
-              : persist?.lastPersistOk === false
-                ? "Failed"
-                : "Unknown"}
+          <p className="ops-kpi-label">Last attempt</p>
+          <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>
+            {attempts[0]?.status || "None"}
           </p>
           <p className="ops-kpi-meta">
-            {health?.productCount != null
-              ? `${health.productCount} products in catalog`
-              : "—"}
+            {attempts[0]
+              ? new Date(attempts[0].at).toLocaleString()
+              : "No backups yet"}
           </p>
         </article>
         <article className="ops-card">
-          <p className="ops-kpi-label">Shopify</p>
-          <p className="ops-kpi-value" style={{ fontSize: "1.15rem" }}>
-            {health?.shopify?.checkoutReady ? "Checkout ready" : "Setup needed"}
-          </p>
-          <p className="ops-kpi-meta">
-            Webhook{" "}
-            {health?.shopify?.webhookConfigured ? "configured" : "missing"}
-          </p>
-        </article>
-        <article className="ops-card">
-          <p className="ops-kpi-label">Google Sheets</p>
-          <p className="ops-kpi-value" style={{ fontSize: "1.15rem" }}>
-            Planned
-          </p>
-          <p className="ops-kpi-meta">
-            Backup spreadsheet tabs come after Sales, Coaching, and Memberships.
-          </p>
+          <p className="ops-kpi-label">Actions</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              className="ops-primary-btn"
+              disabled={busy}
+              onClick={() => void runAction("manual_backup")}
+            >
+              Run backup / queue
+            </button>
+            <button
+              type="button"
+              className="ops-ghost-btn"
+              disabled={busy}
+              onClick={() => void runAction("self_test")}
+            >
+              Durable self-test
+            </button>
+          </div>
         </article>
       </section>
 
       <section className="ops-dash-mid">
-        <article className="ops-card">
+        <form className="ops-card" onSubmit={saveConfig}>
           <div className="ops-card-head">
-            <h2>Backend status</h2>
-            <button
-              type="button"
-              className="ops-primary-btn"
-              onClick={() => void runSelfTest()}
-              disabled={testing}
+            <h2>Google Sheets connection</h2>
+            <span
+              className={
+                sheets.connected
+                  ? "ops-badge ops-badge-green"
+                  : "ops-badge ops-badge-gray"
+              }
             >
-              {testing ? "Testing…" : "Run save/load test"}
-            </button>
+              {sheets.connected ? "Linked" : "Not linked"}
+            </span>
           </div>
-          <ul className="ops-activity">
-            {(
-              [
-                ["Blob", persist?.backends?.blob],
-                ["Redis", persist?.backends?.redis],
-                ["GitHub", persist?.backends?.github],
-              ] as const
-            ).map(([name, backend]) => (
-              <li key={name}>
-                <div>
-                  <strong>{name}</strong>
-                  <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
-                    {backend?.detail || "No recent result"}
-                  </div>
-                </div>
-                <span
-                  className={
-                    backend?.ok
-                      ? "ops-badge ops-badge-green"
-                      : "ops-badge ops-badge-yellow"
-                  }
-                >
-                  {backend?.ok ? "OK" : "Check"}
-                </span>
-              </li>
+          <p className="ops-note">
+            Spreadsheet name:{" "}
+            <strong>
+              Ballard&apos;s Bowling Academy — Business Management & Backup
+            </strong>
+            . Tabs: Dashboard, Sales, Orders, Coaching, Memberships, Customers,
+            Expenses, Inventory, Refunds, Backup Log. Put service-account
+            credentials in Vercel env — not in git.
+          </p>
+          <label className="ops-note" style={{ display: "block", marginTop: 12 }}>
+            Spreadsheet ID
+            <input
+              className="field"
+              value={spreadsheetId}
+              onChange={(e) => setSpreadsheetId(e.target.value)}
+              placeholder="from sheets.google.com/…/d/SPREADSHEET_ID/edit"
+              style={{ display: "block", width: "100%", marginTop: 4 }}
+            />
+          </label>
+          <button
+            type="submit"
+            className="ops-primary-btn"
+            style={{ marginTop: "0.85rem" }}
+            disabled={busy}
+          >
+            Save spreadsheet ID
+          </button>
+          <ul className="ops-note" style={{ marginTop: "0.85rem", paddingLeft: "1.1rem" }}>
+            {requiredEnv.map((line) => (
+              <li key={line}>{line}</li>
             ))}
           </ul>
-        </article>
+        </form>
 
         <article className="ops-card">
           <div className="ops-card-head">
-            <h2>Planned Sheets tabs</h2>
-            <span className="ops-badge ops-badge-gray">Later stage</span>
-          </div>
-          <p className="ops-note">
-            One spreadsheet:{" "}
-            <strong>
-              Ballard&apos;s Bowling Academy – Business Management & Backup
-            </strong>
-            . Tabs: Dashboard, Sales, Orders, Coaching, Memberships, Customers,
-            Expenses, Inventory, Refunds, Backup Log, Settings. Each transaction
-            gets a unique ID so rows are never duplicated.
-          </p>
-          <div className="ops-actions-grid" style={{ marginTop: "0.85rem" }}>
-            <Link className="ops-action" href="/ops/admin">
-              Administration
-            </Link>
-            <Link className="ops-action" href="/ops">
-              Dashboard
+            <h2>Backup history</h2>
+            <Link href="/ops/integrations" className="ops-ghost-btn">
+              Integrations
             </Link>
           </div>
+          {!attempts.length ? (
+            <p className="ops-note">No backup attempts recorded yet.</p>
+          ) : (
+            <ul className="ops-activity">
+              {attempts.map((a) => (
+                <li key={a.id}>
+                  <div>
+                    <strong>
+                      {a.destination} · {a.status}
+                    </strong>
+                    <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
+                      {new Date(a.at).toLocaleString()} · {a.detail}
+                      {a.recordCounts
+                        ? ` · ${Object.entries(a.recordCounts)
+                            .map(([k, v]) => `${k}:${v}`)
+                            .join(", ")}`
+                        : ""}
+                    </div>
+                  </div>
+                  <span
+                    className={
+                      a.status === "success"
+                        ? "ops-badge ops-badge-green"
+                        : a.status === "failed"
+                          ? "ops-badge ops-badge-red"
+                          : "ops-badge ops-badge-yellow"
+                    }
+                  >
+                    {a.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </article>
       </section>
     </div>

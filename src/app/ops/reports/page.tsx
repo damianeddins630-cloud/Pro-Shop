@@ -1,17 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Overview = {
+  range: { label: string };
   sales: {
     today: number;
+    week: number;
     month: number;
     year: number;
-    orderCountMonth: number;
-    orderCountAll: number;
+    range: number;
+    orderCountRange: number;
     averageOrder: number;
-    dailySales: { day: number; total: number }[];
+    dailySales: { day: string; total: number }[];
+  };
+  coaching: { revenueCollected: number; sessionsBooked: number };
+  memberships: { revenueCollected: number; activeCount: number };
+  finances: {
+    totalCollectedMonth: number;
+    expensesTotal: number;
+    netProfitMonth: number;
   };
   inventory: {
     activeCount: number;
@@ -19,6 +28,7 @@ type Overview = {
     needsPriceCount: number;
   };
   customers: { accountCount: number; subscriberCount: number };
+  salesBreakdown: { shop: number; coaching: number; memberships: number };
 };
 
 function money(n: number) {
@@ -26,26 +36,26 @@ function money(n: number) {
 }
 
 export default function OpsReportsPage() {
+  const [range, setRange] = useState("30d");
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState("");
 
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/ops/overview?range=${range}`, {
+      cache: "no-store",
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(json.error || "Failed to load");
+      return;
+    }
+    setData(json);
+    setError("");
+  }, [range]);
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/ops/overview", { cache: "no-store" });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Failed");
-        if (!cancelled) setData(json);
-      } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : "Failed to load");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void load();
+  }, [load]);
 
   const maxDaily = useMemo(() => {
     if (!data?.sales.dailySales?.length) return 1;
@@ -54,16 +64,31 @@ export default function OpsReportsPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-          Reports & Analytics
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          Performance from live paid sales and catalog data. Best-sellers,
-          coaching popularity, and membership growth reports arrive after those
-          modules ship — staff should not need to calculate figures the system
-          can generate.
-        </p>
+      <div className="ops-card-head" style={{ marginBottom: 0 }}>
+        <div>
+          <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
+            Reports & Analytics
+          </h2>
+          <p className="ops-note" style={{ marginTop: 0 }}>
+            Every figure comes from paid orders, paid coaching/memberships, and
+            recorded expenses — not sample data.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {["today", "7d", "30d", "90d"].map((r) => (
+            <button
+              key={r}
+              type="button"
+              className={range === r ? "ops-primary-btn" : "ops-ghost-btn"}
+              onClick={() => setRange(r)}
+            >
+              {r}
+            </button>
+          ))}
+          <a className="ops-ghost-btn" href="/api/ops/sales/export">
+            Export sales CSV
+          </a>
+        </div>
       </div>
 
       {error ? (
@@ -74,30 +99,32 @@ export default function OpsReportsPage() {
 
       <section className="ops-kpi-row">
         <article className="ops-card ops-card-red">
-          <p className="ops-kpi-label">Month sales</p>
+          <p className="ops-kpi-label">Shop sales · range</p>
+          <p className="ops-kpi-value">{money(data?.sales.range ?? 0)}</p>
+          <p className="ops-kpi-meta">
+            {data?.sales.orderCountRange ?? 0} paid orders · avg{" "}
+            {money(data?.sales.averageOrder ?? 0)}
+          </p>
+        </article>
+        <article className="ops-card">
+          <p className="ops-kpi-label">Coaching collected</p>
           <p className="ops-kpi-value">
-            {data ? money(data.sales.month) : "…"}
+            {money(data?.coaching.revenueCollected ?? 0)}
+          </p>
+        </article>
+        <article className="ops-card">
+          <p className="ops-kpi-label">Memberships collected</p>
+          <p className="ops-kpi-value">
+            {money(data?.memberships.revenueCollected ?? 0)}
+          </p>
+        </article>
+        <article className="ops-card ops-card-green">
+          <p className="ops-kpi-label">Net · month</p>
+          <p className="ops-kpi-value">
+            {money(data?.finances.netProfitMonth ?? 0)}
           </p>
           <p className="ops-kpi-meta">
-            {data ? `${data.sales.orderCountMonth} paid orders` : "—"}
-          </p>
-        </article>
-        <article className="ops-card">
-          <p className="ops-kpi-label">Year sales</p>
-          <p className="ops-kpi-value">
-            {data ? money(data.sales.year) : "…"}
-          </p>
-        </article>
-        <article className="ops-card">
-          <p className="ops-kpi-label">Average order</p>
-          <p className="ops-kpi-value">
-            {data ? money(data.sales.averageOrder) : "…"}
-          </p>
-        </article>
-        <article className="ops-card">
-          <p className="ops-kpi-label">Today</p>
-          <p className="ops-kpi-value">
-            {data ? money(data.sales.today) : "…"}
+            Expenses {money(data?.finances.expensesTotal ?? 0)}
           </p>
         </article>
       </section>
@@ -105,13 +132,13 @@ export default function OpsReportsPage() {
       <section className="ops-dash-mid">
         <article className="ops-card">
           <div className="ops-card-head">
-            <h2>Daily paid sales · this month</h2>
+            <h2>Daily paid shop sales</h2>
           </div>
           <div className="ops-spark" aria-hidden>
             {(data?.sales.dailySales || []).map((d) => (
               <span
                 key={d.day}
-                title={`Day ${d.day}: ${money(d.total)}`}
+                title={`${d.day}: ${money(d.total)}`}
                 style={{
                   height: `${Math.max(4, (d.total / maxDaily) * 100)}%`,
                   opacity: d.total > 0 ? 0.95 : 0.2,
@@ -122,24 +149,32 @@ export default function OpsReportsPage() {
         </article>
         <article className="ops-card">
           <div className="ops-card-head">
-            <h2>Catalog snapshot</h2>
+            <h2>Snapshot</h2>
           </div>
           <div className="ops-stat-list">
             <div>
-              <strong>{data?.inventory.activeCount ?? "—"}</strong>
-              <span>Active products</span>
+              <strong>{money(data?.sales.today ?? 0)}</strong>
+              <span>Today</span>
             </div>
             <div>
-              <strong>{data?.inventory.lowStockCount ?? "—"}</strong>
-              <span>Low stock</span>
+              <strong>{money(data?.sales.week ?? 0)}</strong>
+              <span>Week</span>
             </div>
             <div>
-              <strong>{data?.customers.accountCount ?? "—"}</strong>
+              <strong>{money(data?.sales.month ?? 0)}</strong>
+              <span>Month</span>
+            </div>
+            <div>
+              <strong>{money(data?.sales.year ?? 0)}</strong>
+              <span>Year</span>
+            </div>
+            <div>
+              <strong>{data?.memberships.activeCount ?? 0}</strong>
+              <span>Active members</span>
+            </div>
+            <div>
+              <strong>{data?.customers.accountCount ?? 0}</strong>
               <span>Customers</span>
-            </div>
-            <div>
-              <strong>{data?.customers.subscriberCount ?? "—"}</strong>
-              <span>Subscribers</span>
             </div>
           </div>
           <div className="ops-actions-grid" style={{ marginTop: "0.85rem" }}>

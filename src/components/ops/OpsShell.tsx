@@ -64,21 +64,26 @@ const GROUPS: NavGroup[] = [
         href: "/ops/coaching",
         label: "Coaching",
         icon: "◈",
-        perms: [],
+        perms: ["manage_coaches", "view_dashboard"],
         match: (p) => p.startsWith("/ops/coaching"),
       },
       {
         href: "/ops/memberships",
         label: "Memberships",
         icon: "◇",
-        perms: [],
+        perms: ["manage_memberships", "manage_users", "view_dashboard"],
         match: (p) => p.startsWith("/ops/memberships"),
       },
       {
         href: "/ops/customers",
         label: "Customers",
         icon: "◉",
-        perms: ["manage_users", "view_orders", "manage_orders"],
+        perms: [
+          "manage_customers",
+          "manage_users",
+          "view_orders",
+          "manage_orders",
+        ],
         match: (p) => p.startsWith("/ops/customers"),
       },
     ],
@@ -91,7 +96,12 @@ const GROUPS: NavGroup[] = [
         href: "/ops/finances",
         label: "Finances",
         icon: "⬡",
-        perms: ["view_orders", "manage_orders", "manage_inventory"],
+        perms: [
+          "view_finances",
+          "manage_finances",
+          "view_orders",
+          "manage_orders",
+        ],
         match: (p) => p.startsWith("/ops/finances"),
       },
       {
@@ -128,19 +138,37 @@ const GROUPS: NavGroup[] = [
         href: "/ops/backups",
         label: "Backups & System",
         icon: "↻",
-        perms: ["manage_roles", "manage_users", "manage_inventory"],
+        perms: [
+          "manage_backups",
+          "manage_roles",
+          "manage_users",
+          "manage_inventory",
+          "manage_settings",
+        ],
         match: (p) => p.startsWith("/ops/backups"),
+      },
+      {
+        href: "/ops/integrations",
+        label: "Integrations",
+        icon: "☍",
+        perms: [
+          "manage_settings",
+          "manage_roles",
+          "manage_inventory",
+          "manage_orders",
+        ],
+        match: (p) =>
+          p.startsWith("/ops/integrations") || p.startsWith("/ops/shopify"),
       },
       {
         href: "/ops/admin",
         label: "Administration",
         icon: "⚙",
-        perms: ["manage_roles", "manage_users"],
+        perms: ["manage_roles", "manage_users", "manage_settings"],
         match: (p) =>
           p.startsWith("/ops/admin") ||
           p.startsWith("/ops/users") ||
-          p.startsWith("/ops/roles") ||
-          p.startsWith("/ops/shopify"),
+          p.startsWith("/ops/roles"),
       },
     ],
   },
@@ -168,6 +196,7 @@ export function OpsShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const allowed =
+    can("view_dashboard") ||
     can("manage_inventory") ||
     can("manage_deals") ||
     can("manage_sponsors") ||
@@ -176,7 +205,11 @@ export function OpsShell({ children }: { children: ReactNode }) {
     can("manage_users") ||
     can("view_orders") ||
     can("manage_orders") ||
-    can("edit_pages");
+    can("edit_pages") ||
+    can("manage_coaches") ||
+    can("manage_memberships") ||
+    can("view_finances") ||
+    can("manage_backups");
 
   const refreshHealth = useCallback(async () => {
     try {

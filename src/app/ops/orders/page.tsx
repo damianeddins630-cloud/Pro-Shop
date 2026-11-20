@@ -195,15 +195,20 @@ export default function OpsOrdersPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs tracking-[0.28em] text-red uppercase">
-            In-store fulfillment
+            Sales & Orders
           </p>
-          <h2 className="display mt-1 text-5xl md:text-6xl">Orders</h2>
+          <h2 className="display mt-1 text-5xl md:text-6xl">Sales & Orders</h2>
           <p className="mt-2 max-w-2xl text-sm text-mist">
             {IN_STORE_POLICY} Only fully paid checkouts appear here — unpaid
-            Shopify invoices stay out until payment completes.
+            Shopify invoices stay out until payment completes. Search, filter,
+            update fulfillment, and export CSV without mixing coaching or
+            expense records into order rows.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a className="btn btn-ghost text-sm" href="/api/ops/sales/export">
+            Export CSV
+          </a>
           {canManage ? (
             <button
               type="button"

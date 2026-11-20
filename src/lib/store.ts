@@ -19,6 +19,16 @@ import type {
   Coupon,
   ShopifySiteConfig,
   SubscriberAnnouncement,
+  CoachingBooking,
+  CoachingPackage,
+  Membership,
+  Expense,
+  CustomerNote,
+  ActivityLogEntry,
+  StockAdjustment,
+  BackupAttempt,
+  GoogleSheetsConfig,
+  PaymentCollectStatus,
 } from "./types";
 import { ALL_PERMISSIONS } from "./types";
 import seedJson from "@/data/seed.json";
@@ -260,6 +270,9 @@ function defaultRoles(): Role[] {
         "manage_coaches",
         "view_orders",
         "manage_subscribers",
+        "view_dashboard",
+        "manage_customers",
+        "view_finances",
       ],
       system: true,
       rank: STAFF_ROLE_RANK,
@@ -295,7 +308,21 @@ function cloneSeed(): StoreData {
   seed.roles = seed.roles?.length ? seed.roles : defaultRoles();
   seed.orders = seed.orders || [];
   seed.coupons = seed.coupons || [];
+  ensureBusinessCollections(seed);
   return seed;
+}
+
+/** Ensure Ops business arrays exist without inventing sample records. */
+function ensureBusinessCollections(data: StoreData) {
+  data.coachingBookings = data.coachingBookings || [];
+  data.coachingPackages = data.coachingPackages || [];
+  data.memberships = data.memberships || [];
+  data.expenses = data.expenses || [];
+  data.customerNotes = data.customerNotes || [];
+  data.activityLog = data.activityLog || [];
+  data.stockAdjustments = data.stockAdjustments || [];
+  data.backupAttempts = data.backupAttempts || [];
+  data.googleSheetsConfig = data.googleSheetsConfig || {};
 }
 
 function normalizeCoupon(c: Coupon): Coupon {
@@ -446,6 +473,7 @@ function mergeWithSeed(parsed: StoreData): StoreData {
     ? parsed.coupons
     : seed.coupons || [];
   parsed.shopifyConfig = parsed.shopifyConfig || seed.shopifyConfig;
+  ensureBusinessCollections(parsed);
   ensureCoupons(parsed);
   ensureSponsorUrls(parsed);
   ensureCatalogCopy(parsed);
@@ -2059,4 +2087,491 @@ export async function saveShopifyConfig(
   (saved as ShopifySiteConfig & { _persistDetail?: string })._persistDetail =
     dedicated.detail;
   return saved;
+}
+
+function paidOnly(status: PaymentCollectStatus | undefined) {
+  return status === "paid";
+}
+
+function pushActivity(
+  data: StoreData,
+  entry: Omit<ActivityLogEntry, "id" | "at"> & { at?: string }
+) {
+  data.activityLog = data.activityLog || [];
+  data.activityLog.unshift({
+    id: randomUUID(),
+    at: entry.at || new Date().toISOString(),
+    actorId: entry.actorId,
+    actorName: entry.actorName,
+    action: entry.action,
+    entityType: entry.entityType,
+    entityId: entry.entityId,
+    detail: entry.detail,
+  });
+  data.activityLog = data.activityLog.slice(0, 500);
+}
+
+export async function listActivityLog(limit = 100) {
+  ensureBusinessCollections(await getStore());
+  return ((await getStore()).activityLog || []).slice(0, limit);
+}
+
+export async function listCoachingBookings() {
+  ensureBusinessCollections(await getStore());
+  return [...((await getStore()).coachingBookings || [])].sort((a, b) =>
+    `${b.date}T${b.startTime}`.localeCompare(`${a.date}T${a.startTime}`)
+  );
+}
+
+export async function createCoachingBooking(
+  input: Omit<CoachingBooking, "id" | "createdAt" | "revenueCollected">,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let created: CoachingBooking | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    // Prevent double-booking same coach overlapping time on same date
+    const conflict = (data.coachingBookings || []).some((b) => {
+      if (b.coachId !== input.coachId || b.date !== input.date) return false;
+      if (b.bookingStatus === "cancelled") return false;
+      return input.startTime < b.endTime && input.endTime > b.startTime;
+    });
+    if (conflict) {
+      throw new Error("Coach already has a booking in that time slot");
+    }
+    const revenueCollected = paidOnly(input.paymentStatus);
+    created = {
+      ...input,
+      id: randomUUID(),
+      price: Math.max(0, Number(input.price) || 0),
+      revenueCollected,
+      createdAt: new Date().toISOString(),
+    };
+    data.coachingBookings!.unshift(created);
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "create",
+      entityType: "coaching_booking",
+      entityId: created.id,
+      detail: `${created.title} · ${created.customerName}`,
+    });
+  });
+  return created!;
+}
+
+export async function updateCoachingBooking(
+  id: string,
+  patch: Partial<CoachingBooking>,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let updated: CoachingBooking | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    const idx = (data.coachingBookings || []).findIndex((b) => b.id === id);
+    if (idx < 0) return;
+    const current = data.coachingBookings![idx];
+    const next = {
+      ...current,
+      ...patch,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    next.price = Math.max(0, Number(next.price) || 0);
+    next.revenueCollected = paidOnly(next.paymentStatus);
+    if (patch.date || patch.startTime || patch.endTime || patch.coachId) {
+      const conflict = data.coachingBookings!.some((b) => {
+        if (b.id === id) return false;
+        if (b.coachId !== next.coachId || b.date !== next.date) return false;
+        if (b.bookingStatus === "cancelled") return false;
+        return next.startTime < b.endTime && next.endTime > b.startTime;
+      });
+      if (conflict) throw new Error("Coach already has a booking in that time slot");
+    }
+    data.coachingBookings![idx] = next;
+    updated = next;
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "update",
+      entityType: "coaching_booking",
+      entityId: id,
+      detail: next.title,
+    });
+  });
+  return updated;
+}
+
+export async function deleteCoachingBooking(
+  id: string,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let ok = false;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    const before = data.coachingBookings!.length;
+    data.coachingBookings = data.coachingBookings!.filter((b) => b.id !== id);
+    ok = data.coachingBookings.length < before;
+    if (ok) {
+      pushActivity(data, {
+        actorId: opts?.actorId,
+        actorName: opts?.actorName,
+        action: "delete",
+        entityType: "coaching_booking",
+        entityId: id,
+      });
+    }
+  });
+  return ok;
+}
+
+export async function listCoachingPackages() {
+  ensureBusinessCollections(await getStore());
+  return [...((await getStore()).coachingPackages || [])];
+}
+
+export async function createCoachingPackage(
+  input: Omit<CoachingPackage, "id" | "createdAt" | "sessionsUsed" | "revenueCollected"> & {
+    sessionsUsed?: number;
+  },
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let created: CoachingPackage | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    created = {
+      ...input,
+      id: randomUUID(),
+      price: Math.max(0, Number(input.price) || 0),
+      sessionsPurchased: Math.max(0, Math.floor(Number(input.sessionsPurchased) || 0)),
+      sessionsUsed: Math.max(0, Math.floor(Number(input.sessionsUsed) || 0)),
+      revenueCollected: paidOnly(input.paymentStatus),
+      createdAt: new Date().toISOString(),
+    };
+    data.coachingPackages!.unshift(created);
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "create",
+      entityType: "coaching_package",
+      entityId: created.id,
+      detail: created.name,
+    });
+  });
+  return created!;
+}
+
+export async function updateCoachingPackage(
+  id: string,
+  patch: Partial<CoachingPackage>,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let updated: CoachingPackage | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    const idx = (data.coachingPackages || []).findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const next = {
+      ...data.coachingPackages![idx],
+      ...patch,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    next.price = Math.max(0, Number(next.price) || 0);
+    next.sessionsPurchased = Math.max(0, Math.floor(Number(next.sessionsPurchased) || 0));
+    next.sessionsUsed = Math.max(0, Math.floor(Number(next.sessionsUsed) || 0));
+    next.revenueCollected = paidOnly(next.paymentStatus);
+    data.coachingPackages![idx] = next;
+    updated = next;
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "update",
+      entityType: "coaching_package",
+      entityId: id,
+      detail: next.name,
+    });
+  });
+  return updated;
+}
+
+export async function listMemberships() {
+  ensureBusinessCollections(await getStore());
+  return [...((await getStore()).memberships || [])];
+}
+
+export async function createMembership(
+  input: Omit<Membership, "id" | "createdAt" | "revenueCollected">,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let created: Membership | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    created = {
+      ...input,
+      id: randomUUID(),
+      price: Math.max(0, Number(input.price) || 0),
+      revenueCollected: paidOnly(input.paymentStatus),
+      createdAt: new Date().toISOString(),
+    };
+    data.memberships!.unshift(created);
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "create",
+      entityType: "membership",
+      entityId: created.id,
+      detail: `${created.name} · ${created.customerName}`,
+    });
+  });
+  return created!;
+}
+
+export async function updateMembership(
+  id: string,
+  patch: Partial<Membership>,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let updated: Membership | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    const idx = (data.memberships || []).findIndex((m) => m.id === id);
+    if (idx < 0) return;
+    const next = {
+      ...data.memberships![idx],
+      ...patch,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    next.price = Math.max(0, Number(next.price) || 0);
+    next.revenueCollected = paidOnly(next.paymentStatus);
+    data.memberships![idx] = next;
+    updated = next;
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "update",
+      entityType: "membership",
+      entityId: id,
+      detail: `${next.name} · ${next.status}`,
+    });
+  });
+  return updated;
+}
+
+export async function listExpenses() {
+  ensureBusinessCollections(await getStore());
+  return [...((await getStore()).expenses || [])].sort((a, b) =>
+    b.date.localeCompare(a.date)
+  );
+}
+
+export async function createExpense(
+  input: Omit<Expense, "id" | "createdAt">,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let created: Expense | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    created = {
+      ...input,
+      id: randomUUID(),
+      amount: Math.max(0, Number(input.amount) || 0),
+      createdAt: new Date().toISOString(),
+      createdBy: opts?.actorName || input.createdBy,
+    };
+    data.expenses!.unshift(created);
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "create",
+      entityType: "expense",
+      entityId: created.id,
+      detail: `${created.label} · $${created.amount}`,
+    });
+  });
+  return created!;
+}
+
+export async function deleteExpense(
+  id: string,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let ok = false;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    const before = data.expenses!.length;
+    data.expenses = data.expenses!.filter((e) => e.id !== id);
+    ok = data.expenses.length < before;
+    if (ok) {
+      pushActivity(data, {
+        actorId: opts?.actorId,
+        actorName: opts?.actorName,
+        action: "delete",
+        entityType: "expense",
+        entityId: id,
+      });
+    }
+  });
+  return ok;
+}
+
+export async function listCustomerNotes(userId?: string) {
+  ensureBusinessCollections(await getStore());
+  const notes = (await getStore()).customerNotes || [];
+  return userId ? notes.filter((n) => n.userId === userId) : notes;
+}
+
+export async function addCustomerNote(
+  input: Omit<CustomerNote, "id" | "createdAt">,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let created: CustomerNote | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    created = {
+      ...input,
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      createdBy: opts?.actorName || input.createdBy,
+    };
+    data.customerNotes!.unshift(created);
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "note",
+      entityType: "customer",
+      entityId: input.userId,
+      detail: input.note.slice(0, 120),
+    });
+  });
+  return created!;
+}
+
+export async function listStockAdjustments(limit = 100) {
+  ensureBusinessCollections(await getStore());
+  return ((await getStore()).stockAdjustments || []).slice(0, limit);
+}
+
+export async function recordStockAdjustment(
+  input: Omit<StockAdjustment, "id" | "at">,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let created: StockAdjustment | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    created = {
+      ...input,
+      id: randomUUID(),
+      at: new Date().toISOString(),
+      actorName: opts?.actorName || input.actorName,
+    };
+    data.stockAdjustments!.unshift(created);
+    data.stockAdjustments = data.stockAdjustments!.slice(0, 500);
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "stock_adjust",
+      entityType: "product",
+      entityId: input.productId,
+      detail: `${input.productName}: ${input.previousStock} → ${input.nextStock} (${input.reason})`,
+    });
+  }, { catalog: true });
+  return created!;
+}
+
+export async function listBackupAttempts(limit = 50) {
+  ensureBusinessCollections(await getStore());
+  return ((await getStore()).backupAttempts || []).slice(0, limit);
+}
+
+export async function recordBackupAttempt(
+  input: Omit<BackupAttempt, "id" | "at"> & { at?: string }
+) {
+  let created: BackupAttempt | null = null;
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    created = {
+      ...input,
+      id: randomUUID(),
+      at: input.at || new Date().toISOString(),
+    };
+    data.backupAttempts!.unshift(created);
+    data.backupAttempts = data.backupAttempts!.slice(0, 200);
+    if (input.destination === "google_sheets") {
+      data.googleSheetsConfig = {
+        ...(data.googleSheetsConfig || {}),
+        lastBackupAt: created.at,
+        lastBackupOk: input.status === "success",
+        lastBackupDetail: input.detail,
+      };
+    }
+  });
+  return created!;
+}
+
+export async function getGoogleSheetsConfig(): Promise<GoogleSheetsConfig> {
+  ensureBusinessCollections(await getStore());
+  return { ...((await getStore()).googleSheetsConfig || {}) };
+}
+
+export async function updateGoogleSheetsConfig(
+  patch: Partial<GoogleSheetsConfig>,
+  opts?: { actorName?: string; actorId?: string }
+) {
+  let saved: GoogleSheetsConfig = {};
+  await mutate((data) => {
+    ensureBusinessCollections(data);
+    saved = {
+      ...(data.googleSheetsConfig || {}),
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+    data.googleSheetsConfig = saved;
+    pushActivity(data, {
+      actorId: opts?.actorId,
+      actorName: opts?.actorName,
+      action: "update",
+      entityType: "google_sheets_config",
+      detail: saved.connected ? "Marked connected" : "Config updated",
+    });
+  });
+  return saved;
+}
+
+/** Collected coaching + membership revenue (paid only). */
+export async function businessRevenueSnapshot() {
+  ensureBusinessCollections(await getStore());
+  const data = await getStore();
+  const coaching = (data.coachingBookings || [])
+    .filter((b) => b.revenueCollected || paidOnly(b.paymentStatus))
+    .reduce((s, b) => s + Math.max(0, Number(b.price) || 0), 0);
+  const packages = (data.coachingPackages || [])
+    .filter((p) => p.revenueCollected || paidOnly(p.paymentStatus))
+    .reduce((s, p) => s + Math.max(0, Number(p.price) || 0), 0);
+  const memberships = (data.memberships || [])
+    .filter((m) => m.revenueCollected || paidOnly(m.paymentStatus))
+    .reduce((s, m) => s + Math.max(0, Number(m.price) || 0), 0);
+  const expenses = (data.expenses || []).reduce(
+    (s, e) => s + Math.max(0, Number(e.amount) || 0),
+    0
+  );
+  const activeMemberships = (data.memberships || []).filter(
+    (m) => m.status === "active"
+  ).length;
+  const upcoming = (data.coachingBookings || []).filter((b) => {
+    if (b.bookingStatus === "cancelled") return false;
+    return `${b.date}T${b.startTime}` >= new Date().toISOString().slice(0, 16);
+  });
+  return {
+    coachingRevenue: Math.round((coaching + packages) * 100) / 100,
+    membershipRevenue: Math.round(memberships * 100) / 100,
+    expensesTotal: Math.round(expenses * 100) / 100,
+    activeMemberships,
+    upcomingLessons: upcoming.length,
+    upcomingBookings: upcoming.slice(0, 8),
+    bookingCount: (data.coachingBookings || []).length,
+    packageCount: (data.coachingPackages || []).length,
+    membershipCount: (data.memberships || []).length,
+  };
 }
