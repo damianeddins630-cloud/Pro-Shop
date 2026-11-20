@@ -107,6 +107,15 @@ export interface Product {
   weightStock?: Record<string, number>;
   /** Optional Shopify variant GID/id if product is synced in Shopify */
   shopifyVariantId?: string;
+  /** SPI / supplier SKU for single-SKU items (bags, shoes, chemicals, etc.) */
+  sku?: string;
+  /** UPC / barcode for single-SKU items */
+  upc?: string;
+  /**
+   * Per-weight SKU/UPC for bowling balls with weight variants.
+   * Keys match weightStock (lbs as strings, e.g. "15").
+   */
+  variantMeta?: Record<string, { sku: string; upc: string }>;
 }
 
 export interface Sponsor {
