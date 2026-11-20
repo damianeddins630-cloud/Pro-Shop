@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ProductPrice } from "@/components/ProductPrice";
 import { saveLocalInventory } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
@@ -21,14 +21,19 @@ const empty = {
   discountPercent: "0",
   stock: "0",
   category: "Accessories",
-  brand: "Ballard's Bowling",
+  brand: "Storm",
   image: "",
+  sku: "",
+  upc: "",
   featured: false,
   active: true,
   weightOptions: [] as number[],
   weightStock: {} as Record<string, string>,
+  variantMeta: {} as Record<string, { sku: string; upc: string }>,
   customWeight: "",
 };
+
+const PAGE_SIZE = 40;
 
 export default function OpsInventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -37,9 +42,15 @@ export default function OpsInventoryPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [persistWarning, setPersistWarning] = useState("");
-  /** Size currently selected for entering "how many in stock". */
   const [editingWeight, setEditingWeight] = useState<number | null>(null);
+  const [q, setQ] = useState("");
+  const [category, setCategory] = useState("all");
+  const [brand, setBrand] = useState("all");
+  const [onlyNeedsPrice, setOnlyNeedsPrice] = useState(false);
+  const [onlyActive, setOnlyActive] = useState(false);
+  const [page, setPage] = useState(0);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/products?admin=1&t=${Date.now()}`, {
@@ -52,18 +63,17 @@ export default function OpsInventoryPage() {
       const detail = String(data.persist.lastPersistDetail || "unknown");
       const coldStart = detail.includes("No durable save verified");
       const blobOk = Boolean(data.persist.backends?.blob?.ok);
-      // Cold instance + Blob already readable (or write-configured) is not "broken".
       if (coldStart && (blobOk || data.persist.durableWriteConfigured)) {
         setPersistWarning("");
         saveLocalInventory(list, data.updatedAt);
       } else if (blobOk) {
         setPersistWarning(
-          `Optional backups offline (${detail}). Blob is working — price/stock changes still stick for shoppers.`
+          `Optional backups offline (${detail}). Blob is working — price/stock changes still stick.`
         );
         saveLocalInventory(list, data.updatedAt);
       } else {
         setPersistWarning(
-          `Durable save is broken (${detail}). Fixes will not stick for shoppers until Blob (or Redis/GITHUB_TOKEN) works.`
+          `Durable save is broken (${detail}). Fixes will not stick until Blob (or Redis/GITHUB_TOKEN) works.`
         );
       }
     } else {
@@ -77,12 +87,87 @@ export default function OpsInventoryPage() {
     void load();
   }, [load]);
 
+  const categories = useMemo(
+    () =>
+      Array.from(new Set(products.map((p) => p.category).filter(Boolean))).sort(
+        (a, b) => a.localeCompare(b)
+      ),
+    [products]
+  );
+  const brands = useMemo(
+    () =>
+      Array.from(new Set(products.map((p) => p.brand).filter(Boolean))).sort(
+        (a, b) => a.localeCompare(b)
+      ),
+    [products]
+  );
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return products.filter((p) => {
+      if (category !== "all" && p.category !== category) return false;
+      if (brand !== "all" && p.brand !== brand) return false;
+      if (onlyNeedsPrice && !(Number(p.price) <= 0)) return false;
+      if (onlyActive && !p.active) return false;
+      if (!needle) return true;
+      const meta = Object.values(p.variantMeta || {})
+        .map((m) => `${m.sku} ${m.upc}`)
+        .join(" ");
+      const hay = `${p.name} ${p.brand} ${p.category} ${p.sku || ""} ${p.upc || ""} ${meta}`.toLowerCase();
+      return hay.includes(needle);
+    });
+  }, [products, q, category, brand, onlyNeedsPrice, onlyActive]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [q, category, brand, onlyNeedsPrice, onlyActive]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const needsPriceCount = products.filter((p) => Number(p.price) <= 0).length;
+
+  function startEdit(p: Product) {
+    const weightOptions = normalizeWeightOptions(p.weightOptions) || [];
+    const weightStock: Record<string, string> = {};
+    for (const w of weightOptions) {
+      const key = weightKey(w);
+      weightStock[key] = String(p.weightStock?.[key] ?? 0);
+    }
+    setEditingId(p.id);
+    setEditingWeight(weightOptions[0] ?? null);
+    setForm({
+      name: p.name,
+      description: p.description || "",
+      price: String(p.price ?? 0),
+      discountPercent: String(p.discountPercent ?? 0),
+      stock: String(p.stock ?? 0),
+      category: p.category || "Accessories",
+      brand: p.brand || "Storm",
+      image: p.image || "",
+      sku: p.sku || "",
+      upc: p.upc || "",
+      featured: Boolean(p.featured),
+      active: Boolean(p.active),
+      weightOptions,
+      weightStock,
+      variantMeta: p.variantMeta || {},
+      customWeight: "",
+    });
+    setMessage("");
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function save(e: FormEvent) {
     e.preventDefault();
     setError("");
     setMessage("");
+    setSaving(true);
     const price = Math.max(0, Number(form.price));
-    const discountPercent = Math.min(100, Math.max(0, Number(form.discountPercent)));
+    const discountPercent = Math.min(
+      100,
+      Math.max(0, Number(form.discountPercent))
+    );
     const weightOptions = normalizeWeightOptions(form.weightOptions) || [];
     const weightStock: Record<string, number> = {};
     if (weightOptions.length) {
@@ -99,8 +184,19 @@ export default function OpsInventoryPage() {
       : Math.max(0, Math.floor(Number(form.stock)));
     if ([price, discountPercent, stock].some((n) => Number.isNaN(n))) {
       setError("Price, discount, and stock must be numbers. $0 is allowed.");
+      setSaving(false);
       return;
     }
+    const variantMeta =
+      weightOptions.length && Object.keys(form.variantMeta || {}).length
+        ? Object.fromEntries(
+            weightOptions.map((w) => {
+              const key = weightKey(w);
+              const row = form.variantMeta[key] || { sku: "", upc: "" };
+              return [key, { sku: row.sku || "", upc: row.upc || "" }];
+            })
+          )
+        : undefined;
     const payload = {
       name: form.name.trim(),
       description: form.description,
@@ -114,46 +210,56 @@ export default function OpsInventoryPage() {
       active: form.active,
       weightOptions,
       weightStock: weightOptions.length ? weightStock : {},
+      sku: form.sku.trim() || undefined,
+      upc: form.upc.trim() || undefined,
+      variantMeta,
     };
-    const res = await fetch(editingId ? `/api/products/${editingId}` : "/api/products", {
-      method: editingId ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Save failed");
-      if (data.persist?.lastPersistDetail) {
-        setPersistWarning(String(data.persist.lastPersistDetail));
-      }
-      return;
-    }
-    if (data.savedDurably === false || data.persist?.lastPersistOk === false) {
-      setError(
-        data.error ||
-          "Save did not stick in durable storage — shoppers may still see the old price."
+    try {
+      const res = await fetch(
+        editingId ? `/api/products/${editingId}` : "/api/products",
+        {
+          method: editingId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
       );
-      setPersistWarning(String(data.persist?.lastPersistDetail || ""));
-      return;
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Save failed");
+        if (data.persist?.lastPersistDetail) {
+          setPersistWarning(String(data.persist.lastPersistDetail));
+        }
+        return;
+      }
+      if (data.savedDurably === false || data.persist?.lastPersistOk === false) {
+        setError(
+          data.error ||
+            "Save did not stick in durable storage — shoppers may still see the old price."
+        );
+        setPersistWarning(String(data.persist?.lastPersistDetail || ""));
+        return;
+      }
+      const next = Array.isArray(data.products)
+        ? data.products
+        : data.product
+          ? [data.product, ...products.filter((p) => p.id !== data.product.id)]
+          : products;
+      setProducts(next);
+      saveLocalInventory(next, data.updatedAt);
+      setPersistWarning("");
+      setMessage(
+        `${editingId ? "Updated" : "Added"} "${payload.name}" — saved for every shopper.${
+          data.voidedUnpaidCheckouts
+            ? ` Voided ${data.voidedUnpaidCheckouts} unpaid invoice(s).`
+            : ""
+        }`
+      );
+      setForm(empty);
+      setEditingId(null);
+      setEditingWeight(null);
+    } finally {
+      setSaving(false);
     }
-    const next = Array.isArray(data.products)
-      ? data.products
-      : data.product
-        ? [data.product, ...products.filter((p) => p.id !== data.product.id)]
-        : products;
-    setProducts(next);
-    saveLocalInventory(next, data.updatedAt);
-    setPersistWarning("");
-    setMessage(
-      `${editingId ? "Updated" : "Added"} "${payload.name}" — saved for every shopper. Shopify will charge this website price on the next Pay click${
-        data.voidedUnpaidCheckouts
-          ? ` (${data.voidedUnpaidCheckouts} old unpaid invoice${data.voidedUnpaidCheckouts === 1 ? "" : "s"} voided)`
-          : ""
-      }.`
-    );
-    setForm(empty);
-    setEditingId(null);
-    setEditingWeight(null);
   }
 
   async function remove(id: string) {
@@ -169,7 +275,7 @@ export default function OpsInventoryPage() {
       : products.filter((p) => p.id !== id);
     setProducts(next);
     saveLocalInventory(next, data.updatedAt);
-    setMessage("Item removed from inventory and shop.");
+    setMessage("Item removed.");
     if (editingId === id) {
       setEditingId(null);
       setForm(empty);
@@ -179,86 +285,264 @@ export default function OpsInventoryPage() {
 
   const ballSummary = summarizeBallInventory(products);
 
-  if (loading) return <p className="text-mist">Loading inventory...</p>;
+  if (loading) return <p className="text-mist">Loading inventory…</p>;
 
   return (
     <div>
-      <section className="mb-6 rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] via-black/30 to-red/10 p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs tracking-[0.22em] text-red uppercase">Ball vault</p>
-            <h3 className="display mt-1 text-4xl">
-              {ballSummary.totalBalls} balls in stock
-            </h3>
-            <p className="mt-1 text-sm text-mist">
-              {ballSummary.ballSkus} ball SKUs · {ballSummary.accessoryUnits} accessory
-              units · pick a size, then enter how many you have
-            </p>
-          </div>
-          <Link href="/ops/orders" className="btn btn-ghost !py-2 text-sm">
-            Open order command →
-          </Link>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="display text-4xl">Inventory</h2>
+          <p className="mt-1 max-w-2xl text-sm text-mist">
+            Website prices & stock are the source of truth. Search SKU/UPC, set
+            price, then save — Shopify only takes payment.
+          </p>
         </div>
-        {ballSummary.byWeight.length ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {ballSummary.byWeight.map((b) => (
-              <div
-                key={b.weight}
-                className="min-w-[4.25rem] rounded-2xl border border-white/15 bg-black/35 px-3 py-2 text-center"
-              >
-                <p className="text-xs text-mist">{b.label}</p>
-                <p className="display text-2xl">{b.stock || "—"}</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </section>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border border-white/15 px-3 py-1.5 text-mist">
+            {products.length} items
+          </span>
+          <span className="rounded-full border border-white/15 px-3 py-1.5 text-mist">
+            {ballSummary.totalBalls} balls in stock
+          </span>
+          {needsPriceCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setOnlyNeedsPrice((v) => !v)}
+              className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-amber-100"
+            >
+              {needsPriceCount} need price
+            </button>
+          )}
+        </div>
+      </div>
 
       {persistWarning ? (
         <div className="mb-4 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
           <p className="font-semibold text-amber-200">Storage warning</p>
           <p className="mt-1">{persistWarning}</p>
-          <p className="mt-2">
-            Run{" "}
-            <Link href="/api/persist/self-test" className="underline text-amber-50">
-              /api/persist/self-test
-            </Link>{" "}
-            while logged into Ops, then fix the failing backend in Vercel env vars.
-          </p>
         </div>
       ) : null}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-mist">
-        This website owns prices. Shopify is payment only — Shopify Admin product
-        prices will <span className="text-chalk">not</span> change. After you save
-        here, the next <span className="text-chalk">Pay with Shopify</span> charge
-        uses these website amounts.
-      </div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="display text-4xl">Inventory</h2>
-          <p className="mt-1 text-sm text-mist">
-            Changes here update the shop. When someone buys, stock drops and an order is created.
-          </p>
-        </div>
-        <Link href="/shop" className="btn btn-ghost !py-2 text-sm">
-          Open shop
-        </Link>
-      </div>
 
       {(message || error) && (
-        <p className={`mb-4 text-sm ${error ? "text-red-300" : "text-emerald-300"}`}>
+        <p
+          className={`mb-4 rounded-xl border px-3 py-2 text-sm ${
+            error
+              ? "border-red/40 bg-red/10 text-red-200"
+              : "border-emerald-400/35 bg-emerald-400/10 text-emerald-100"
+          }`}
+        >
           {error || message}
         </p>
       )}
 
-      <div className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
+      <div className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <input
+          className="field"
+          placeholder="Search name, SKU, UPC…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select
+          className="field"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          <option value="all">All categories</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          className="field"
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+        >
+          <option value="all">All brands</option>
+          {brands.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+        <div className="flex flex-wrap items-center gap-3 text-sm text-mist">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={onlyActive}
+              onChange={(e) => setOnlyActive(e.target.checked)}
+            />
+            Active only
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={onlyNeedsPrice}
+              onChange={(e) => setOnlyNeedsPrice(e.target.checked)}
+            />
+            Needs price
+          </label>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+        <div className="min-w-0">
+          <div className="overflow-hidden rounded-2xl border border-white/12">
+            <div className="max-h-[70vh] overflow-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="sticky top-0 bg-black/90 text-xs tracking-wide text-steel uppercase">
+                  <tr>
+                    <th className="px-3 py-2.5 font-medium">Item</th>
+                    <th className="px-3 py-2.5 font-medium">SKU / UPC</th>
+                    <th className="px-3 py-2.5 font-medium">Price</th>
+                    <th className="px-3 py-2.5 font-medium">Stock</th>
+                    <th className="px-3 py-2.5 font-medium" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((p) => {
+                    const sku =
+                      p.sku ||
+                      Object.values(p.variantMeta || {})
+                        .map((m) => m.sku)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .join(", ") ||
+                      "—";
+                    const upc =
+                      p.upc ||
+                      Object.values(p.variantMeta || {})
+                        .map((m) => m.upc)
+                        .filter(Boolean)[0] ||
+                      "";
+                    return (
+                      <tr
+                        key={p.id}
+                        className="border-t border-white/8 hover:bg-white/[0.03]"
+                      >
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="media-box relative h-10 w-10 shrink-0 overflow-hidden !rounded-lg !p-1">
+                              <Image
+                                src={p.image || "/images/logo.png"}
+                                alt=""
+                                fill
+                                className="img-clean"
+                                unoptimized
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-chalk">
+                                {p.name}
+                              </p>
+                              <p className="truncate text-xs text-mist">
+                                {p.brand} · {p.category}
+                                {!p.active && (
+                                  <span className="ml-1 text-amber-200">
+                                    · hidden
+                                  </span>
+                                )}
+                                {Number(p.price) <= 0 && (
+                                  <span className="ml-1 text-amber-200">
+                                    · set price
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-mist">
+                          <div className="truncate">{sku}</div>
+                          {upc ? (
+                            <div className="truncate text-[11px] text-steel">
+                              {upc}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <ProductPrice product={p} size="sm" />
+                        </td>
+                        <td className="px-3 py-2.5 text-mist">{p.stock}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <button
+                            type="button"
+                            className="text-xs text-red hover:underline"
+                            onClick={() => startEdit(p)}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!pageItems.length && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-3 py-8 text-center text-mist"
+                      >
+                        No items match these filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-mist">
+            <p>
+              Showing {pageItems.length} of {filtered.length}
+              {filtered.length !== products.length
+                ? ` (filtered from ${products.length})`
+                : ""}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost !px-3 !py-1.5 text-xs"
+                disabled={page <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                Prev
+              </button>
+              <span>
+                {page + 1} / {pageCount}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost !px-3 !py-1.5 text-xs"
+                disabled={page >= pageCount - 1}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+
         <form
           onSubmit={save}
-          className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6"
+          className="h-fit space-y-3 rounded-2xl border border-white/12 bg-white/[0.03] p-5"
         >
-          <h3 className="display text-3xl">
-            {editingId ? "Edit item" : "Add item"}
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="display text-3xl">
+              {editingId ? "Edit item" : "Add item"}
+            </h3>
+            {editingId && (
+              <button
+                type="button"
+                className="text-xs text-mist hover:text-chalk"
+                onClick={() => {
+                  setEditingId(null);
+                  setForm(empty);
+                  setEditingWeight(null);
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
           <input
             className="field"
             placeholder="Item name"
@@ -272,19 +556,36 @@ export default function OpsInventoryPage() {
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              className="field"
+              placeholder="SKU"
+              value={form.sku}
+              onChange={(e) => setForm({ ...form, sku: e.target.value })}
+            />
+            <input
+              className="field"
+              placeholder="UPC"
+              value={form.upc}
+              onChange={(e) => setForm({ ...form, upc: e.target.value })}
+            />
+          </div>
           <div
             className={`grid gap-3 ${
               form.weightOptions.length ? "grid-cols-2" : "grid-cols-3"
             }`}
           >
             <div>
-              <label className="label">Price ($0 OK)</label>
+              <label className="label">Price ($0 = needs price)</label>
               <input
                 className="field"
                 inputMode="decimal"
                 value={form.price}
                 onChange={(e) =>
-                  setForm({ ...form, price: e.target.value.replace(/[^0-9.]/g, "") })
+                  setForm({
+                    ...form,
+                    price: e.target.value.replace(/[^0-9.]/g, ""),
+                  })
                 }
               />
             </div>
@@ -319,17 +620,6 @@ export default function OpsInventoryPage() {
               </div>
             ) : null}
           </div>
-          <p className="text-xs text-mist">
-            Discount keeps the regular price. Example: $100 + 20% = $80 on the shop.
-            {Number(form.price) > 0 && Number(form.discountPercent) > 0
-              ? ` Preview $${(
-                  Number(form.price) *
-                  (1 - Math.min(100, Number(form.discountPercent)) / 100)
-                ).toFixed(2)}`
-              : Number(form.price) === 0
-                ? " Preview: FREE"
-                : ""}
-          </p>
           <div className="grid grid-cols-2 gap-3">
             <input
               className="field"
@@ -351,115 +641,62 @@ export default function OpsInventoryPage() {
             onChange={(e) => setForm({ ...form, image: e.target.value })}
           />
 
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium text-chalk">Ball sizes (lb)</p>
-                <p className="mt-1 text-xs text-mist">
-                  No separate total — ball stock is the sum of each size qty.
-                  Select a size, enter how many you have. Shoppers can only pick
-                  sizes above 0.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="text-xs text-red underline"
-                  onClick={() => {
-                    const nextStock = { ...form.weightStock };
-                    for (const w of STANDARD_BALL_WEIGHTS) {
-                      const key = weightKey(w);
-                      if (nextStock[key] == null) nextStock[key] = "0";
-                    }
-                    setForm({
-                      ...form,
-                      weightOptions: [...STANDARD_BALL_WEIGHTS],
-                      weightStock: nextStock,
-                    });
-                    setEditingWeight(15);
-                  }}
-                >
-                  Add 8–16 lb
-                </button>
-                <button
-                  type="button"
-                  className="text-xs text-mist underline"
-                  onClick={() => {
-                    setForm({ ...form, weightOptions: [], weightStock: {} });
-                    setEditingWeight(null);
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {STANDARD_BALL_WEIGHTS.map((weight) => {
-                const on = form.weightOptions.some(
-                  (w) => Math.abs(w - weight) < 0.001
-                );
-                const key = weightKey(weight);
-                const qty = Math.max(
-                  0,
-                  Math.floor(Number(form.weightStock[key] ?? "0") || 0)
-                );
-                const selected =
-                  editingWeight != null &&
-                  Math.abs(editingWeight - weight) < 0.001;
+          <div className="rounded-xl border border-white/10 p-3">
+            <p className="mb-2 text-xs tracking-[0.16em] text-red uppercase">
+              Ball weights
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {STANDARD_BALL_WEIGHTS.map((w) => {
+                const on = form.weightOptions.includes(w);
                 return (
                   <button
-                    key={weight}
+                    key={w}
                     type="button"
-                    className={`weight-bubble ${selected ? "is-selected" : ""} ${on && qty <= 0 ? "is-soldout" : ""}`}
-                    title={
+                    className={`rounded-full border px-2.5 py-1 text-xs ${
                       on
-                        ? `${formatWeightLbs(weight)} · ${qty} in stock — click to edit qty`
-                        : `Add ${formatWeightLbs(weight)}`
-                    }
+                        ? "border-red bg-red/20 text-chalk"
+                        : "border-white/15 text-mist"
+                    }`}
                     onClick={() => {
-                      if (!on) {
-                        setForm({
-                          ...form,
-                          weightOptions: [...form.weightOptions, weight].sort(
-                            (a, b) => a - b
-                          ),
-                          weightStock: {
-                            ...form.weightStock,
-                            [key]: form.weightStock[key] ?? "0",
-                          },
-                        });
-                      }
-                      setEditingWeight(weight);
+                      const next = on
+                        ? form.weightOptions.filter((x) => x !== w)
+                        : [...form.weightOptions, w].sort((a, b) => a - b);
+                      setForm({ ...form, weightOptions: next });
+                      if (!on) setEditingWeight(w);
+                      if (on && editingWeight === w) setEditingWeight(null);
                     }}
                   >
-                    <span className="weight-bubble-main">
-                      {formatWeightLbs(weight)}
-                    </span>
-                    {on ? (
-                      <span className="weight-bubble-qty">{qty}</span>
-                    ) : null}
+                    {formatWeightLbs(w)}
                   </button>
                 );
               })}
             </div>
-
-            {editingWeight != null &&
-            form.weightOptions.some(
-              (w) => Math.abs(w - editingWeight) < 0.001
-            ) ? (
-              <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
-                <div className="flex flex-wrap items-end gap-3">
-                  <label className="min-w-[10rem] flex-1">
-                    <span className="label">
-                      How many in stock · {formatWeightLbs(editingWeight)}
-                    </span>
+            {form.weightOptions.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <label className="label">Stock for selected weight</label>
+                <div className="flex flex-wrap gap-2">
+                  {form.weightOptions.map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      className={`rounded-lg border px-2 py-1 text-xs ${
+                        editingWeight === w
+                          ? "border-red text-chalk"
+                          : "border-white/15 text-mist"
+                      }`}
+                      onClick={() => setEditingWeight(w)}
+                    >
+                      {formatWeightLbs(w)}:{" "}
+                      {form.weightStock[weightKey(w)] || "0"}
+                    </button>
+                  ))}
+                </div>
+                {editingWeight != null && (
+                  <>
                     <input
                       className="field"
                       inputMode="numeric"
-                      autoFocus
-                      value={
-                        form.weightStock[weightKey(editingWeight)] ?? "0"
-                      }
+                      value={form.weightStock[weightKey(editingWeight)] || "0"}
                       onChange={(e) =>
                         setForm({
                           ...form,
@@ -473,299 +710,101 @@ export default function OpsInventoryPage() {
                         })
                       }
                     />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn-ghost !py-2 text-sm"
-                    onClick={() => {
-                      const key = weightKey(editingWeight);
-                      const nextStock = { ...form.weightStock };
-                      delete nextStock[key];
-                      const nextOptions = form.weightOptions.filter(
-                        (w) => Math.abs(w - editingWeight) >= 0.001
-                      );
-                      setForm({
-                        ...form,
-                        weightOptions: nextOptions,
-                        weightStock: nextStock,
-                      });
-                      setEditingWeight(nextOptions[0] ?? null);
-                    }}
-                  >
-                    Remove size
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-mist">
-                  Enter 0 if you are out of this size — shoppers will not be able
-                  to select it.
-                </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        className="field"
+                        placeholder={`${formatWeightLbs(editingWeight)} SKU`}
+                        value={
+                          form.variantMeta[weightKey(editingWeight)]?.sku || ""
+                        }
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            variantMeta: {
+                              ...form.variantMeta,
+                              [weightKey(editingWeight)]: {
+                                sku: e.target.value,
+                                upc:
+                                  form.variantMeta[weightKey(editingWeight)]
+                                    ?.upc || "",
+                              },
+                            },
+                          })
+                        }
+                      />
+                      <input
+                        className="field"
+                        placeholder={`${formatWeightLbs(editingWeight)} UPC`}
+                        value={
+                          form.variantMeta[weightKey(editingWeight)]?.upc || ""
+                        }
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            variantMeta: {
+                              ...form.variantMeta,
+                              [weightKey(editingWeight)]: {
+                                sku:
+                                  form.variantMeta[weightKey(editingWeight)]
+                                    ?.sku || "",
+                                upc: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-            ) : form.weightOptions.length ? (
-              <p className="mt-3 text-xs text-mist">
-                Tap a size above to set how many you have.
-              </p>
-            ) : (
-              <p className="mt-3 text-xs text-mist">
-                No sizes yet — tap a weight (or Add 8–16 lb) to start.
-              </p>
             )}
-
-            {form.weightOptions.length ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <p className="text-sm text-chalk">
-                  Total balls:{" "}
-                  <span className="font-semibold">
-                    {form.weightOptions.reduce((sum, w) => {
-                      const key = weightKey(w);
-                      return (
-                        sum +
-                        Math.max(
-                          0,
-                          Math.floor(Number(form.weightStock[key] ?? "0") || 0)
-                        )
-                      );
-                    }, 0)}
-                  </span>{" "}
-                  <span className="text-mist">(from sizes only)</span>
-                </p>
-                {form.weightOptions.map((weight) => {
-                  const key = weightKey(weight);
-                  const qty = Math.max(
-                    0,
-                    Math.floor(Number(form.weightStock[key] ?? "0") || 0)
-                  );
-                  return (
-                    <button
-                      key={`summary-${key}`}
-                      type="button"
-                      className={`rounded-full border px-3 py-1 text-xs ${
-                        qty > 0
-                          ? "border-white/20 text-chalk"
-                          : "border-white/10 text-mist line-through"
-                      }`}
-                      onClick={() => setEditingWeight(weight)}
-                    >
-                      {formatWeightLbs(weight)} · {qty}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {form.weightOptions.some(
-              (w) =>
-                !STANDARD_BALL_WEIGHTS.some((s) => Math.abs(s - w) < 0.001)
-            ) ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {form.weightOptions
-                  .filter(
-                    (w) =>
-                      !STANDARD_BALL_WEIGHTS.some(
-                        (s) => Math.abs(s - w) < 0.001
-                      )
-                  )
-                  .map((weight) => (
-                    <button
-                      key={`custom-${weight}`}
-                      type="button"
-                      className={`weight-bubble ${
-                        editingWeight != null &&
-                        Math.abs(editingWeight - weight) < 0.001
-                          ? "is-selected"
-                          : ""
-                      }`}
-                      onClick={() => setEditingWeight(weight)}
-                      title="Edit custom weight qty"
-                    >
-                      <span className="weight-bubble-main">
-                        {formatWeightLbs(weight)}
-                      </span>
-                      <span className="weight-bubble-qty">
-                        {Math.max(
-                          0,
-                          Math.floor(
-                            Number(form.weightStock[weightKey(weight)] ?? "0") ||
-                              0
-                          )
-                        )}
-                      </span>
-                    </button>
-                  ))}
-              </div>
-            ) : null}
-            <div className="mt-3 flex gap-2">
-              <input
-                className="field"
-                inputMode="decimal"
-                placeholder="Custom lb"
-                value={form.customWeight}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    customWeight: e.target.value.replace(/[^0-9.]/g, ""),
-                  })
-                }
-              />
-              <button
-                type="button"
-                className="btn btn-ghost shrink-0 !py-2"
-                onClick={() => {
-                  const n = Number(form.customWeight);
-                  if (!Number.isFinite(n) || n <= 0 || n > 30) return;
-                  const rounded = Math.round(n * 10) / 10;
-                  const key = weightKey(rounded);
-                  if (
-                    form.weightOptions.some(
-                      (w) => Math.abs(w - rounded) < 0.001
-                    )
-                  ) {
-                    setForm({ ...form, customWeight: "" });
-                    setEditingWeight(rounded);
-                    return;
-                  }
-                  setForm({
-                    ...form,
-                    customWeight: "",
-                    weightOptions: [...form.weightOptions, rounded].sort(
-                      (a, b) => a - b
-                    ),
-                    weightStock: {
-                      ...form.weightStock,
-                      [key]: form.weightStock[key] ?? "0",
-                    },
-                  });
-                  setEditingWeight(rounded);
-                }}
-              >
-                Add
-              </button>
-            </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-mist">
-            <input
-              type="checkbox"
-              checked={form.active}
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            />
-            Show on shop
-          </label>
-          <label className="flex items-center gap-2 text-sm text-mist">
-            <input
-              type="checkbox"
-              checked={form.featured}
-              onChange={(e) => setForm({ ...form, featured: e.target.checked })}
-            />
-            Featured on home
-          </label>
-          <div className="flex gap-2">
-            <button className="btn btn-primary" type="submit">
-              {editingId ? "Save changes" : "Add to inventory"}
+          <div className="flex flex-wrap gap-4 text-sm text-mist">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(e) =>
+                  setForm({ ...form, active: e.target.checked })
+                }
+              />
+              Active on shop
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.featured}
+                onChange={(e) =>
+                  setForm({ ...form, featured: e.target.checked })
+                }
+              />
+              Featured
+            </label>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={saving}
+            >
+              {saving ? "Saving…" : editingId ? "Save changes" : "Add item"}
             </button>
             {editingId && (
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => {
-                  setEditingId(null);
-                  setForm(empty);
-                  setEditingWeight(null);
-                }}
+                onClick={() => void remove(editingId)}
               >
-                Cancel
+                Delete
               </button>
             )}
+            <Link href="/shop" className="btn btn-ghost">
+              Open shop
+            </Link>
           </div>
         </form>
-
-        <div className="space-y-3">
-          <h3 className="display text-3xl">Current stock ({products.length})</h3>
-          <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
-            {products.map((p) => (
-              <article
-                key={p.id}
-                className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3"
-              >
-                <div className="logo-box relative h-20 w-20 shrink-0 overflow-hidden !rounded-xl">
-                  <Image src={p.image} alt={p.name} fill className="img-clean p-1" unoptimized />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="truncate font-semibold">{p.name}</h4>
-                  <ProductPrice product={p} size="sm" />
-                  <p className="text-xs text-mist">
-                    {p.weightOptions?.length ? (
-                      <>
-                        {p.weightOptions
-                          .map((w) => {
-                            const qty = p.weightStock?.[weightKey(w)] ?? 0;
-                            return `${w}lb×${qty}`;
-                          })
-                          .join(" · ")}
-                        {" · "}
-                        {p.stock} total from sizes
-                      </>
-                    ) : (
-                      <>Stock {p.stock}</>
-                    )}
-                    {!p.active ? " · hidden" : ""}
-                  </p>
-                  <div className="mt-2 flex gap-3">
-                    <button
-                      type="button"
-                      className="text-xs text-red underline"
-                      onClick={() => {
-                        const weightOptions = p.weightOptions || [];
-                        const weightStock: Record<string, string> = {};
-                        for (const w of weightOptions) {
-                          const key = weightKey(w);
-                          weightStock[key] = String(
-                            p.weightStock?.[key] ?? 0
-                          );
-                        }
-                        setEditingId(p.id);
-                        const firstWithStock =
-                          weightOptions.find((w) => {
-                            const key = weightKey(w);
-                            return (
-                              Math.max(
-                                0,
-                                Math.floor(Number(p.weightStock?.[key] ?? 0) || 0)
-                              ) > 0
-                            );
-                          }) ?? weightOptions[0] ?? null;
-                        setEditingWeight(firstWithStock);
-                        setForm({
-                          name: p.name,
-                          description: p.description,
-                          price: String(p.price ?? 0),
-                          discountPercent: String(p.discountPercent ?? 0),
-                          stock: String(p.stock ?? 0),
-                          category: p.category,
-                          brand: p.brand,
-                          image: p.image,
-                          featured: p.featured,
-                          active: p.active,
-                          weightOptions,
-                          weightStock,
-                          customWeight: "",
-                        });
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs text-red-300 underline"
-                      onClick={() => remove(p.id)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

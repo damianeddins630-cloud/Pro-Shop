@@ -102,9 +102,6 @@ function mergeVengeance(existing, spiCandidate) {
 
 function mergeStore(store, spiProducts) {
   const products = Array.isArray(store.products) ? [...store.products] : [];
-  const spiByName = new Map(
-    spiProducts.map((p) => [String(p.name).trim().toLowerCase(), p])
-  );
 
   // 1) Merge Vengeance (exact name) into existing non-spi product
   const vengeanceSpi = spiProducts.find((p) => p.name === "Vengeance");

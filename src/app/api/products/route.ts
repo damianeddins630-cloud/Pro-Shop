@@ -78,6 +78,18 @@ const createSchema = z.object({
   active: z.coerce.boolean().optional(),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
   shopifyVariantId: z.string().optional(),
+  sku: z.string().optional(),
+  upc: z.string().optional(),
+  variantMeta: z
+    .record(
+      z.string(),
+      z.object({
+        sku: z.string().default(""),
+        upc: z.string().default(""),
+      })
+    )
+    .optional()
+    .nullable(),
   weightOptions: z
     .array(z.coerce.number().positive().max(30))
     .optional()
@@ -121,6 +133,9 @@ export async function POST(req: Request) {
       shopifyVariantId: body.shopifyVariantId,
       weightOptions: body.weightOptions,
       weightStock: body.weightStock || undefined,
+      sku: body.sku,
+      upc: body.upc,
+      variantMeta: body.variantMeta || undefined,
     });
 
     if (!requireDurablePersistOrLocal()) {

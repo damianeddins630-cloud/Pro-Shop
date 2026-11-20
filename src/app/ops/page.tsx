@@ -14,78 +14,80 @@ const cards: {
   {
     href: "/ops/inventory",
     title: "Inventory",
-    text: "Prices, discounts, ball weights, and per-weight stock that powers the vault.",
+    text: "SPI catalog, prices, SKU/UPC, ball weights, and stock that powers the shop.",
     perms: ["manage_inventory", "edit_pages"],
-  },
-  {
-    href: "/ops/deals",
-    title: "Deals",
-    text: "Add, remove, or update current deals and specials.",
-    perms: ["manage_deals", "edit_pages"],
-  },
-  {
-    href: "/ops/coupons",
-    title: "Coupons",
-    text: "Add, edit, or remove any redeem code and set how many times each can be used.",
-    perms: ["manage_deals", "manage_inventory", "edit_pages"],
-  },
-  {
-    href: "/ops/sponsors",
-    title: "Sponsors",
-    text: "Add, remove, or update sponsor names and logos.",
-    perms: ["manage_sponsors", "edit_pages"],
-  },
-  {
-    href: "/ops/subscribers",
-    title: "Subscribers",
-    text: "See who signed up and email announcements or documents to their signup address.",
-    perms: ["manage_subscribers", "edit_pages", "manage_users"],
   },
   {
     href: "/ops/orders",
     title: "Orders",
-    text: "In-store command center — drill notes, phone, pipeline, ball vault. No shipping.",
+    text: "Paid orders, drill notes, and in-store pickup pipeline.",
     perms: ["view_orders", "manage_orders"],
   },
   {
     href: "/ops/shopify",
     title: "Shopify",
-    text: "Connect Shopify payment checkout. Status + step-by-step setup.",
+    text: "Payment checkout connect + status. Website still owns prices.",
     perms: ["manage_inventory", "manage_orders", "manage_roles", "manage_users"],
   },
   {
-    href: "/ops/roles",
-    title: "Roles",
-    text: "Create, edit, and remove roles and permissions.",
-    perms: ["manage_roles"],
+    href: "/ops/deals",
+    title: "Deals",
+    text: "Featured deals and specials on the site.",
+    perms: ["manage_deals", "edit_pages"],
+  },
+  {
+    href: "/ops/coupons",
+    title: "Coupons",
+    text: "Discount codes and usage limits.",
+    perms: ["manage_deals", "manage_inventory", "edit_pages"],
+  },
+  {
+    href: "/ops/sponsors",
+    title: "Sponsors",
+    text: "Sponsor logos and links.",
+    perms: ["manage_sponsors", "edit_pages"],
+  },
+  {
+    href: "/ops/subscribers",
+    title: "Subscribers",
+    text: "Email list and announcements.",
+    perms: ["manage_subscribers", "edit_pages", "manage_users"],
   },
   {
     href: "/ops/users",
     title: "Users",
-    text: "See every account, when it was made, email, and if they ordered.",
+    text: "Accounts and roles for staff and customers.",
     perms: ["manage_users", "manage_roles"],
+  },
+  {
+    href: "/ops/roles",
+    title: "Roles",
+    text: "Permissions for Operations staff.",
+    perms: ["manage_roles"],
   },
 ];
 
 export default function OpsHomePage() {
   const { user, can } = useEditMode();
-  const [persistWarning, setPersistWarning] = useState("");
-  const [shopifyWarning, setShopifyWarning] = useState("");
+  const [stats, setStats] = useState<{
+    products: number | null;
+    warning: string;
+    shopify: string;
+  }>({ products: null, warning: "", shopify: "" });
 
   useEffect(() => {
     fetch("/api/health", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
-        if (typeof d.warning === "string" && d.warning) setPersistWarning(d.warning);
-        if (d.shopify && !d.shopify.configured) {
-          setShopifyWarning(
-            "Shopify is not connected — open Ops → Shopify and click Save Connect (or Refresh status)."
-          );
-        } else if (d.shopify?.configured && !d.shopify?.webhookConfigured) {
-          setShopifyWarning(
-            "Shopify checkout is ready, but the webhook secret is missing — open Ops → Shopify to finish setup."
-          );
-        }
+        setStats({
+          products: typeof d.productCount === "number" ? d.productCount : null,
+          warning: typeof d.warning === "string" ? d.warning : "",
+          shopify: d.shopify?.checkoutReady
+            ? "Checkout ready"
+            : d.shopify?.configured
+              ? "Connected — finish webhook if needed"
+              : "Not connected",
+        });
       })
       .catch(() => {});
   }, []);
@@ -100,32 +102,46 @@ export default function OpsHomePage() {
 
   return (
     <div>
-      <h2 className="display text-4xl">Welcome{user ? `, ${user.username}` : ""}</h2>
+      <h2 className="display text-4xl">
+        Welcome{user ? `, ${user.username}` : ""}
+      </h2>
       <p className="mt-2 max-w-2xl text-mist">
-        This is Operations Home Base. Pick a section to manage the pro shop.
+        Operations home — inventory, payments, and orders in one place. Keep it
+        simple: set price → save → shoppers check out.
       </p>
-      {persistWarning && (
+
+      <div className="mt-5 flex flex-wrap gap-2 text-xs">
+        {stats.products != null && (
+          <span className="rounded-full border border-white/15 px-3 py-1.5 text-mist">
+            {stats.products} products loaded
+          </span>
+        )}
+        <span className="rounded-full border border-white/15 px-3 py-1.5 text-mist">
+          Shopify: {stats.shopify || "…"}
+        </span>
+        <Link
+          href="/ops/inventory"
+          className="rounded-full border border-red/40 bg-red/10 px-3 py-1.5 text-red"
+        >
+          Open inventory →
+        </Link>
+      </div>
+
+      {stats.warning && (
         <p className="mt-4 max-w-3xl rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
-          {persistWarning}
+          {stats.warning}
         </p>
       )}
-      {shopifyWarning && (
-        <p className="mt-4 max-w-3xl rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
-          {shopifyWarning}{" "}
-          <Link href="/ops/shopify" className="underline text-amber-50">
-            Open Shopify setup
-          </Link>
-        </p>
-      )}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+
+      <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visibleCards.map((card) => (
           <Link
             key={card.href}
             href={card.href}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-red/50 hover:bg-white/[0.05]"
+            className="rounded-2xl border border-white/12 bg-white/[0.03] p-5 transition hover:border-red/45 hover:bg-white/[0.05]"
           >
-            <h3 className="display text-3xl text-chalk">{card.title}</h3>
-            <p className="mt-3 text-sm text-mist">{card.text}</p>
+            <h3 className="display text-2xl">{card.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-mist">{card.text}</p>
           </Link>
         ))}
       </div>

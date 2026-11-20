@@ -57,6 +57,18 @@ const patchSchema = z.object({
   active: z.coerce.boolean().optional(),
   discountPercent: z.coerce.number().min(0).max(100).optional(),
   shopifyVariantId: z.string().optional(),
+  sku: z.string().optional().nullable(),
+  upc: z.string().optional().nullable(),
+  variantMeta: z
+    .record(
+      z.string(),
+      z.object({
+        sku: z.string().default(""),
+        upc: z.string().default(""),
+      })
+    )
+    .optional()
+    .nullable(),
   weightOptions: z
     .array(z.coerce.number().positive().max(30))
     .optional()
@@ -82,7 +94,10 @@ export async function PUT(req: Request, { params }: Params) {
     const before = await getProduct(id);
     const product = await updateProduct(id, {
       ...body,
+      sku: body.sku ?? undefined,
+      upc: body.upc ?? undefined,
       weightStock: body.weightStock ?? undefined,
+      variantMeta: body.variantMeta ?? undefined,
     });
     if (!product) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
