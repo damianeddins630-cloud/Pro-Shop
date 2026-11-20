@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { OpsPageHeader } from "@/components/ops/OpsUi";
 import { isPurchasedOrder } from "@/lib/order-status";
 import type { Order, PublicUser } from "@/lib/types";
 
@@ -118,18 +119,10 @@ export default function OpsCustomersPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2
-          style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}
-        >
-          Customers
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          One place for customer accounts linked to paid purchase history.
-          Coaching and membership history will attach here in later stages —
-          purchases should never create duplicate customer records.
-        </p>
-      </div>
+      <OpsPageHeader
+        title="Customers"
+        description="One place for customer accounts linked to paid purchase history. Purchases should never create duplicate customer records."
+      />
 
       {error ? (
         <div className="ops-stage-banner" role="alert">
@@ -144,35 +137,22 @@ export default function OpsCustomersPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, email, phone"
-            style={{
-              background: "#0c0c0f",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "0.55rem",
-              padding: "0.45rem 0.7rem",
-              color: "#fff",
-              minWidth: "220px",
-            }}
+            style={{ minWidth: 220 }}
           />
         </div>
 
         {!loading && filtered.length === 0 ? (
-          <p className="ops-note">No customer accounts matched.</p>
+          <p className="ops-empty">No customer accounts matched.</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "0.88rem",
-              }}
-            >
+          <div className="ops-table-wrap">
+            <table className="ops-table">
               <thead>
-                <tr style={{ color: "var(--ops-muted)", textAlign: "left" }}>
-                  <th style={{ padding: "0.55rem 0.35rem" }}>Customer</th>
-                  <th style={{ padding: "0.55rem 0.35rem" }}>Contact</th>
-                  <th style={{ padding: "0.55rem 0.35rem" }}>Paid orders</th>
-                  <th style={{ padding: "0.55rem 0.35rem" }}>Total spent</th>
-                  <th style={{ padding: "0.55rem 0.35rem" }}>Last order</th>
+                <tr>
+                  <th>Customer</th>
+                  <th>Contact</th>
+                  <th>Paid orders</th>
+                  <th>Total spent</th>
+                  <th>Last order</th>
                 </tr>
               </thead>
               <tbody>

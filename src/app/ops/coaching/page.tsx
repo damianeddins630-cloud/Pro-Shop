@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { OpsPageHeader } from "@/components/ops/OpsUi";
 import type {
   Coach,
   CoachingBooking,
@@ -146,16 +147,10 @@ export default function OpsCoachingPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-          Coaching Management
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          Private, group, and online lessons plus packages. Double-booking the
-          same coach is blocked. Only <strong>paid</strong> sessions/packages
-          count as collected revenue ({money(collected)} so far).
-        </p>
-      </div>
+      <OpsPageHeader
+        title="Coaching"
+        description={`Private, group, and online lessons plus packages. Double-booking the same coach is blocked. Only paid sessions/packages count as collected revenue (${money(collected)} so far).`}
+      />
 
       {error ? (
         <div className="ops-stage-banner" role="alert">

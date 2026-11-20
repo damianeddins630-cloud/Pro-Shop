@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { OpsPageHeader } from "@/components/ops/OpsUi";
 
 const links = [
   {
@@ -27,14 +28,11 @@ const links = [
 
 export default function OpsMarketingHubPage() {
   return (
-    <div>
-      <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-        Marketing
-      </h2>
-      <p className="ops-note" style={{ marginTop: 0, marginBottom: "1rem" }}>
-        Promotions and audience tools. Existing Deals, Coupons, Sponsors, and
-        Subscribers pages stay intact — this hub organizes them.
-      </p>
+    <div className="ops-dash-grid">
+      <OpsPageHeader
+        title="Marketing"
+        description="Promotions and audience tools. Deals, Coupons, Sponsors, and Subscribers stay available from this hub."
+      />
       <div className="ops-hub-grid">
         {links.map((item) => (
           <Link key={item.href} href={item.href} className="ops-hub-card">

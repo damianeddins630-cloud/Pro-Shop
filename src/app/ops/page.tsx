@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  IconBackups,
+  IconFinances,
+  IconInventory,
+  IconMemberships,
+  IconOrders,
+} from "@/components/ops/OpsIcons";
+import { OpsEmpty, OpsPageHeader, OpsStatCard } from "@/components/ops/OpsUi";
 
 type Overview = {
   generatedAt: string;
@@ -171,92 +179,79 @@ export default function OpsDashboardPage() {
     return Math.max(1, ...data.sales.dailySales.map((d) => d.total));
   }, [data]);
 
-  const breakdownMax = useMemo(() => {
-    if (!data) return 1;
-    return Math.max(
-      1,
-      data.salesBreakdown.shop,
-      data.salesBreakdown.coaching,
-      data.salesBreakdown.memberships
-    );
-  }, [data]);
+  const breakdown = data?.salesBreakdown || {
+    shop: 0,
+    coaching: 0,
+    memberships: 0,
+  };
+  const breakdownTotal =
+    breakdown.shop + breakdown.coaching + breakdown.memberships;
+  const breakdownMax = Math.max(
+    1,
+    breakdown.shop,
+    breakdown.coaching,
+    breakdown.memberships
+  );
+
+  const donutStyle = useMemo(() => {
+    const total = Math.max(breakdownTotal, 0.0001);
+    const shop = (breakdown.shop / total) * 100;
+    const coaching = (breakdown.coaching / total) * 100;
+    const memberships = (breakdown.memberships / total) * 100;
+    const a = shop;
+    const b = shop + coaching;
+    return {
+      background: `conic-gradient(#e10600 0 ${a}%, #38bdf8 ${a}% ${b}%, #a78bfa ${b}% 100%)`,
+    };
+  }, [breakdown.shop, breakdown.coaching, breakdown.memberships, breakdownTotal]);
 
   return (
     <div className="ops-dash-grid">
-      <div className="ops-card-head" style={{ marginBottom: 0 }}>
-        <div>
-          <h2
-            style={{
-              margin: "0 0 0.35rem",
-              fontSize: "1.35rem",
-              fontWeight: 750,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Dashboard
-          </h2>
-          <p className="ops-note" style={{ marginTop: 0 }}>
-            Live business overview from paid orders, coaching, memberships,
-            expenses, and system health — no placeholder revenue.
-          </p>
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-          {RANGES.map((r) => (
+      <OpsPageHeader
+        title="Business overview"
+        description="Live paid revenue, orders, memberships, coaching, inventory alerts, and system health — no placeholder totals."
+        actions={
+          <>
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                className={range === r.key ? "ops-primary-btn" : "ops-ghost-btn"}
+                onClick={() => setRange(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
             <button
-              key={r.key}
               type="button"
-              className={
-                range === r.key ? "ops-primary-btn" : "ops-ghost-btn"
-              }
-              onClick={() => setRange(r.key)}
+              className={range === "custom" ? "ops-primary-btn" : "ops-ghost-btn"}
+              onClick={() => setRange("custom")}
             >
-              {r.label}
+              Custom
             </button>
-          ))}
-          <button
-            type="button"
-            className={range === "custom" ? "ops-primary-btn" : "ops-ghost-btn"}
-            onClick={() => setRange("custom")}
-          >
-            Custom
-          </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {range === "custom" ? (
-        <div className="ops-card" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "end" }}>
-          <label style={{ fontSize: "0.8rem", color: "var(--ops-muted)" }}>
+        <div
+          className="ops-card"
+          style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "end" }}
+        >
+          <label className="ops-note" style={{ margin: 0 }}>
             From
             <input
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              style={{
-                display: "block",
-                marginTop: 4,
-                background: "#0c0c0f",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 8,
-                padding: "0.4rem 0.6rem",
-                color: "#fff",
-              }}
             />
           </label>
-          <label style={{ fontSize: "0.8rem", color: "var(--ops-muted)" }}>
+          <label className="ops-note" style={{ margin: 0 }}>
             To
             <input
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              style={{
-                display: "block",
-                marginTop: 4,
-                background: "#0c0c0f",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 8,
-                padding: "0.4rem 0.6rem",
-                color: "#fff",
-              }}
             />
           </label>
           <button type="button" className="ops-primary-btn" onClick={() => void load()}>
@@ -280,55 +275,42 @@ export default function OpsDashboardPage() {
       ) : null}
 
       <section className="ops-kpi-row" aria-label="Key metrics">
-        <article className="ops-card ops-card-red">
-          <p className="ops-kpi-label">Shop sales · range</p>
-          <p className="ops-kpi-value">
-            {loading ? "…" : money(data?.sales.range ?? 0)}
-          </p>
-          <p className="ops-kpi-meta">
-            Today {money(data?.sales.today ?? 0)} · Week{" "}
-            {money(data?.sales.week ?? 0)} · Month{" "}
-            {money(data?.sales.month ?? 0)}
-          </p>
-        </article>
-        <article className="ops-card ops-card-blue">
-          <p className="ops-kpi-label">Coaching revenue</p>
-          <p className="ops-kpi-value">
-            {money(data?.coaching.revenueCollected ?? 0)}
-          </p>
-          <p className="ops-kpi-meta">
-            {data?.coaching.upcomingLessons ?? 0} upcoming ·{" "}
-            {data?.coaching.sessionsBooked ?? 0} bookings
-          </p>
-        </article>
-        <article className="ops-card ops-card-purple">
-          <p className="ops-kpi-label">Membership revenue</p>
-          <p className="ops-kpi-value">
-            {money(data?.memberships.revenueCollected ?? 0)}
-          </p>
-          <p className="ops-kpi-meta">
-            {data?.memberships.activeCount ?? 0} active ·{" "}
-            {data?.memberships.totalCount ?? 0} total
-          </p>
-        </article>
-        <article className="ops-card ops-card-green">
-          <p className="ops-kpi-label">Net · this month</p>
-          <p className="ops-kpi-value">
-            {loading ? "…" : money(data?.finances.netProfitMonth ?? 0)}
-          </p>
-          <p className="ops-kpi-meta">
-            Collected {money(data?.finances.totalCollectedMonth ?? 0)} −
-            expenses {money(data?.finances.expensesTotal ?? 0)}
-          </p>
-        </article>
+        <OpsStatCard
+          tone="red"
+          label="Today's revenue"
+          value={loading ? "…" : money(data?.sales.today ?? 0)}
+          meta={`Week ${money(data?.sales.week ?? 0)}`}
+          icon={<IconFinances />}
+        />
+        <OpsStatCard
+          tone="blue"
+          label="Monthly revenue"
+          value={loading ? "…" : money(data?.sales.month ?? 0)}
+          meta={`Range ${money(data?.sales.range ?? 0)} · ${data?.range.label || range}`}
+          icon={<IconOrders />}
+        />
+        <OpsStatCard
+          tone="purple"
+          label="Total orders"
+          value={loading ? "…" : String(data?.sales.orderCountAll ?? 0)}
+          meta={`${data?.sales.orderCountRange ?? 0} in range · avg ${money(data?.sales.averageOrder ?? 0)}`}
+          icon={<IconOrders />}
+        />
+        <OpsStatCard
+          tone="green"
+          label="Active memberships"
+          value={String(data?.memberships.activeCount ?? 0)}
+          meta={`${money(data?.memberships.revenueCollected ?? 0)} collected`}
+          icon={<IconMemberships />}
+        />
       </section>
 
       <section className="ops-dash-mid">
         <article className="ops-card">
           <div className="ops-card-head">
-            <h2>Revenue overview</h2>
+            <h2>Revenue over time</h2>
             <span className="ops-badge ops-badge-gray">
-              {data?.range.label || range} · paid
+              {data?.range.label || range} · paid shop
             </span>
           </div>
           <div className="ops-spark" aria-hidden>
@@ -337,15 +319,15 @@ export default function OpsDashboardPage() {
                 key={d.day}
                 title={`${d.day}: ${money(d.total)}`}
                 style={{
-                  height: `${Math.max(4, (d.total / maxDaily) * 100)}%`,
-                  opacity: d.total > 0 ? 0.95 : 0.2,
+                  height: `${Math.max(6, (d.total / maxDaily) * 100)}%`,
+                  opacity: d.total > 0 ? 0.95 : 0.18,
                 }}
               />
             ))}
           </div>
           <p className="ops-note">
-            Paid shop sales by day in the selected range. Unpaid Shopify drafts
-            and refunds are excluded from collected totals.
+            Paid shop sales by day. Unpaid drafts and incomplete refunds are
+            excluded from collected totals.
           </p>
         </article>
 
@@ -354,96 +336,171 @@ export default function OpsDashboardPage() {
             <h2>Sales breakdown</h2>
             <span className="ops-badge ops-badge-red">Paid only</span>
           </div>
-          {(
-            [
-              ["Shop", data?.salesBreakdown.shop ?? 0, "#e10600"],
-              ["Coaching", data?.salesBreakdown.coaching ?? 0, "#3b82f6"],
-              ["Memberships", data?.salesBreakdown.memberships ?? 0, "#a855f7"],
-            ] as const
-          ).map(([label, value, color]) => (
-            <div key={label} style={{ marginBottom: "0.75rem" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: "0.85rem",
-                  marginBottom: 4,
-                }}
-              >
-                <span>{label}</span>
-                <strong>{money(value)}</strong>
-              </div>
-              <div
-                style={{
-                  height: 8,
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.06)",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${Math.max(2, (value / breakdownMax) * 100)}%`,
-                    height: "100%",
-                    background: color,
-                    opacity: value > 0 ? 1 : 0.25,
-                  }}
-                />
+          <div className="ops-donut-wrap">
+            <div className="ops-donut" style={donutStyle}>
+              <div className="ops-donut-center">
+                <strong>{money(breakdownTotal)}</strong>
+                <span>combined</span>
               </div>
             </div>
-          ))}
-          <div className="ops-actions-grid" style={{ marginTop: "0.5rem" }}>
-            <Link className="ops-action" href="/ops/orders">
-              ◎ Sales & Orders
-            </Link>
-            <Link className="ops-action" href="/ops/coaching">
-              ◈ Coaching
-            </Link>
-            <Link className="ops-action" href="/ops/memberships">
-              ◇ Memberships
-            </Link>
-            <Link className="ops-action" href="/ops/finances">
-              ⬡ Finances
+            <div className="ops-breakdown-list">
+              {(
+                [
+                  ["Shop", breakdown.shop, "#e10600"],
+                  ["Coaching", breakdown.coaching, "#38bdf8"],
+                  ["Memberships", breakdown.memberships, "#a78bfa"],
+                ] as const
+              ).map(([label, value, color]) => (
+                <div key={label} className="ops-breakdown-row">
+                  <header>
+                    <span>{label}</span>
+                    <strong>{money(value)}</strong>
+                  </header>
+                  <div className="ops-breakdown-track">
+                    <div
+                      className="ops-breakdown-fill"
+                      style={{
+                        width: `${Math.max(2, (value / breakdownMax) * 100)}%`,
+                        background: color,
+                        opacity: value > 0 ? 1 : 0.25,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="ops-dash-third">
+        <article className="ops-card">
+          <div className="ops-card-head">
+            <h2>Recent orders</h2>
+            <Link href="/ops/orders" className="ops-ghost-btn">
+              View all
             </Link>
           </div>
+          {loading ? (
+            <OpsEmpty>Loading…</OpsEmpty>
+          ) : !data?.recentOrders?.length ? (
+            <OpsEmpty>No paid orders yet.</OpsEmpty>
+          ) : (
+            <div className="ops-table-wrap">
+              <table className="ops-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recentOrders.map((o) => (
+                    <tr key={o.id}>
+                      <td>
+                        <strong>{o.username || o.email}</strong>
+                        <div style={{ color: "var(--ops-muted)", fontSize: "0.75rem" }}>
+                          #{o.id.slice(0, 8)} · {o.itemCount} item
+                          {o.itemCount === 1 ? "" : "s"}
+                        </div>
+                      </td>
+                      <td>{money(o.total)}</td>
+                      <td>
+                        <span className={statusBadge(o.status)}>{o.status}</span>
+                      </td>
+                      <td>{relTime(o.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </article>
+
+        <article className="ops-card">
+          <div className="ops-card-head">
+            <h2>Upcoming coaching</h2>
+            <Link href="/ops/coaching" className="ops-ghost-btn">
+              Manage
+            </Link>
+          </div>
+          {(data?.coaching.upcomingBookings?.length || 0) > 0 ? (
+            <ul className="ops-activity">
+              {data!.coaching.upcomingBookings.map((b) => (
+                <li key={b.id}>
+                  <span className="ops-activity-dot" aria-hidden />
+                  <div>
+                    <strong>{b.title}</strong>
+                    <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
+                      {b.date} {b.startTime} · {b.customerName} · {b.coachName}
+                    </div>
+                  </div>
+                  <span className="ops-badge ops-badge-blue">Lesson</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <OpsEmpty>{data?.coaching.note || "No upcoming lessons."}</OpsEmpty>
+          )}
+        </article>
+
+        <article className="ops-card">
+          <div className="ops-card-head">
+            <h2>Recent activity</h2>
+          </div>
+          {(data?.activity?.length || 0) > 0 ? (
+            <ul className="ops-activity">
+              {data!.activity.slice(0, 8).map((a) => (
+                <li key={a.id}>
+                  <span
+                    className="ops-activity-dot"
+                    style={{ background: "#38bdf8", boxShadow: "0 0 0 4px rgba(56,189,248,0.12)" }}
+                    aria-hidden
+                  />
+                  <div>
+                    <strong>
+                      {a.action} · {a.entityType}
+                    </strong>
+                    <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
+                      {a.actorName || "system"}
+                      {a.detail ? ` · ${a.detail}` : ""}
+                    </div>
+                  </div>
+                  <span style={{ color: "var(--ops-muted)", fontSize: "0.75rem" }}>
+                    {relTime(a.at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <OpsEmpty>No recent activity logged.</OpsEmpty>
+          )}
         </article>
       </section>
 
       <section className="ops-dash-bottom">
         <article className="ops-card">
           <div className="ops-card-head">
-            <h2>Business stats</h2>
-          </div>
-          <div className="ops-stat-list">
-            <div>
-              <strong>{data?.sales.orderCountAll ?? "—"}</strong>
-              <span>Paid orders</span>
-            </div>
-            <div>
-              <strong>{data ? money(data.sales.averageOrder) : "—"}</strong>
-              <span>Avg (range)</span>
-            </div>
-            <div>
-              <strong>{data?.inventory.activeCount ?? "—"}</strong>
-              <span>Active products</span>
-            </div>
-            <div>
-              <strong>{data?.customers.accountCount ?? "—"}</strong>
-              <span>Customers</span>
-            </div>
-            <div>
-              <strong>{data?.inventory.lowStockCount ?? "—"}</strong>
-              <span>Low stock</span>
-            </div>
-            <div>
-              <strong>{data?.memberships.activeCount ?? "—"}</strong>
-              <span>Active members</span>
-            </div>
+            <h2>Inventory alerts</h2>
+            <IconInventory aria-hidden />
           </div>
           {(data?.inventory.alerts?.length || 0) > 0 ? (
-            <ul className="ops-activity" style={{ marginTop: "0.75rem" }}>
+            <ul className="ops-activity">
               {data!.inventory.alerts.map((a) => (
                 <li key={a.id}>
+                  <span
+                    className="ops-activity-dot"
+                    style={{
+                      background: a.kind === "out" ? "#e10600" : "#fbbf24",
+                      boxShadow:
+                        a.kind === "out"
+                          ? "0 0 0 4px rgba(225,6,0,0.12)"
+                          : "0 0 0 4px rgba(251,191,36,0.12)",
+                    }}
+                    aria-hidden
+                  />
                   <div>
                     <strong>{a.name}</strong>
                     <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
@@ -463,63 +520,81 @@ export default function OpsDashboardPage() {
               ))}
             </ul>
           ) : (
-            <p className="ops-note">No inventory alerts right now.</p>
+            <OpsEmpty>No inventory alerts right now.</OpsEmpty>
           )}
+          <p className="ops-note">
+            {data?.inventory.activeCount ?? 0} active ·{" "}
+            {data?.inventory.lowStockCount ?? 0} low ·{" "}
+            {data?.inventory.outOfStockCount ?? 0} out
+          </p>
         </article>
 
         <article className="ops-card">
           <div className="ops-card-head">
-            <h2>Recent orders</h2>
-            <Link href="/ops/orders" className="ops-ghost-btn">
-              View all
-            </Link>
+            <h2>Membership alerts</h2>
+            <IconMemberships aria-hidden />
           </div>
-          {loading ? (
-            <p className="ops-note">Loading…</p>
-          ) : !data?.recentOrders?.length ? (
-            <p className="ops-note">No paid orders yet.</p>
-          ) : (
-            <ul className="ops-activity">
-              {data.recentOrders.map((o) => (
-                <li key={o.id}>
-                  <div>
-                    <strong>
-                      Order {o.id.slice(0, 8)} · {money(o.total)}
-                    </strong>
-                    <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
-                      {o.username || o.email} · {relTime(o.createdAt)}
-                    </div>
-                  </div>
-                  <span className={statusBadge(o.status)}>{o.status}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="ops-stat-list">
+            <div>
+              <strong>{data?.memberships.activeCount ?? 0}</strong>
+              <span>Active</span>
+            </div>
+            <div>
+              <strong>{data?.memberships.totalCount ?? 0}</strong>
+              <span>Total</span>
+            </div>
+          </div>
+          <p className="ops-note">
+            {money(data?.memberships.revenueCollected ?? 0)} collected from paid
+            memberships. Renewals and cancellations are managed on the
+            Memberships page.
+          </p>
+          <Link href="/ops/memberships" className="ops-action" style={{ marginTop: "0.75rem" }}>
+            Open memberships
+          </Link>
         </article>
 
         <article className="ops-card">
           <div className="ops-card-head">
-            <h2>Upcoming & system</h2>
+            <h2>Google Sheets backup</h2>
+            <IconBackups aria-hidden />
           </div>
-          {(data?.coaching.upcomingBookings?.length || 0) > 0 ? (
-            <ul className="ops-activity">
-              {data!.coaching.upcomingBookings.map((b) => (
-                <li key={b.id}>
-                  <div>
-                    <strong>{b.title}</strong>
-                    <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
-                      {b.date} {b.startTime} · {b.customerName} · {b.coachName}
-                    </div>
-                  </div>
-                  <span className="ops-badge ops-badge-blue">Lesson</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="ops-note">{data?.coaching.note}</p>
-          )}
-          <ul className="ops-activity" style={{ marginTop: "0.5rem" }}>
+          <p style={{ margin: 0, fontSize: "0.92rem" }}>
+            <span
+              className={
+                data?.system.googleSheetsConnected
+                  ? "ops-badge ops-badge-green"
+                  : "ops-badge ops-badge-gray"
+              }
+            >
+              {data?.system.googleSheetsConnected ? "Connected" : "Not connected"}
+            </span>
+          </p>
+          <p className="ops-note">{data?.system.googleSheetsNote}</p>
+          {data?.system.lastBackupAt ? (
+            <p className="ops-note">Last backup {relTime(data.system.lastBackupAt)}</p>
+          ) : null}
+          <Link href="/ops/backups" className="ops-action" style={{ marginTop: "0.75rem" }}>
+            Backup settings
+          </Link>
+        </article>
+
+        <article className="ops-card">
+          <div className="ops-card-head">
+            <h2>System health</h2>
+          </div>
+          <ul className="ops-activity">
             <li>
+              <span
+                className="ops-activity-dot"
+                style={{
+                  background: data?.system.durableWriteConfigured ? "#22c55e" : "#fbbf24",
+                  boxShadow: data?.system.durableWriteConfigured
+                    ? "0 0 0 4px rgba(34,197,94,0.12)"
+                    : "0 0 0 4px rgba(251,191,36,0.12)",
+                }}
+                aria-hidden
+              />
               <div>
                 <strong>Durable store</strong>
                 <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
@@ -537,45 +612,41 @@ export default function OpsDashboardPage() {
               </span>
             </li>
             <li>
+              <span
+                className="ops-activity-dot"
+                style={{
+                  background: data?.system.shopifyCheckoutReady ? "#22c55e" : "#38bdf8",
+                  boxShadow: "0 0 0 4px rgba(56,189,248,0.12)",
+                }}
+                aria-hidden
+              />
               <div>
-                <strong>Google Sheets backup</strong>
+                <strong>Shopify checkout</strong>
                 <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
-                  {data?.system.googleSheetsNote}
+                  {data?.system.shopifyCheckoutReady
+                    ? "Ready for paid checkouts"
+                    : "Needs connection"}
                 </div>
               </div>
               <span
                 className={
-                  data?.system.googleSheetsConnected
+                  data?.system.shopifyCheckoutReady
                     ? "ops-badge ops-badge-green"
-                    : "ops-badge ops-badge-gray"
+                    : "ops-badge ops-badge-blue"
                 }
               >
-                {data?.system.googleSheetsConnected ? "On" : "Later"}
+                {data?.system.shopifyCheckoutReady ? "Ready" : "Setup"}
               </span>
             </li>
           </ul>
-          {(data?.activity?.length || 0) > 0 ? (
-            <>
-              <p className="ops-kpi-label" style={{ marginTop: "0.75rem" }}>
-                Recent activity
-              </p>
-              <ul className="ops-activity">
-                {data!.activity.slice(0, 5).map((a) => (
-                  <li key={a.id}>
-                    <div>
-                      <strong>
-                        {a.action} · {a.entityType}
-                      </strong>
-                      <div style={{ color: "var(--ops-muted)", fontSize: "0.8rem" }}>
-                        {a.actorName || "system"} · {a.detail || ""} ·{" "}
-                        {relTime(a.at)}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
+          <div className="ops-actions-grid" style={{ marginTop: "0.5rem" }}>
+            <Link className="ops-action" href="/ops/backups">
+              Backups
+            </Link>
+            <Link className="ops-action" href="/ops/integrations">
+              Integrations
+            </Link>
+          </div>
         </article>
       </section>
     </div>

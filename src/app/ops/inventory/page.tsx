@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ProductPrice } from "@/components/ProductPrice";
+import { OpsPageHeader, OpsStatCard } from "@/components/ops/OpsUi";
 import { saveLocalInventory } from "@/lib/inventory-client";
 import type { Product } from "@/lib/types";
 import { summarizeBallInventory } from "@/lib/inventory-stats";
@@ -332,47 +333,51 @@ export default function OpsInventoryPage() {
   if (loading) return <p className="text-mist">Loading inventory…</p>;
 
   return (
-    <div>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="display text-4xl">Inventory</h2>
-          <p className="mt-1 max-w-2xl text-sm text-mist">
-            Website prices & stock are the source of truth. Search SKU/UPC, set
-            cost and selling price, then save — Shopify only takes payment. Paid
-            orders automatically decrement stock and write adjustment history.
-          </p>
-          <p className="mt-2 text-sm text-mist">
-            Valuation at cost:{" "}
-            <strong className="text-chalk">
-              ${valuation.atCost.toLocaleString()}
-            </strong>
-            {" · "}at sell price:{" "}
-            <strong className="text-chalk">
-              ${valuation.atPrice.toLocaleString()}
-            </strong>
-            {" · "}potential profit:{" "}
-            <strong className="text-chalk">
-              ${valuation.profitIfSold.toLocaleString()}
-            </strong>
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full border border-white/15 px-3 py-1.5 text-mist">
-            {products.length} items
-          </span>
-          <span className="rounded-full border border-white/15 px-3 py-1.5 text-mist">
-            {ballSummary.totalBalls} balls in stock
-          </span>
-          {needsPriceCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setOnlyNeedsPrice((v) => !v)}
-              className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-amber-100"
-            >
-              {needsPriceCount} need price
-            </button>
-          )}
-        </div>
+    <div className="ops-dash-grid">
+      <OpsPageHeader
+        title="Inventory"
+        description="Website prices & stock are the source of truth. Search SKU/UPC, set cost and selling price, then save — Shopify only takes payment. Paid orders automatically decrement stock and write adjustment history."
+        actions={
+          <>
+            <span className="ops-filter-chip">{products.length} items</span>
+            <span className="ops-filter-chip">
+              {ballSummary.totalBalls} balls in stock
+            </span>
+            {needsPriceCount > 0 ? (
+              <button
+                type="button"
+                className={`ops-filter-chip ${onlyNeedsPrice ? "active" : ""}`}
+                onClick={() => setOnlyNeedsPrice((v) => !v)}
+              >
+                {needsPriceCount} need price
+              </button>
+            ) : null}
+          </>
+        }
+      />
+
+      <div className="ops-kpi-row">
+        <OpsStatCard
+          tone="red"
+          label="Valuation at cost"
+          value={`$${valuation.atCost.toLocaleString()}`}
+        />
+        <OpsStatCard
+          tone="blue"
+          label="At sell price"
+          value={`$${valuation.atPrice.toLocaleString()}`}
+        />
+        <OpsStatCard
+          tone="green"
+          label="Potential profit"
+          value={`$${valuation.profitIfSold.toLocaleString()}`}
+        />
+        <OpsStatCard
+          tone="amber"
+          label="Ball units"
+          value={String(ballSummary.totalBalls)}
+          meta={`${products.filter((p) => p.active).length} active SKUs`}
+        />
       </div>
 
       {persistWarning ? (

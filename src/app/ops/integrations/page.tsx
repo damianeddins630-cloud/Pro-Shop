@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { OpsPageHeader } from "@/components/ops/OpsUi";
 
 export default function OpsIntegrationsPage() {
   const [shopify, setShopify] = useState<{
@@ -31,15 +32,10 @@ export default function OpsIntegrationsPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-          Integrations
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          Connected services for checkout and backups. Never paste private keys
-          into frontend forms that store secrets in git — use Vercel env vars.
-        </p>
-      </div>
+      <OpsPageHeader
+        title="Integrations"
+        description="Connected services for checkout and backups. Never paste private keys into frontend forms — use Vercel env vars."
+      />
 
       <div className="ops-hub-grid">
         <Link href="/ops/shopify" className="ops-hub-card">

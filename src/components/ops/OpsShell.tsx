@@ -1,17 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { BrandedPageBackdrop } from "@/components/BrandedPageBackdrop";
-import { OpsLogo } from "@/components/ops/OpsLogo";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  IconAdmin,
+  IconBackups,
+  IconBell,
+  IconChevron,
+  IconCoaching,
+  IconCustomers,
+  IconDashboard,
+  IconFinances,
+  IconIntegrations,
+  IconInventory,
+  IconMarketing,
+  IconMemberships,
+  IconMenu,
+  IconOrders,
+  IconReports,
+  IconSearch,
+} from "@/components/ops/OpsIcons";
 import { useEditMode } from "@/lib/edit-mode";
 import type { Permission } from "@/lib/types";
 
 type NavItem = {
   href: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
   perms: Permission[];
   match?: (path: string) => boolean;
 };
@@ -25,12 +48,12 @@ type NavGroup = {
 const GROUPS: NavGroup[] = [
   {
     id: "overview",
-    label: "Overview",
+    label: "Main",
     items: [
       {
         href: "/ops",
         label: "Dashboard",
-        icon: "▣",
+        icon: <IconDashboard />,
         perms: [],
         match: (p) => p === "/ops" || p === "/ops/",
       },
@@ -38,19 +61,19 @@ const GROUPS: NavGroup[] = [
   },
   {
     id: "sales",
-    label: "Sales",
+    label: "Commerce",
     items: [
       {
         href: "/ops/orders",
         label: "Sales & Orders",
-        icon: "◎",
+        icon: <IconOrders />,
         perms: ["view_orders", "manage_orders"],
         match: (p) => p.startsWith("/ops/orders"),
       },
       {
         href: "/ops/inventory",
         label: "Inventory",
-        icon: "▤",
+        icon: <IconInventory />,
         perms: ["manage_inventory", "edit_pages"],
         match: (p) => p.startsWith("/ops/inventory"),
       },
@@ -63,21 +86,21 @@ const GROUPS: NavGroup[] = [
       {
         href: "/ops/coaching",
         label: "Coaching",
-        icon: "◈",
+        icon: <IconCoaching />,
         perms: ["manage_coaches", "view_dashboard"],
         match: (p) => p.startsWith("/ops/coaching"),
       },
       {
         href: "/ops/memberships",
         label: "Memberships",
-        icon: "◇",
+        icon: <IconMemberships />,
         perms: ["manage_memberships", "manage_users", "view_dashboard"],
         match: (p) => p.startsWith("/ops/memberships"),
       },
       {
         href: "/ops/customers",
         label: "Customers",
-        icon: "◉",
+        icon: <IconCustomers />,
         perms: [
           "manage_customers",
           "manage_users",
@@ -95,7 +118,7 @@ const GROUPS: NavGroup[] = [
       {
         href: "/ops/finances",
         label: "Finances",
-        icon: "⬡",
+        icon: <IconFinances />,
         perms: [
           "view_finances",
           "manage_finances",
@@ -105,9 +128,16 @@ const GROUPS: NavGroup[] = [
         match: (p) => p.startsWith("/ops/finances"),
       },
       {
+        href: "/ops/reports",
+        label: "Reports",
+        icon: <IconReports />,
+        perms: ["view_orders", "manage_orders", "manage_inventory"],
+        match: (p) => p.startsWith("/ops/reports"),
+      },
+      {
         href: "/ops/marketing",
         label: "Marketing",
-        icon: "✦",
+        icon: <IconMarketing />,
         perms: [
           "manage_deals",
           "manage_sponsors",
@@ -121,13 +151,6 @@ const GROUPS: NavGroup[] = [
           p.startsWith("/ops/sponsors") ||
           p.startsWith("/ops/subscribers"),
       },
-      {
-        href: "/ops/reports",
-        label: "Reports & Analytics",
-        icon: "▦",
-        perms: ["view_orders", "manage_orders", "manage_inventory"],
-        match: (p) => p.startsWith("/ops/reports"),
-      },
     ],
   },
   {
@@ -136,8 +159,8 @@ const GROUPS: NavGroup[] = [
     items: [
       {
         href: "/ops/backups",
-        label: "Backups & System",
-        icon: "↻",
+        label: "Backups",
+        icon: <IconBackups />,
         perms: [
           "manage_backups",
           "manage_roles",
@@ -150,7 +173,7 @@ const GROUPS: NavGroup[] = [
       {
         href: "/ops/integrations",
         label: "Integrations",
-        icon: "☍",
+        icon: <IconIntegrations />,
         perms: [
           "manage_settings",
           "manage_roles",
@@ -163,7 +186,7 @@ const GROUPS: NavGroup[] = [
       {
         href: "/ops/admin",
         label: "Administration",
-        icon: "⚙",
+        icon: <IconAdmin />,
         perms: ["manage_roles", "manage_users", "manage_settings"],
         match: (p) =>
           p.startsWith("/ops/admin") ||
@@ -189,11 +212,21 @@ type HealthSnap = {
 
 export function OpsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading, can } = useEditMode();
   const [health, setHealth] = useState<HealthSnap | null>(null);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    overview: true,
+    sales: true,
+    people: true,
+    business: true,
+    system: true,
+  });
 
   const allowed =
     can("view_dashboard") ||
@@ -238,6 +271,7 @@ export function OpsShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setMobileOpen(false);
+    setNotifyOpen(false);
   }, [pathname]);
 
   async function runSelfTest() {
@@ -263,34 +297,74 @@ export function OpsShell({ children }: { children: ReactNode }) {
     }
   }
 
+  const notifications = useMemo(() => {
+    const items: { id: string; title: string; detail: string; href: string }[] =
+      [];
+    if (health?.warning) {
+      items.push({
+        id: "durable",
+        title: "Durable storage",
+        detail: health.warning,
+        href: "/ops/backups",
+      });
+    }
+    if (!health?.shopifyReady) {
+      items.push({
+        id: "shopify",
+        title: "Shopify checkout",
+        detail: "Connect Shopify under Integrations to take live payments.",
+        href: "/ops/integrations",
+      });
+    }
+    if (!health?.durableOk) {
+      items.push({
+        id: "persist",
+        title: "System health",
+        detail: "Primary storage is not fully online yet.",
+        href: "/ops/backups",
+      });
+    }
+    return items;
+  }, [health]);
+
   if (loading) {
     return (
-      <BrandedPageBackdrop tone="ops">
-        <div className="flex items-center gap-4">
-          <OpsLogo size="sm" />
-          <p className="text-mist">Loading Operations…</p>
+      <div className="ops-gate">
+        <div className="ops-gate-card">
+          <div className="ops-gate-logo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/ops-logo.png" alt="" width={48} height={48} />
+          </div>
+          <p>Loading Operations Center…</p>
         </div>
-      </BrandedPageBackdrop>
+      </div>
     );
   }
 
   if (!user || !allowed) {
     return (
-      <BrandedPageBackdrop tone="ops">
-        <div className="mx-auto max-w-lg py-10 text-center">
-          <OpsLogo size="lg" className="mx-auto" />
-          <p className="mt-6 text-sm tracking-[0.2em] text-red uppercase">
-            Operations
+      <div className="ops-gate">
+        <div className="ops-gate-card">
+          <div className="ops-gate-logo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/ops-logo.png"
+              alt="Ballard's Bowling Academy"
+              width={56}
+              height={56}
+            />
+          </div>
+          <p className="ops-gate-kicker">Operations Center</p>
+          <h1>Access required</h1>
+          <p className="ops-gate-copy">
+            Sign in with an operations account to manage Ballard&apos;s business
+            systems.
           </p>
-          <h1 className="display mt-2 text-5xl">Access required</h1>
-          <p className="mt-4 text-mist">
-            Log in with an operations account to continue.
-          </p>
-          <Link href="/login?next=/ops" className="btn btn-primary mt-6">
+          <Link href="/login?next=/ops" className="ops-primary-btn">
             Login
           </Link>
         </div>
-      </BrandedPageBackdrop>
+      </div>
     );
   }
 
@@ -299,91 +373,117 @@ export function OpsShell({ children }: { children: ReactNode }) {
     items: group.items.filter((item) => canSee(user.permissions, item.perms)),
   })).filter((group) => group.items.length > 0);
 
-  const activeLabel =
+  const activeItem =
     visibleGroups
       .flatMap((g) => g.items)
       .find((item) =>
         item.match ? item.match(pathname) : pathname.startsWith(item.href)
-      )?.label || "Operations";
+      ) || null;
+  const activeLabel = activeItem?.label || "Operations";
+
+  const searchHits = search.trim()
+    ? visibleGroups
+        .flatMap((g) => g.items)
+        .filter((item) =>
+          item.label.toLowerCase().includes(search.trim().toLowerCase())
+        )
+        .slice(0, 6)
+    : [];
+
+  function toggleGroup(id: string) {
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function onSearchSubmit(e: FormEvent) {
+    e.preventDefault();
+    const q = search.trim();
+    if (!q) return;
+    if (searchHits[0]) {
+      router.push(searchHits[0].href);
+      setSearch("");
+      return;
+    }
+    router.push(`/ops/customers`);
+    setSearch("");
+  }
 
   return (
     <div className="ops-shell">
       <aside className={`ops-sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="ops-brand">
-          <Link href="/" className="ops-brand-mark" aria-label="Ballard's home">
+          <Link href="/ops" className="ops-brand-mark" aria-label="Dashboard">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/ops-logo.png" alt="" width={44} height={44} />
+            <img src="/images/ops-logo.png" alt="" width={40} height={40} />
           </Link>
           <div>
-            <p className="ops-brand-kicker">Ballard&apos;s Bowling Academy</p>
-            <p className="ops-brand-title">Operations Center</p>
+            <p className="ops-brand-kicker">Ballard&apos;s Academy</p>
+            <p className="ops-brand-title">Operations</p>
           </div>
         </div>
 
         <nav className="ops-nav" aria-label="Operations">
-          {visibleGroups.map((group) => (
-            <div key={group.id} className="ops-nav-group">
-              <p className="ops-nav-group-label">{group.label}</p>
-              <ul>
-                {group.items.map((item) => {
-                  const active = item.match
-                    ? item.match(pathname)
-                    : pathname.startsWith(item.href);
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={`ops-nav-link ${active ? "active" : ""}`}
-                      >
-                        <span className="ops-nav-icon" aria-hidden>
-                          {item.icon}
-                        </span>
-                        {item.label}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+          {visibleGroups.map((group) => {
+            const open = openGroups[group.id] !== false;
+            return (
+              <div key={group.id} className="ops-nav-group">
+                <button
+                  type="button"
+                  className="ops-nav-group-toggle"
+                  onClick={() => toggleGroup(group.id)}
+                  aria-expanded={open}
+                >
+                  <span>{group.label}</span>
+                  <IconChevron
+                    className={`ops-nav-chevron ${open ? "open" : ""}`}
+                  />
+                </button>
+                {open ? (
+                  <ul>
+                    {group.items.map((item) => {
+                      const active = item.match
+                        ? item.match(pathname)
+                        : pathname.startsWith(item.href);
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            className={`ops-nav-link ${active ? "active" : ""}`}
+                          >
+                            <span className="ops-nav-icon" aria-hidden>
+                              {item.icon}
+                            </span>
+                            <span>{item.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="ops-sidebar-foot">
-          <div className="ops-status-chip">
-            <span
-              className="ops-status-dot"
-              style={{
-                background: health?.durableOk ? "#22c55e" : "#eab308",
-                boxShadow: health?.durableOk
-                  ? "0 0 0 4px rgba(34, 197, 94, 0.15)"
-                  : "0 0 0 4px rgba(234, 179, 8, 0.15)",
-              }}
-              aria-hidden
-            />
-            <div>
-              <strong>
-                {health?.durableOk ? "Systems online" : "Setup needed"}
-              </strong>
-              <span>
-                {health?.productCount != null
-                  ? `${health.productCount} products`
-                  : "Checking store…"}
-                {health?.shopifyReady ? " · Checkout ready" : " · Shopify setup"}
-              </span>
-            </div>
-          </div>
+          <Link href="/ops/orders" className="ops-sidebar-cta">
+            + New sale
+          </Link>
           <div className="ops-user-chip">
             <div className="ops-user-avatar" aria-hidden>
               {(user.username || "A").slice(0, 1).toUpperCase()}
             </div>
             <div>
               <strong>{user.username}</strong>
-              <span>{user.roleName || "staff"}</span>
+              <span>{user.roleName || "Staff"}</span>
             </div>
           </div>
           <div className="ops-sidebar-actions">
-            <Link href="/">← Storefront</Link>
-            <button type="button" onClick={() => void runSelfTest()} disabled={testing}>
+            <Link href="/">Storefront</Link>
+            <button
+              type="button"
+              onClick={() => void runSelfTest()}
+              disabled={testing}
+            >
               {testing ? "Testing…" : "Test save"}
             </button>
           </div>
@@ -407,28 +507,95 @@ export function OpsShell({ children }: { children: ReactNode }) {
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
           >
-            ☰
+            <IconMenu />
           </button>
-          <div className="ops-topbar-copy">
-            <p className="ops-crumb">Operations Center · {activeLabel}</p>
-            <h1>OPERATIONS CENTER</h1>
-            <p className="ops-subtitle">
-              Ballard&apos;s Bowling Academy business command center — paid sales,
-              inventory, and system health.
+
+          <div className="ops-topbar-title">
+            <p className="ops-crumb">
+              Operations <span>/</span> {activeLabel}
             </p>
+            <h1>{activeLabel}</h1>
           </div>
+
+          <form className="ops-search" onSubmit={onSearchSubmit} role="search">
+            <IconSearch aria-hidden />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search pages… (Enter)"
+              aria-label="Search operations"
+            />
+            {searchHits.length > 0 ? (
+              <div className="ops-search-menu">
+                {searchHits.map((hit) => (
+                  <button
+                    key={hit.href}
+                    type="button"
+                    onClick={() => {
+                      router.push(hit.href);
+                      setSearch("");
+                    }}
+                  >
+                    {hit.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </form>
+
           <div className="ops-topbar-actions">
-            <Link href="/shop" className="ops-ghost-btn">
-              View shop
-            </Link>
+            <div className="ops-notify-wrap">
+              <button
+                type="button"
+                className="ops-icon-btn"
+                aria-label="Notifications"
+                onClick={() => setNotifyOpen((v) => !v)}
+              >
+                <IconBell />
+                {notifications.length > 0 ? (
+                  <span className="ops-notify-dot">{notifications.length}</span>
+                ) : null}
+              </button>
+              {notifyOpen ? (
+                <div className="ops-notify-menu">
+                  <p className="ops-notify-title">Alerts</p>
+                  {notifications.length === 0 ? (
+                    <p className="ops-empty">No system alerts.</p>
+                  ) : (
+                    notifications.map((n) => (
+                      <Link
+                        key={n.id}
+                        href={n.href}
+                        className="ops-notify-item"
+                        onClick={() => setNotifyOpen(false)}
+                      >
+                        <strong>{n.title}</strong>
+                        <span>{n.detail}</span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="ops-top-user">
+              <div className="ops-user-avatar" aria-hidden>
+                {(user.username || "A").slice(0, 1).toUpperCase()}
+              </div>
+              <div className="ops-top-user-copy">
+                <strong>{user.username}</strong>
+                <span>{user.roleName || "Staff"}</span>
+              </div>
+            </div>
+
             <Link href="/ops/orders" className="ops-primary-btn">
-              Sales & Orders
+              + Quick action
             </Link>
           </div>
         </header>
 
         {(health?.warning || testMsg) && (
-          <div className="ops-content" style={{ paddingBottom: 0 }}>
+          <div className="ops-banner-stack">
             {health?.warning ? (
               <p className="ops-stage-banner" role="status">
                 {health.warning}

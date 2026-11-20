@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { OpsPageHeader, OpsStatCard } from "@/components/ops/OpsUi";
 import type { Expense, ExpenseCategory } from "@/lib/types";
 
 function money(n: number) {
@@ -92,15 +93,15 @@ export default function OpsFinancesPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-          Finances
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          Collected revenue (paid only) stays separate from expenses and net
-          profit. Unpaid drafts never count as money collected.
-        </p>
-      </div>
+      <OpsPageHeader
+        title="Finances"
+        description="Collected revenue (paid only) stays separate from expenses and net profit. Unpaid drafts never count as money collected."
+        actions={
+          <Link href="/ops/reports" className="ops-ghost-btn">
+            Open reports
+          </Link>
+        }
+      />
 
       {error ? (
         <div className="ops-stage-banner" role="alert">
@@ -109,26 +110,27 @@ export default function OpsFinancesPage() {
       ) : null}
 
       <section className="ops-kpi-row">
-        <article className="ops-card ops-card-red">
-          <p className="ops-kpi-label">Shop · month</p>
-          <p className="ops-kpi-value">{money(f?.shopRevenueMonth ?? 0)}</p>
-        </article>
-        <article className="ops-card ops-card-blue">
-          <p className="ops-kpi-label">Coaching collected</p>
-          <p className="ops-kpi-value">{money(f?.coachingRevenue ?? 0)}</p>
-        </article>
-        <article className="ops-card ops-card-purple">
-          <p className="ops-kpi-label">Memberships collected</p>
-          <p className="ops-kpi-value">{money(f?.membershipRevenue ?? 0)}</p>
-        </article>
-        <article className="ops-card ops-card-green">
-          <p className="ops-kpi-label">Net · month</p>
-          <p className="ops-kpi-value">{money(f?.netProfitMonth ?? 0)}</p>
-          <p className="ops-kpi-meta">
-            {money(f?.totalCollectedMonth ?? 0)} collected −{" "}
-            {money(f?.expensesTotal ?? 0)} expenses
-          </p>
-        </article>
+        <OpsStatCard
+          tone="red"
+          label="Shop · month"
+          value={money(f?.shopRevenueMonth ?? 0)}
+        />
+        <OpsStatCard
+          tone="blue"
+          label="Coaching collected"
+          value={money(f?.coachingRevenue ?? 0)}
+        />
+        <OpsStatCard
+          tone="purple"
+          label="Memberships collected"
+          value={money(f?.membershipRevenue ?? 0)}
+        />
+        <OpsStatCard
+          tone="green"
+          label="Net · month"
+          value={money(f?.netProfitMonth ?? 0)}
+          meta={`${money(f?.totalCollectedMonth ?? 0)} collected − ${money(f?.expensesTotal ?? 0)} expenses`}
+        />
       </section>
 
       <section className="ops-kpi-row">

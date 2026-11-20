@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { OpsPageHeader } from "@/components/ops/OpsUi";
 import type {
   BillingFrequency,
   Membership,
@@ -97,15 +98,10 @@ export default function OpsMembershipsPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-          Membership Management
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          Track renewals and payment status. Collected (paid only):{" "}
-          {money(collected)} · Active: {active}
-        </p>
-      </div>
+      <OpsPageHeader
+        title="Memberships"
+        description={`Track renewals and payment status. Collected (paid only): ${money(collected)} · Active: ${active}`}
+      />
 
       {error ? (
         <div className="ops-stage-banner" role="alert">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { OpsPageHeader, OpsStatCard } from "@/components/ops/OpsUi";
 
 type Attempt = {
   id: string;
@@ -87,16 +88,15 @@ export default function OpsBackupsPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-          Backups & System
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          Durable store is the source of truth. Google Sheets is a secondary
-          backup. “Connected” only appears after a live Google API verification
-          or successful sync — never from saving an ID alone.
-        </p>
-      </div>
+      <OpsPageHeader
+        title="Backups"
+        description='Durable store is the source of truth. Google Sheets is a secondary backup. “Connected” only appears after a live Google API verification or successful sync — never from saving an ID alone.'
+        actions={
+          <Link href="/ops/integrations" className="ops-ghost-btn">
+            Integrations
+          </Link>
+        }
+      />
 
       {error ? (
         <div className="ops-stage-banner" role="alert">
@@ -116,22 +116,20 @@ export default function OpsBackupsPage() {
       ) : null}
 
       <section className="ops-kpi-row">
-        <article className="ops-card">
-          <p className="ops-kpi-label">Durable write</p>
-          <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>
-            {persist.durableWriteConfigured ? "Configured" : "Not set"}
-          </p>
-          <p className="ops-kpi-meta">{persist.lastPersistDetail || "—"}</p>
-        </article>
-        <article className="ops-card">
-          <p className="ops-kpi-label">Sheets credentials</p>
-          <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>
-            {sheets.envReady ? "Env present" : "Needs env"}
-          </p>
-          <p className="ops-kpi-meta">
-            {reallyConnected ? "API verified / synced" : "Not verified connected"}
-          </p>
-        </article>
+        <OpsStatCard
+          tone={persist.durableWriteConfigured ? "green" : "amber"}
+          label="Durable write"
+          value={persist.durableWriteConfigured ? "Configured" : "Not set"}
+          meta={persist.lastPersistDetail || "—"}
+        />
+        <OpsStatCard
+          tone={reallyConnected ? "green" : "amber"}
+          label="Sheets credentials"
+          value={sheets.envReady ? "Env present" : "Needs env"}
+          meta={
+            reallyConnected ? "API verified / synced" : "Not verified connected"
+          }
+        />
         <article className="ops-card">
           <p className="ops-kpi-label">Last backup</p>
           <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>

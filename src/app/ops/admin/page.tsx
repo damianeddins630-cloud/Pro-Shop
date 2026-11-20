@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { OpsPageHeader } from "@/components/ops/OpsUi";
 
 type Entry = {
   id: string;
@@ -49,15 +50,10 @@ export default function OpsAdminHubPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div>
-        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-          Administration
-        </h2>
-        <p className="ops-note" style={{ marginTop: 0 }}>
-          Control who can access the business system. Do not give every staff
-          member website-owner permissions.
-        </p>
-      </div>
+      <OpsPageHeader
+        title="Administration"
+        description="Control who can access the business system. Do not give every staff member website-owner permissions."
+      />
 
       <div className="ops-hub-grid">
         {links.map((item) => (

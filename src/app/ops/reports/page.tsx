@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { OpsPageHeader } from "@/components/ops/OpsUi";
 
 type Overview = {
   range: { label: string };
@@ -64,32 +65,27 @@ export default function OpsReportsPage() {
 
   return (
     <div className="ops-dash-grid">
-      <div className="ops-card-head" style={{ marginBottom: 0 }}>
-        <div>
-          <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", fontWeight: 750 }}>
-            Reports & Analytics
-          </h2>
-          <p className="ops-note" style={{ marginTop: 0 }}>
-            Every figure comes from paid orders, paid coaching/memberships, and
-            recorded expenses — not sample data.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {["today", "7d", "30d", "90d"].map((r) => (
-            <button
-              key={r}
-              type="button"
-              className={range === r ? "ops-primary-btn" : "ops-ghost-btn"}
-              onClick={() => setRange(r)}
-            >
-              {r}
-            </button>
-          ))}
-          <a className="ops-ghost-btn" href="/api/ops/sales/export">
-            Export sales CSV
-          </a>
-        </div>
-      </div>
+      <OpsPageHeader
+        title="Reports"
+        description="Every figure comes from paid orders, paid coaching/memberships, and recorded expenses — not sample data."
+        actions={
+          <>
+            {["today", "7d", "30d", "90d"].map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={range === r ? "ops-primary-btn" : "ops-ghost-btn"}
+                onClick={() => setRange(r)}
+              >
+                {r}
+              </button>
+            ))}
+            <a className="ops-ghost-btn" href="/api/ops/sales/export">
+              Export sales CSV
+            </a>
+          </>
+        }
+      />
 
       {error ? (
         <div className="ops-stage-banner" role="alert">
