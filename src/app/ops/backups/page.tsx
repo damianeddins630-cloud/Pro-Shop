@@ -19,8 +19,9 @@ export default function OpsBackupsPage() {
     spreadsheetId?: string;
     spreadsheetName?: string;
     envReady?: boolean;
+    lastBackupOk?: boolean;
+    lastBackupAt?: string;
     lastBackupDetail?: string;
-    serviceAccountEmail?: string;
   }>({});
   const [persist, setPersist] = useState<{
     durableWriteConfigured?: boolean;
@@ -52,48 +53,37 @@ export default function OpsBackupsPage() {
     void load();
   }, [load]);
 
-  async function saveConfig(e: FormEvent) {
-    e.preventDefault();
+  async function post(body: Record<string, unknown>) {
     setBusy(true);
     setMessage("");
+    setError("");
     const res = await fetch("/api/ops/backups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "save_sheets_config",
-        spreadsheetId,
-        spreadsheetName:
-          "Ballard's Bowling Academy — Business Management & Backup",
-        connected: Boolean(spreadsheetId.trim()),
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setError(data.error || "Save failed");
-      return;
-    }
-    setMessage("Sheets spreadsheet ID saved. Durable store remains source of truth.");
-    await load();
-  }
-
-  async function runAction(action: string) {
-    setBusy(true);
-    setMessage("");
-    const res = await fetch("/api/ops/backups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok) {
       setError(data.error || "Action failed");
-      return;
+      return data;
     }
-    setMessage(data.message || data.attempt?.detail || "Done");
+    setMessage(data.message || data.result?.detail || data.verified?.detail || "Done");
     await load();
+    return data;
   }
+
+  async function saveConfig(e: FormEvent) {
+    e.preventDefault();
+    await post({
+      action: "save_sheets_config",
+      spreadsheetId,
+      spreadsheetName:
+        "Ballard's Bowling Academy — Business Management & Backup",
+    });
+  }
+
+  const reallyConnected = Boolean(sheets.connected);
 
   return (
     <div className="ops-dash-grid">
@@ -102,9 +92,9 @@ export default function OpsBackupsPage() {
           Backups & System
         </h2>
         <p className="ops-note" style={{ marginTop: 0 }}>
-          Protect business information. The durable store is the source of truth.
-          Google Sheets is a secondary backup — if Sheets is down, the site keeps
-          working and queues retry jobs.
+          Durable store is the source of truth. Google Sheets is a secondary
+          backup. “Connected” only appears after a live Google API verification
+          or successful sync — never from saving an ID alone.
         </p>
       </div>
 
@@ -120,8 +110,8 @@ export default function OpsBackupsPage() {
       ) : null}
       {!persist.durableWriteConfigured ? (
         <div className="ops-stage-banner" role="status">
-          Durable write is not configured on this environment. Set Blob / Redis /
-          GitHub token in Vercel before trusting production records.
+          Durable write is not configured. Set Blob / Redis / GitHub token in
+          Vercel before trusting production records.
         </div>
       ) : null}
 
@@ -134,23 +124,27 @@ export default function OpsBackupsPage() {
           <p className="ops-kpi-meta">{persist.lastPersistDetail || "—"}</p>
         </article>
         <article className="ops-card">
-          <p className="ops-kpi-label">Sheets env</p>
+          <p className="ops-kpi-label">Sheets credentials</p>
           <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>
-            {sheets.envReady ? "Credentials present" : "Needs env"}
+            {sheets.envReady ? "Env present" : "Needs env"}
           </p>
           <p className="ops-kpi-meta">
-            {sheets.connected ? "Spreadsheet linked" : "No spreadsheet ID yet"}
+            {reallyConnected ? "API verified / synced" : "Not verified connected"}
           </p>
         </article>
         <article className="ops-card">
-          <p className="ops-kpi-label">Last attempt</p>
+          <p className="ops-kpi-label">Last backup</p>
           <p className="ops-kpi-value" style={{ fontSize: "1.1rem" }}>
-            {attempts[0]?.status || "None"}
+            {sheets.lastBackupOk
+              ? "Success"
+              : attempts[0]?.status || "None"}
           </p>
           <p className="ops-kpi-meta">
-            {attempts[0]
-              ? new Date(attempts[0].at).toLocaleString()
-              : "No backups yet"}
+            {sheets.lastBackupAt
+              ? new Date(sheets.lastBackupAt).toLocaleString()
+              : attempts[0]
+                ? new Date(attempts[0].at).toLocaleString()
+                : "—"}
           </p>
         </article>
         <article className="ops-card">
@@ -160,15 +154,23 @@ export default function OpsBackupsPage() {
               type="button"
               className="ops-primary-btn"
               disabled={busy}
-              onClick={() => void runAction("manual_backup")}
+              onClick={() => void post({ action: "manual_backup" })}
             >
-              Run backup / queue
+              Run Sheets backup
             </button>
             <button
               type="button"
               className="ops-ghost-btn"
               disabled={busy}
-              onClick={() => void runAction("self_test")}
+              onClick={() => void post({ action: "retry_queued" })}
+            >
+              Retry queued
+            </button>
+            <button
+              type="button"
+              className="ops-ghost-btn"
+              disabled={busy}
+              onClick={() => void post({ action: "self_test" })}
             >
               Durable self-test
             </button>
@@ -182,22 +184,20 @@ export default function OpsBackupsPage() {
             <h2>Google Sheets connection</h2>
             <span
               className={
-                sheets.connected
+                reallyConnected
                   ? "ops-badge ops-badge-green"
                   : "ops-badge ops-badge-gray"
               }
             >
-              {sheets.connected ? "Linked" : "Not linked"}
+              {reallyConnected ? "Connected" : "Not connected"}
             </span>
           </div>
           <p className="ops-note">
-            Spreadsheet name:{" "}
+            Spreadsheet:{" "}
             <strong>
               Ballard&apos;s Bowling Academy — Business Management & Backup
             </strong>
-            . Tabs: Dashboard, Sales, Orders, Coaching, Memberships, Customers,
-            Expenses, Inventory, Refunds, Backup Log. Put service-account
-            credentials in Vercel env — not in git.
+            . Saving an ID verifies live API access when credentials exist.
           </p>
           <label className="ops-note" style={{ display: "block", marginTop: 12 }}>
             Spreadsheet ID
@@ -209,14 +209,26 @@ export default function OpsBackupsPage() {
               style={{ display: "block", width: "100%", marginTop: 4 }}
             />
           </label>
-          <button
-            type="submit"
-            className="ops-primary-btn"
-            style={{ marginTop: "0.85rem" }}
-            disabled={busy}
-          >
-            Save spreadsheet ID
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: "0.85rem", flexWrap: "wrap" }}>
+            <button type="submit" className="ops-primary-btn" disabled={busy}>
+              Save & verify
+            </button>
+            <button
+              type="button"
+              className="ops-ghost-btn"
+              disabled={busy}
+              onClick={() =>
+                void post({ action: "verify", spreadsheetId })
+              }
+            >
+              Verify only
+            </button>
+          </div>
+          {sheets.lastBackupDetail ? (
+            <p className="ops-note" style={{ marginTop: 12 }}>
+              {sheets.lastBackupDetail}
+            </p>
+          ) : null}
           <ul className="ops-note" style={{ marginTop: "0.85rem", paddingLeft: "1.1rem" }}>
             {requiredEnv.map((line) => (
               <li key={line}>{line}</li>

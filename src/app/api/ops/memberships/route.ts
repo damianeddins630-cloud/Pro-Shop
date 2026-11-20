@@ -6,6 +6,7 @@ import {
   listMemberships,
   updateMembership,
 } from "@/lib/store";
+import { autoBackupBusinessRecords } from "@/lib/google-sheets";
 import {
   persistFailedResponse,
   requireDurablePersistOrLocal,
@@ -73,6 +74,10 @@ export async function POST(req: Request) {
     if (!requireDurablePersistOrLocal()) {
       return persistFailedResponse("Create membership");
     }
+    void autoBackupBusinessRecords({
+      actorName: session.username,
+      reason: "Membership created",
+    });
     return NextResponse.json(withPersistMeta({ membership: created }));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Invalid request";
@@ -103,5 +108,9 @@ export async function PUT(req: Request) {
   if (!requireDurablePersistOrLocal()) {
     return persistFailedResponse("Update membership");
   }
+  void autoBackupBusinessRecords({
+    actorName: session.username,
+    reason: "Membership updated",
+  });
   return NextResponse.json(withPersistMeta({ membership: updated }));
 }

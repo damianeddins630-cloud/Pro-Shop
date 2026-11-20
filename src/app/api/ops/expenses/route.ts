@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
 import { createExpense, deleteExpense, listExpenses } from "@/lib/store";
+import { autoBackupBusinessRecords } from "@/lib/google-sheets";
 import {
   persistFailedResponse,
   requireDurablePersistOrLocal,
@@ -55,6 +56,10 @@ export async function POST(req: Request) {
     if (!requireDurablePersistOrLocal()) {
       return persistFailedResponse("Create expense");
     }
+    void autoBackupBusinessRecords({
+      actorName: session.username,
+      reason: "Expense created",
+    });
     return NextResponse.json(withPersistMeta({ expense: created }));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Invalid request";
@@ -81,5 +86,9 @@ export async function DELETE(req: Request) {
   if (!requireDurablePersistOrLocal()) {
     return persistFailedResponse("Delete expense");
   }
+  void autoBackupBusinessRecords({
+    actorName: session.username,
+    reason: "Expense deleted",
+  });
   return NextResponse.json(withPersistMeta({ ok: true }));
 }

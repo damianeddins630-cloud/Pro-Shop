@@ -15,6 +15,7 @@ import type {
   ActivityLogEntry,
   StockAdjustment,
   BackupAttempt,
+  RefundRecord,
 } from "@/lib/types";
 import {
   githubWriteConfigured,
@@ -213,6 +214,10 @@ function mergeDurableCopies(
     backupAttempts: mergeById<BackupAttempt>(
       secondary.backupAttempts || [],
       primary.backupAttempts || []
+    ),
+    refunds: mergeById<RefundRecord>(
+      secondary.refunds || [],
+      primary.refunds || []
     ),
     googleSheetsConfig: (() => {
       const a = primary.googleSheetsConfig;

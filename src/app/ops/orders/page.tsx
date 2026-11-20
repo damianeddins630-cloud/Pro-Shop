@@ -53,12 +53,30 @@ export default function OpsOrdersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [message, setMessage] = useState("");
+  const [refunds, setRefunds] = useState<
+    {
+      id: string;
+      orderId: string;
+      amount: number;
+      reason: string;
+      status: string;
+      provider: string;
+      createdAt: string;
+    }[]
+  >([]);
+  const [refundForm, setRefundForm] = useState({
+    orderId: "",
+    amount: "",
+    reason: "",
+    restoreInventory: true,
+  });
   const canManage = can("manage_orders");
 
   const load = useCallback(async () => {
-    const [ordersRes, productsRes] = await Promise.all([
+    const [ordersRes, productsRes, refundsRes] = await Promise.all([
       fetch("/api/orders?all=1", { cache: "no-store" }),
       fetch(`/api/products?admin=1&t=${Date.now()}`, { cache: "no-store" }),
+      fetch("/api/ops/refunds", { cache: "no-store" }),
     ]);
     const ordersData = await ordersRes.json();
     const productsData = await productsRes.json().catch(() => ({}));
@@ -69,6 +87,10 @@ export default function OpsOrdersPage() {
     }
     setOrders(ordersData.orders || []);
     setProducts(productsData.products || []);
+    if (refundsRes.ok) {
+      const rj = await refundsRes.json().catch(() => ({}));
+      setRefunds(rj.refunds || []);
+    }
     setError("");
     setLoading(false);
   }, []);
@@ -209,6 +231,14 @@ export default function OpsOrdersPage() {
           <a className="btn btn-ghost text-sm" href="/api/ops/sales/export">
             Export CSV
           </a>
+          {filtered[0] ? (
+            <Link
+              href={`/ops/orders/${filtered[0].id}/receipt`}
+              className="btn btn-ghost text-sm"
+            >
+              Latest receipt
+            </Link>
+          ) : null}
           {canManage ? (
             <button
               type="button"
@@ -380,6 +410,166 @@ export default function OpsOrdersPage() {
           ))
         )}
       </div>
+
+      {canManage ? (
+        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+          <h3 className="display text-3xl">Refunds</h3>
+          <p className="mt-1 text-sm text-mist">
+            Refunds stay <strong>pending</strong> until you attest the payment
+            provider completed the refund. Collected revenue is reduced only
+            after confirmation.
+          </p>
+          <form
+            className="mt-4 grid gap-3 md:grid-cols-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void (async () => {
+                const res = await fetch("/api/ops/refunds", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "request",
+                    orderId: refundForm.orderId,
+                    amount: Number(refundForm.amount) || 0,
+                    reason: refundForm.reason,
+                    restoreInventory: refundForm.restoreInventory,
+                  }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  setError(data.error || "Refund request failed");
+                  return;
+                }
+                setMessage(data.message || "Refund requested (pending).");
+                setRefundForm({
+                  orderId: "",
+                  amount: "",
+                  reason: "",
+                  restoreInventory: true,
+                });
+                await load();
+              })();
+            }}
+          >
+            <select
+              className="field"
+              required
+              value={refundForm.orderId}
+              onChange={(e) =>
+                setRefundForm((f) => ({ ...f, orderId: e.target.value }))
+              }
+            >
+              <option value="">Select paid order…</option>
+              {orders.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.id.slice(0, 8)} · {o.username} · ${o.total}
+                </option>
+              ))}
+            </select>
+            <input
+              className="field"
+              required
+              placeholder="Amount"
+              inputMode="decimal"
+              value={refundForm.amount}
+              onChange={(e) =>
+                setRefundForm((f) => ({ ...f, amount: e.target.value }))
+              }
+            />
+            <input
+              className="field"
+              required
+              placeholder="Reason"
+              value={refundForm.reason}
+              onChange={(e) =>
+                setRefundForm((f) => ({ ...f, reason: e.target.value }))
+              }
+            />
+            <button type="submit" className="btn btn-primary">
+              Request refund
+            </button>
+          </form>
+
+          <ul className="mt-4 space-y-2 text-sm">
+            {refunds.length === 0 ? (
+              <li className="text-mist">No refunds yet.</li>
+            ) : (
+              refunds.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 py-2"
+                >
+                  <div>
+                    <strong>
+                      ${r.amount.toFixed(2)} · {r.status}
+                    </strong>
+                    <div className="text-mist">
+                      Order {r.orderId.slice(0, 8)} · {r.provider} · {r.reason}
+                    </div>
+                  </div>
+                  {r.status === "pending" ? (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-primary text-xs"
+                        onClick={() => {
+                          if (
+                            !confirm(
+                              "Confirm ONLY if the payment provider has already refunded the customer."
+                            )
+                          ) {
+                            return;
+                          }
+                          void (async () => {
+                            const res = await fetch("/api/ops/refunds", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                action: "confirm",
+                                refundId: r.id,
+                                attestedProviderConfirmed: true,
+                                restoreInventory: true,
+                              }),
+                            });
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                              setError(data.error || "Confirm failed");
+                              return;
+                            }
+                            setMessage(data.message || "Refund completed.");
+                            await load();
+                          })();
+                        }}
+                      >
+                        Confirm provider refunded
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost text-xs"
+                        onClick={() => {
+                          void (async () => {
+                            await fetch("/api/ops/refunds", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                action: "cancel",
+                                refundId: r.id,
+                              }),
+                            });
+                            await load();
+                          })();
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))
+            )}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -462,6 +652,12 @@ function OrderWorkstationCard({
               <p className="mt-1 text-xs text-steel">No phone on file</p>
             )}
             <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                href={`/ops/orders/${order.id}/receipt`}
+                className="inline-flex rounded-full border border-red/40 bg-red/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-chalk"
+              >
+                Print receipt
+              </Link>
               <span className="inline-flex rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-chalk">
                 In-store · no shipping
               </span>

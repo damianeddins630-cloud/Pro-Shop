@@ -80,6 +80,9 @@ const createSchema = z.object({
   shopifyVariantId: z.string().optional(),
   sku: z.string().optional(),
   upc: z.string().optional(),
+  cost: z.coerce.number().min(0).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
+  supplier: z.string().optional(),
   variantMeta: z
     .record(
       z.string(),
@@ -135,6 +138,9 @@ export async function POST(req: Request) {
       weightStock: body.weightStock || undefined,
       sku: body.sku,
       upc: body.upc,
+      cost: body.cost,
+      lowStockThreshold: body.lowStockThreshold,
+      supplier: body.supplier,
       variantMeta: body.variantMeta || undefined,
     });
 

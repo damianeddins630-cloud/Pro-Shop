@@ -11,6 +11,7 @@ import {
   updateCoachingBooking,
   updateCoachingPackage,
 } from "@/lib/store";
+import { autoBackupBusinessRecords } from "@/lib/google-sheets";
 import {
   persistFailedResponse,
   requireDurablePersistOrLocal,
@@ -91,6 +92,10 @@ export async function POST(req: Request) {
       if (!requireDurablePersistOrLocal()) {
         return persistFailedResponse("Create coaching package");
       }
+      void autoBackupBusinessRecords({
+        actorName: session.username,
+        reason: "Coaching package created",
+      });
       return NextResponse.json(withPersistMeta({ package: created }));
     }
     const parsed = bookingSchema.parse(body);
@@ -110,6 +115,10 @@ export async function POST(req: Request) {
     if (!requireDurablePersistOrLocal()) {
       return persistFailedResponse("Create coaching booking");
     }
+    void autoBackupBusinessRecords({
+      actorName: session.username,
+      reason: "Coaching booking created",
+    });
     return NextResponse.json(withPersistMeta({ booking: created }));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Invalid request";
@@ -139,6 +148,10 @@ export async function PUT(req: Request) {
       if (!requireDurablePersistOrLocal()) {
         return persistFailedResponse("Update coaching package");
       }
+      void autoBackupBusinessRecords({
+        actorName: session.username,
+        reason: "Coaching package updated",
+      });
       return NextResponse.json(withPersistMeta({ package: updated }));
     }
     const updated = await updateCoachingBooking(id, body, {
@@ -151,6 +164,10 @@ export async function PUT(req: Request) {
     if (!requireDurablePersistOrLocal()) {
       return persistFailedResponse("Update coaching booking");
     }
+    void autoBackupBusinessRecords({
+      actorName: session.username,
+      reason: "Coaching booking updated",
+    });
     return NextResponse.json(withPersistMeta({ booking: updated }));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Update failed";

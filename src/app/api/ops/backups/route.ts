@@ -2,15 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAnyPermission } from "@/lib/auth";
 import {
-  businessRevenueSnapshot,
+  googleSheetsEnvReady,
+  retryQueuedGoogleSheetBackups,
+  syncBusinessToGoogleSheets,
+  verifyGoogleSheetsConnection,
+} from "@/lib/google-sheets";
+import {
   getGoogleSheetsConfig,
-  listAllOrdersForOps,
   listBackupAttempts,
-  listCoachingBookings,
-  listExpenses,
-  listMemberships,
-  listProducts,
-  listUsers,
   recordBackupAttempt,
   storePersistStatus,
   updateGoogleSheetsConfig,
@@ -28,8 +27,6 @@ const noStore = { "Cache-Control": "no-store, max-age=0" };
 const configSchema = z.object({
   spreadsheetId: z.string().max(200).optional(),
   spreadsheetName: z.string().max(200).optional(),
-  connected: z.boolean().optional(),
-  serviceAccountEmail: z.string().email().optional().or(z.literal("")),
 });
 
 export async function GET() {
@@ -42,28 +39,45 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Auto-retry queued Sheets jobs when credentials become available
+  let autoRetry: { retried: number; detail?: string } | null = null;
+  if (googleSheetsEnvReady()) {
+    try {
+      const { retried, result } = await retryQueuedGoogleSheetBackups({
+        actorName: "auto-retry",
+      });
+      if (retried > 0) {
+        autoRetry = {
+          retried,
+          detail: result?.detail || (result?.ok ? "ok" : "failed"),
+        };
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }
+
   const [attempts, sheets, persist] = await Promise.all([
     listBackupAttempts(40),
     getGoogleSheetsConfig(),
     Promise.resolve(storePersistStatus()),
   ]);
+  // connected only when verify/sync set the flag — never from ID alone
   return NextResponse.json(
     {
       attempts,
       googleSheets: {
         ...sheets,
-        // Never expose secrets — only whether env hints exist
-        envReady: Boolean(
-          process.env.GOOGLE_SHEETS_CLIENT_EMAIL?.trim() &&
-            process.env.GOOGLE_SHEETS_PRIVATE_KEY?.trim()
-        ),
+        connected: Boolean(sheets.connected),
+        envReady: googleSheetsEnvReady(),
       },
       persist,
+      autoRetry,
       requiredEnv: [
-        "BLOB_READ_WRITE_TOKEN (or UPSTASH Redis / GITHUB_TOKEN)",
-        "GOOGLE_SHEETS_CLIENT_EMAIL (for Sheets backup)",
-        "GOOGLE_SHEETS_PRIVATE_KEY (for Sheets backup)",
-        "GOOGLE_SHEETS_SPREADSHEET_ID (optional override)",
+        "BLOB_READ_WRITE_TOKEN (or UPSTASH Redis / GITHUB_TOKEN) — primary DB",
+        "GOOGLE_SHEETS_CLIENT_EMAIL",
+        "GOOGLE_SHEETS_PRIVATE_KEY",
+        "GOOGLE_SHEETS_SPREADSHEET_ID (optional if saved in Ops)",
       ],
     },
     { headers: noStore }
@@ -85,25 +99,70 @@ export async function POST(req: Request) {
   if (action === "save_sheets_config") {
     try {
       const parsed = configSchema.parse(body);
+      const spreadsheetId = (parsed.spreadsheetId || "").trim();
+      if (!spreadsheetId) {
+        const saved = await updateGoogleSheetsConfig(
+          {
+            spreadsheetId: "",
+            connected: false,
+            lastBackupOk: false,
+            lastBackupDetail: "Spreadsheet ID cleared",
+          },
+          { actorId: session.userId, actorName: session.username }
+        );
+        return NextResponse.json(withPersistMeta({ googleSheets: saved }));
+      }
+
+      const verified = await verifyGoogleSheetsConnection(spreadsheetId);
       const saved = await updateGoogleSheetsConfig(
         {
-          spreadsheetId: parsed.spreadsheetId?.trim() || undefined,
+          spreadsheetId,
           spreadsheetName:
             parsed.spreadsheetName?.trim() ||
+            verified.title ||
             "Ballard's Bowling Academy — Business Management & Backup",
-          connected: Boolean(parsed.connected && parsed.spreadsheetId?.trim()),
-          serviceAccountEmail: parsed.serviceAccountEmail || undefined,
+          connected: verified.ok,
+          lastBackupOk: verified.ok ? undefined : false,
+          lastBackupDetail: verified.detail,
+          serviceAccountEmail: process.env.GOOGLE_SHEETS_CLIENT_EMAIL?.trim(),
         },
         { actorId: session.userId, actorName: session.username }
       );
       if (!requireDurablePersistOrLocal()) {
         return persistFailedResponse("Save Sheets config");
       }
-      return NextResponse.json(withPersistMeta({ googleSheets: saved }));
+      return NextResponse.json(
+        withPersistMeta({
+          googleSheets: {
+            ...saved,
+            connected: Boolean(saved.connected),
+          },
+          verified,
+          message: verified.ok
+            ? "Connection verified with Google Sheets."
+            : `Not connected: ${verified.detail}`,
+        })
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : "Invalid config";
       return NextResponse.json({ error: message }, { status: 400 });
     }
+  }
+
+  if (action === "verify") {
+    const cfg = await getGoogleSheetsConfig();
+    const id =
+      String(body?.spreadsheetId || cfg.spreadsheetId || "").trim() ||
+      process.env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim() ||
+      "";
+    const verified = await verifyGoogleSheetsConnection(id);
+    await updateGoogleSheetsConfig({
+      spreadsheetId: id || cfg.spreadsheetId,
+      connected: verified.ok,
+      lastBackupOk: verified.ok ? cfg.lastBackupOk : false,
+      lastBackupDetail: verified.detail,
+    });
+    return NextResponse.json(withPersistMeta({ verified }));
   }
 
   if (action === "self_test") {
@@ -122,52 +181,37 @@ export async function POST(req: Request) {
     );
   }
 
-  // Manual backup snapshot — queues Sheets job when credentials missing
-  const [
-    orders,
-    products,
-    users,
-    bookings,
-    memberships,
-    expenses,
-    biz,
-    sheets,
-  ] = await Promise.all([
-    listAllOrdersForOps(),
-    listProducts({ includeInactive: true }),
-    listUsers(),
-    listCoachingBookings(),
-    listMemberships(),
-    listExpenses(),
-    businessRevenueSnapshot(),
-    getGoogleSheetsConfig(),
-  ]);
+  if (action === "retry_queued") {
+    const { retried, result } = await retryQueuedGoogleSheetBackups({
+      actorName: session.username,
+    });
+    return NextResponse.json(
+      withPersistMeta({
+        retried,
+        result,
+        message: retried
+          ? result?.ok
+            ? `Retried ${retried} queued job(s) — sync succeeded.`
+            : `Retried ${retried} queued job(s) — sync failed: ${result?.detail}`
+          : "No queued Google Sheets jobs.",
+      })
+    );
+  }
 
-  const recordCounts = {
-    orders: orders.length,
-    products: products.length,
-    customers: users.length,
-    coaching: bookings.length,
-    memberships: memberships.length,
-    expenses: expenses.length,
-  };
+  // Manual backup / sync
+  const cfg = await getGoogleSheetsConfig();
+  const spreadsheetId = (
+    cfg.spreadsheetId ||
+    process.env.GOOGLE_SHEETS_SPREADSHEET_ID ||
+    ""
+  ).trim();
 
-  const envReady = Boolean(
-    process.env.GOOGLE_SHEETS_CLIENT_EMAIL?.trim() &&
-      process.env.GOOGLE_SHEETS_PRIVATE_KEY?.trim()
-  );
-  const spreadsheetId =
-    sheets.spreadsheetId ||
-    process.env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim() ||
-    "";
-
-  if (!envReady || !spreadsheetId) {
+  if (!googleSheetsEnvReady() || !spreadsheetId) {
     const attempt = await recordBackupAttempt({
       status: "queued",
       destination: "google_sheets",
       detail:
-        "Backup queued. Add GOOGLE_SHEETS_CLIENT_EMAIL + GOOGLE_SHEETS_PRIVATE_KEY in Vercel, and set a spreadsheet ID. The website continues using the durable store as source of truth.",
-      recordCounts,
+        "Backup queued. Add GOOGLE_SHEETS_CLIENT_EMAIL + GOOGLE_SHEETS_PRIVATE_KEY in Vercel and a verified spreadsheet ID, then use Retry queued or Run backup.",
       actorName: session.username,
     });
     if (!requireDurablePersistOrLocal()) {
@@ -177,42 +221,28 @@ export async function POST(req: Request) {
       withPersistMeta({
         attempt,
         queued: true,
-        financesHint: biz,
         message:
-          "Sheets credentials are not configured. Snapshot counts were logged; retry after env is set.",
+          "Sheets not ready — job queued. Website continues on durable store.",
       })
     );
   }
 
-  // Credentials present but live Sheets write not implemented in this phase —
-  // record an honest queued/success-pending status rather than pretending.
-  const attempt = await recordBackupAttempt({
-    status: "queued",
-    destination: "google_sheets",
-    detail: `Sheets env detected for spreadsheet ${spreadsheetId}. Live tab sync ships next; counts captured for reconciliation.`,
-    recordCounts,
+  const result = await syncBusinessToGoogleSheets({
     actorName: session.username,
+    spreadsheetId,
   });
-  await updateGoogleSheetsConfig(
-    {
-      spreadsheetId,
-      connected: true,
-      lastBackupAt: attempt.at,
-      lastBackupOk: false,
-      lastBackupDetail: attempt.detail,
-    },
-    { actorId: session.userId, actorName: session.username }
-  );
 
   if (!requireDurablePersistOrLocal()) {
     return persistFailedResponse("Record backup");
   }
+
   return NextResponse.json(
     withPersistMeta({
-      attempt,
-      queued: true,
-      message:
-        "Backup job recorded. Full Google Sheets row sync is staged next; durable database remains source of truth.",
+      result,
+      ok: result.ok,
+      message: result.ok
+        ? result.detail
+        : `Backup failed: ${result.detail}`,
     })
   );
 }

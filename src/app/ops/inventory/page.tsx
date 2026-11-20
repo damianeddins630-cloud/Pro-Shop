@@ -18,8 +18,11 @@ const empty = {
   name: "",
   description: "",
   price: "0",
+  cost: "0",
   discountPercent: "0",
   stock: "0",
+  lowStockThreshold: "3",
+  supplier: "",
   category: "Accessories",
   brand: "Storm",
   image: "",
@@ -51,14 +54,31 @@ export default function OpsInventoryPage() {
   const [onlyNeedsPrice, setOnlyNeedsPrice] = useState(false);
   const [onlyActive, setOnlyActive] = useState(false);
   const [page, setPage] = useState(0);
+  const [adjustments, setAdjustments] = useState<
+    {
+      id: string;
+      productName: string;
+      previousStock: number;
+      nextStock: number;
+      delta: number;
+      reason: string;
+      at: string;
+      actorName?: string;
+    }[]
+  >([]);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/products?admin=1&t=${Date.now()}`, {
-      cache: "no-store",
-    });
+    const [res, adjRes] = await Promise.all([
+      fetch(`/api/products?admin=1&t=${Date.now()}`, { cache: "no-store" }),
+      fetch("/api/ops/inventory/adjustments", { cache: "no-store" }),
+    ]);
     const data = await res.json();
     const list = data.products || [];
     setProducts(list);
+    if (adjRes.ok) {
+      const adj = await adjRes.json().catch(() => ({}));
+      setAdjustments(adj.adjustments || []);
+    }
     if (data.persist?.lastPersistOk === false) {
       const detail = String(data.persist.lastPersistDetail || "unknown");
       const coldStart = detail.includes("No durable save verified");
@@ -139,8 +159,11 @@ export default function OpsInventoryPage() {
       name: p.name,
       description: p.description || "",
       price: String(p.price ?? 0),
+      cost: String(p.cost ?? 0),
       discountPercent: String(p.discountPercent ?? 0),
       stock: String(p.stock ?? 0),
+      lowStockThreshold: String(p.lowStockThreshold ?? 3),
+      supplier: p.supplier || "",
       category: p.category || "Accessories",
       brand: p.brand || "Storm",
       image: p.image || "",
@@ -201,8 +224,11 @@ export default function OpsInventoryPage() {
       name: form.name.trim(),
       description: form.description,
       price,
+      cost: Math.max(0, Number(form.cost) || 0),
       discountPercent,
       stock,
+      lowStockThreshold: Math.max(0, Math.floor(Number(form.lowStockThreshold) || 0)),
+      supplier: form.supplier.trim() || undefined,
       category: form.category,
       brand: form.brand,
       image: form.image.trim() || "/images/logo.png",
@@ -284,6 +310,24 @@ export default function OpsInventoryPage() {
   }
 
   const ballSummary = summarizeBallInventory(products);
+  const valuation = useMemo(() => {
+    let atCost = 0;
+    let atPrice = 0;
+    let profitIfSold = 0;
+    for (const p of products.filter((x) => x.active)) {
+      const stock = Math.max(0, p.stock || 0);
+      const cost = Math.max(0, Number(p.cost) || 0);
+      const price = Math.max(0, Number(p.price) || 0);
+      atCost += cost * stock;
+      atPrice += price * stock;
+      profitIfSold += (price - cost) * stock;
+    }
+    return {
+      atCost: Math.round(atCost * 100) / 100,
+      atPrice: Math.round(atPrice * 100) / 100,
+      profitIfSold: Math.round(profitIfSold * 100) / 100,
+    };
+  }, [products]);
 
   if (loading) return <p className="text-mist">Loading inventory…</p>;
 
@@ -294,7 +338,22 @@ export default function OpsInventoryPage() {
           <h2 className="display text-4xl">Inventory</h2>
           <p className="mt-1 max-w-2xl text-sm text-mist">
             Website prices & stock are the source of truth. Search SKU/UPC, set
-            price, then save — Shopify only takes payment.
+            cost and selling price, then save — Shopify only takes payment. Paid
+            orders automatically decrement stock and write adjustment history.
+          </p>
+          <p className="mt-2 text-sm text-mist">
+            Valuation at cost:{" "}
+            <strong className="text-chalk">
+              ${valuation.atCost.toLocaleString()}
+            </strong>
+            {" · "}at sell price:{" "}
+            <strong className="text-chalk">
+              ${valuation.atPrice.toLocaleString()}
+            </strong>
+            {" · "}potential profit:{" "}
+            <strong className="text-chalk">
+              ${valuation.profitIfSold.toLocaleString()}
+            </strong>
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
@@ -569,6 +628,26 @@ export default function OpsInventoryPage() {
               value={form.upc}
               onChange={(e) => setForm({ ...form, upc: e.target.value })}
             />
+            <input
+              className="field"
+              placeholder="Supplier"
+              value={form.supplier}
+              onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+            />
+            <div>
+              <label className="label">Low-stock alert at</label>
+              <input
+                className="field"
+                inputMode="numeric"
+                value={form.lowStockThreshold}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    lowStockThreshold: e.target.value.replace(/[^0-9]/g, ""),
+                  })
+                }
+              />
+            </div>
           </div>
           <div
             className={`grid gap-3 ${
@@ -576,7 +655,7 @@ export default function OpsInventoryPage() {
             }`}
           >
             <div>
-              <label className="label">Price ($0 = needs price)</label>
+              <label className="label">Selling price ($0 = needs price)</label>
               <input
                 className="field"
                 inputMode="decimal"
@@ -585,6 +664,20 @@ export default function OpsInventoryPage() {
                   setForm({
                     ...form,
                     price: e.target.value.replace(/[^0-9.]/g, ""),
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Purchase cost</label>
+              <input
+                className="field"
+                inputMode="decimal"
+                value={form.cost}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    cost: e.target.value.replace(/[^0-9.]/g, ""),
                   })
                 }
               />
@@ -806,6 +899,37 @@ export default function OpsInventoryPage() {
           </div>
         </form>
       </div>
+
+      <section className="mt-8 rounded-2xl border border-white/12 bg-black/40 p-5">
+        <h3 className="display text-3xl">Stock adjustment history</h3>
+        <p className="mt-1 text-sm text-mist">
+          Manual edits and paid-order stock drops are logged. Records are never
+          silently overwritten without a history entry.
+        </p>
+        {!adjustments.length ? (
+          <p className="mt-3 text-sm text-mist">No adjustments recorded yet.</p>
+        ) : (
+          <ul className="mt-4 space-y-2 text-sm">
+            {adjustments.slice(0, 40).map((a) => (
+              <li
+                key={a.id}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 py-2"
+              >
+                <div>
+                  <strong>{a.productName}</strong>
+                  <div className="text-mist">
+                    {a.previousStock} → {a.nextStock} ({a.delta >= 0 ? "+" : ""}
+                    {a.delta}) · {a.reason} · {a.actorName || "system"}
+                  </div>
+                </div>
+                <span className="text-xs text-mist">
+                  {new Date(a.at).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

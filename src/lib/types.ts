@@ -429,6 +429,7 @@ export interface BackupAttempt {
 export interface GoogleSheetsConfig {
   spreadsheetId?: string;
   spreadsheetName?: string;
+  /** True only after a successful live Google API verify/sync */
   connected?: boolean;
   lastBackupAt?: string;
   lastBackupOk?: boolean;
@@ -436,6 +437,28 @@ export interface GoogleSheetsConfig {
   /** Never store private keys here in plaintext long-term; env preferred */
   serviceAccountEmail?: string;
   updatedAt?: string;
+}
+
+export type RefundRecordStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+/** Standalone refund history — completed only after provider/staff confirmation */
+export interface RefundRecord {
+  id: string;
+  orderId: string;
+  amount: number;
+  reason: string;
+  status: RefundRecordStatus;
+  provider: "shopify" | "local" | "manual";
+  providerRefundId?: string;
+  inventoryRestored: boolean;
+  createdAt: string;
+  completedAt?: string;
+  createdBy?: string;
+  notes?: string;
 }
 
 export type CouponType = "percent" | "fixed" | "free";
@@ -501,6 +524,7 @@ export interface StoreData {
   stockAdjustments?: StockAdjustment[];
   backupAttempts?: BackupAttempt[];
   googleSheetsConfig?: GoogleSheetsConfig;
+  refunds?: RefundRecord[];
 }
 
 export interface CartItem {
