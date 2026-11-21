@@ -59,6 +59,9 @@ const patchSchema = z.object({
   shopifyVariantId: z.string().optional(),
   sku: z.string().optional().nullable(),
   upc: z.string().optional().nullable(),
+  cost: z.coerce.number().min(0).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).optional(),
+  supplier: z.string().optional().nullable(),
   variantMeta: z
     .record(
       z.string(),
@@ -92,13 +95,18 @@ export async function PUT(req: Request, { params }: Params) {
   try {
     const body = patchSchema.parse(await req.json());
     const before = await getProduct(id);
-    const product = await updateProduct(id, {
-      ...body,
-      sku: body.sku ?? undefined,
-      upc: body.upc ?? undefined,
-      weightStock: body.weightStock ?? undefined,
-      variantMeta: body.variantMeta ?? undefined,
-    });
+    const product = await updateProduct(
+      id,
+      {
+        ...body,
+        sku: body.sku ?? undefined,
+        upc: body.upc ?? undefined,
+        supplier: body.supplier ?? undefined,
+        weightStock: body.weightStock ?? undefined,
+        variantMeta: body.variantMeta ?? undefined,
+      },
+      { actorName: session.username, stockReason: "Ops inventory edit" }
+    );
     if (!product) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

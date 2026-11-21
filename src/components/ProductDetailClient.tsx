@@ -91,8 +91,9 @@ export function ProductDetailClient({
       )
     : product.stock;
   const out = overallStock <= 0;
+  // Only mark sold-out once a weight is chosen; null selection uses "Select a weight".
   const selectedOut =
-    needsWeight && (selectedWeight == null || selectedStock <= 0);
+    needsWeight && selectedWeight != null && selectedStock <= 0;
 
   return (
     <section className="site-shell section-pad pt-24">

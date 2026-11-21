@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { OpsPageHeader, OpsStatCard } from "@/components/ops/OpsUi";
 import type { Order, OrderStatus, Product } from "@/lib/types";
 import { useEditMode } from "@/lib/edit-mode";
 import {
@@ -53,12 +54,30 @@ export default function OpsOrdersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [message, setMessage] = useState("");
+  const [refunds, setRefunds] = useState<
+    {
+      id: string;
+      orderId: string;
+      amount: number;
+      reason: string;
+      status: string;
+      provider: string;
+      createdAt: string;
+    }[]
+  >([]);
+  const [refundForm, setRefundForm] = useState({
+    orderId: "",
+    amount: "",
+    reason: "",
+    restoreInventory: true,
+  });
   const canManage = can("manage_orders");
 
   const load = useCallback(async () => {
-    const [ordersRes, productsRes] = await Promise.all([
+    const [ordersRes, productsRes, refundsRes] = await Promise.all([
       fetch("/api/orders?all=1", { cache: "no-store" }),
       fetch(`/api/products?admin=1&t=${Date.now()}`, { cache: "no-store" }),
+      fetch("/api/ops/refunds", { cache: "no-store" }),
     ]);
     const ordersData = await ordersRes.json();
     const productsData = await productsRes.json().catch(() => ({}));
@@ -69,6 +88,10 @@ export default function OpsOrdersPage() {
     }
     setOrders(ordersData.orders || []);
     setProducts(productsData.products || []);
+    if (refundsRes.ok) {
+      const rj = await refundsRes.json().catch(() => ({}));
+      setRefunds(rj.refunds || []);
+    }
     setError("");
     setLoading(false);
   }, []);
@@ -191,124 +214,130 @@ export default function OpsOrdersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs tracking-[0.28em] text-red uppercase">
-            In-store fulfillment
-          </p>
-          <h2 className="display mt-1 text-5xl md:text-6xl">Orders</h2>
-          <p className="mt-2 max-w-2xl text-sm text-mist">
-            {IN_STORE_POLICY} Only fully paid checkouts appear here — unpaid
-            Shopify invoices stay out until payment completes.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canManage ? (
+    <div className="ops-dash-grid">
+      <OpsPageHeader
+        title="Sales & Orders"
+        description={`${IN_STORE_POLICY} Only fully paid checkouts appear here — unpaid Shopify invoices stay out until payment completes.`}
+        actions={
+          <>
+            <a className="ops-ghost-btn" href="/api/ops/sales/export">
+              Export CSV
+            </a>
+            {filtered[0] ? (
+              <Link
+                href={`/ops/orders/${filtered[0].id}/receipt`}
+                className="ops-ghost-btn"
+              >
+                Latest receipt
+              </Link>
+            ) : null}
+            {canManage ? (
+              <button
+                type="button"
+                className="ops-ghost-btn"
+                disabled={clearing || orders.length === 0}
+                onClick={() => void clearOrders()}
+              >
+                {clearing ? "Clearing…" : "Clear all"}
+              </button>
+            ) : null}
             <button
               type="button"
-              className="btn btn-ghost text-sm text-red-300"
-              disabled={clearing || orders.length === 0}
-              onClick={() => void clearOrders()}
+              className="ops-primary-btn"
+              onClick={() => {
+                setLoading(true);
+                void load();
+              }}
             >
-              {clearing ? "Clearing…" : "Clear all orders"}
+              Refresh
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="btn btn-ghost text-sm"
-            onClick={() => {
-              setLoading(true);
-              void load();
-            }}
-          >
-            Refresh
-          </button>
+          </>
+        }
+      />
+
+      {error ? (
+        <div className="ops-stage-banner" role="alert">
+          {error}
         </div>
-      </div>
+      ) : null}
+      {message ? (
+        <div className="ops-stage-banner" role="status">
+          {message}
+        </div>
+      ) : null}
 
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-
-      <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-        <p className="text-xs tracking-[0.2em] text-red uppercase">
-          Order flow
-        </p>
-        <p className="mt-1 text-sm text-mist">
-          Balls in → Come do drilling → Order complete
-        </p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="ops-card">
+        <div className="ops-card-head">
+          <h2>Order flow</h2>
+          <span className="ops-badge ops-badge-gray">
+            Balls in → Drilling → Complete
+          </span>
+        </div>
+        <div className="ops-metric-grid">
           {STAFF_WORKFLOW.map((step) => (
-            <div
-              key={step.n}
-              className="rounded-2xl border border-white/10 bg-black/30 p-3"
-            >
-              <p className="text-xs text-red">{step.n}</p>
-              <p className="mt-1 text-sm font-semibold text-chalk">{step.title}</p>
-              <p className="mt-1 text-xs text-mist">{step.text}</p>
+            <div key={step.n} className="ops-soft-panel" style={{ padding: "0.85rem" }}>
+              <p className="ops-kpi-label">Step {step.n}</p>
+              <p style={{ margin: "0.35rem 0 0", fontWeight: 700 }}>{step.title}</p>
+              <p className="ops-note" style={{ marginTop: "0.35rem" }}>
+                {step.text}
+              </p>
             </div>
           ))}
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric
+      <div className="ops-kpi-row">
+        <OpsStatCard
+          tone="red"
           label="Active in shop"
           value={String(pipelineCounts.active)}
-          hint="Paid only · balls in → drilling"
+          meta="Paid only · balls in → drilling"
         />
-        <Metric
+        <OpsStatCard
+          tone="amber"
           label="Balls in"
           value={String(
             (pipelineCounts.placed || 0) + (pipelineCounts.processing || 0)
           )}
-          hint="Waiting for customer to come drill"
+          meta="Waiting for customer to come drill"
         />
-        <Metric
+        <OpsStatCard
+          tone="blue"
           label="Balls in vault"
           value={String(ballSummary.totalBalls)}
-          hint={`${ballSummary.ballSkus} ball SKU${ballSummary.ballSkus === 1 ? "" : "s"}`}
+          meta={`${ballSummary.ballSkus} ball SKU${ballSummary.ballSkus === 1 ? "" : "s"}`}
         />
-        <Metric
+        <OpsStatCard
+          tone="green"
           label="Come do drilling"
           value={String(pipelineCounts.ready || 0)}
-          hint="Customer should come in now"
+          meta="Customer should come in now"
         />
       </div>
 
-      <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] via-black/40 to-red/10 p-5 md:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      <section className="ops-card">
+        <div className="ops-card-head">
           <div>
-            <p className="text-xs tracking-[0.22em] text-red uppercase">
-              Ball vault
-            </p>
-            <h3 className="display mt-1 text-3xl">
-              {ballSummary.totalBalls} total
-            </h3>
-            <p className="mt-1 text-sm text-mist">
+            <h2>Ball vault · {ballSummary.totalBalls} total</h2>
+            <p className="ops-note" style={{ marginTop: "0.25rem" }}>
               Units by weight across active ball inventory.
             </p>
           </div>
-          <Link href="/ops/inventory" className="btn btn-ghost !py-2 text-sm">
+          <Link href="/ops/inventory" className="ops-ghost-btn">
             Manage inventory
           </Link>
         </div>
         {ballSummary.byWeight.length ? (
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="ops-stat-list" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(88px, 1fr))" }}>
             {ballSummary.byWeight.map((bucket) => (
-              <div
-                key={bucket.weight}
-                className="min-w-[4.5rem] rounded-2xl border border-white/15 bg-black/35 px-3 py-3 text-center"
-              >
-                <p className="text-xs text-mist">{bucket.label}</p>
-                <p className="display mt-1 text-3xl text-chalk">
-                  {bucket.stock > 0 ? bucket.stock : "—"}
-                </p>
+              <div key={bucket.weight} style={{ textAlign: "center" }}>
+                <span>{bucket.label}</span>
+                <strong>{bucket.stock > 0 ? bucket.stock : "—"}</strong>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-4 text-sm text-mist">
+          <p className="ops-empty">
             No weighted balls yet — add weights + qty in Inventory.
           </p>
         )}
@@ -375,24 +404,166 @@ export default function OpsOrdersPage() {
           ))
         )}
       </div>
-    </div>
-  );
-}
 
-function Metric({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-      <p className="text-xs tracking-[0.18em] text-mist uppercase">{label}</p>
-      <p className="display mt-2 text-4xl text-chalk">{value}</p>
-      <p className="mt-1 text-xs text-steel">{hint}</p>
+      {canManage ? (
+        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+          <h3 className="display text-3xl">Refunds</h3>
+          <p className="mt-1 text-sm text-mist">
+            Refunds stay <strong>pending</strong> until you attest the payment
+            provider completed the refund. Collected revenue is reduced only
+            after confirmation.
+          </p>
+          <form
+            className="mt-4 grid gap-3 md:grid-cols-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void (async () => {
+                const res = await fetch("/api/ops/refunds", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "request",
+                    orderId: refundForm.orderId,
+                    amount: Number(refundForm.amount) || 0,
+                    reason: refundForm.reason,
+                    restoreInventory: refundForm.restoreInventory,
+                  }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  setError(data.error || "Refund request failed");
+                  return;
+                }
+                setMessage(data.message || "Refund requested (pending).");
+                setRefundForm({
+                  orderId: "",
+                  amount: "",
+                  reason: "",
+                  restoreInventory: true,
+                });
+                await load();
+              })();
+            }}
+          >
+            <select
+              className="field"
+              required
+              value={refundForm.orderId}
+              onChange={(e) =>
+                setRefundForm((f) => ({ ...f, orderId: e.target.value }))
+              }
+            >
+              <option value="">Select paid order…</option>
+              {orders.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.id.slice(0, 8)} · {o.username} · ${o.total}
+                </option>
+              ))}
+            </select>
+            <input
+              className="field"
+              required
+              placeholder="Amount"
+              inputMode="decimal"
+              value={refundForm.amount}
+              onChange={(e) =>
+                setRefundForm((f) => ({ ...f, amount: e.target.value }))
+              }
+            />
+            <input
+              className="field"
+              required
+              placeholder="Reason"
+              value={refundForm.reason}
+              onChange={(e) =>
+                setRefundForm((f) => ({ ...f, reason: e.target.value }))
+              }
+            />
+            <button type="submit" className="btn btn-primary">
+              Request refund
+            </button>
+          </form>
+
+          <ul className="mt-4 space-y-2 text-sm">
+            {refunds.length === 0 ? (
+              <li className="text-mist">No refunds yet.</li>
+            ) : (
+              refunds.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 py-2"
+                >
+                  <div>
+                    <strong>
+                      ${r.amount.toFixed(2)} · {r.status}
+                    </strong>
+                    <div className="text-mist">
+                      Order {r.orderId.slice(0, 8)} · {r.provider} · {r.reason}
+                    </div>
+                  </div>
+                  {r.status === "pending" ? (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-primary text-xs"
+                        onClick={() => {
+                          if (
+                            !confirm(
+                              "Confirm ONLY if the payment provider has already refunded the customer."
+                            )
+                          ) {
+                            return;
+                          }
+                          void (async () => {
+                            const res = await fetch("/api/ops/refunds", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                action: "confirm",
+                                refundId: r.id,
+                                attestedProviderConfirmed: true,
+                                restoreInventory: true,
+                              }),
+                            });
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                              setError(data.error || "Confirm failed");
+                              return;
+                            }
+                            setMessage(data.message || "Refund completed.");
+                            await load();
+                          })();
+                        }}
+                      >
+                        Confirm provider refunded
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost text-xs"
+                        onClick={() => {
+                          void (async () => {
+                            await fetch("/api/ops/refunds", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                action: "cancel",
+                                refundId: r.id,
+                              }),
+                            });
+                            await load();
+                          })();
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))
+            )}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -428,20 +599,20 @@ function OrderWorkstationCard({
   const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : null;
 
   return (
-    <article className="ops-order-card overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03]">
-      <div className="border-b border-white/10 bg-black/25 px-5 py-4 md:px-6">
+    <article className="ops-card ops-order-card" style={{ padding: 0, overflow: "hidden" }}>
+      <div style={{ borderBottom: "1px solid var(--ops-border)", background: "rgba(0,0,0,0.22)", padding: "1rem 1.1rem" }}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs text-mist">
+            <p className="ops-kpi-label">
               {new Date(order.createdAt).toLocaleString()}
               {order.updatedAt && order.updatedAt !== order.createdAt
                 ? ` · updated ${new Date(order.updatedAt).toLocaleString()}`
                 : ""}
             </p>
-            <h3 className="display mt-1 truncate text-3xl md:text-4xl">
+            <h3 style={{ margin: "0.35rem 0 0", fontSize: "1.35rem", fontWeight: 750 }}>
               {order.username}
             </h3>
-            <p className="truncate text-sm text-mist">{order.email}</p>
+            <p className="ops-note" style={{ marginTop: "0.2rem" }}>{order.email}</p>
             {phone ? (
               <p className="mt-1 text-sm text-chalk">
                 Phone{" "}
@@ -457,6 +628,12 @@ function OrderWorkstationCard({
               <p className="mt-1 text-xs text-steel">No phone on file</p>
             )}
             <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                href={`/ops/orders/${order.id}/receipt`}
+                className="inline-flex rounded-full border border-red/40 bg-red/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-chalk"
+              >
+                Print receipt
+              </Link>
               <span className="inline-flex rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-chalk">
                 In-store · no shipping
               </span>

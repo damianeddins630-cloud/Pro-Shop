@@ -13,7 +13,7 @@ const securityHeaders = [
       "base-uri 'self'",
       "form-action 'self' https://*.activehosted.com https://*.myshopify.com https://checkout.shopify.com",
       "frame-ancestors 'self'",
-      "frame-src 'self' https://*.activehosted.com https://*.myshopify.com https://checkout.shopify.com",
+      "frame-src 'self' https://*.activehosted.com https://*.myshopify.com https://checkout.shopify.com https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https://fonts.bunny.net",
       "style-src 'self' 'unsafe-inline' https://fonts.bunny.net",

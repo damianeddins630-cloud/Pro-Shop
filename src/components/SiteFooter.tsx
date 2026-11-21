@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandMark } from "./BrandMark";
 import { EditablePageTitle } from "@/components/EditablePageTitle";
@@ -22,9 +23,12 @@ const defaults = {
 };
 
 export function SiteFooter() {
+  const pathname = usePathname();
   const [t, setT] = useState(defaults);
+  const hide = pathname.startsWith("/ops");
 
   useEffect(() => {
+    if (hide) return;
     void (async () => {
       try {
         const res = await fetch("/api/texts?page=footer", { cache: "no-store" });
@@ -41,7 +45,9 @@ export function SiteFooter() {
         // keep defaults
       }
     })();
-  }, []);
+  }, [hide]);
+
+  if (hide) return null;
 
   return (
     <footer className="site-footer mt-12 border-t border-white/10 bg-gradient-to-b from-black to-[#070707]">

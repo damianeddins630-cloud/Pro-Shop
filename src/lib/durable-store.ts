@@ -1,5 +1,22 @@
 import { get as blobGet, list as blobList, put as blobPut } from "@vercel/blob";
-import type { StoreData, User, Order, Role, Coupon, Subscriber, SubscriberAnnouncement } from "@/lib/types";
+import type {
+  StoreData,
+  User,
+  Order,
+  Role,
+  Coupon,
+  Subscriber,
+  SubscriberAnnouncement,
+  CoachingBooking,
+  CoachingPackage,
+  Membership,
+  Expense,
+  CustomerNote,
+  ActivityLogEntry,
+  StockAdjustment,
+  BackupAttempt,
+  RefundRecord,
+} from "@/lib/types";
 import {
   githubWriteConfigured,
   loadGithubStore,
@@ -166,6 +183,50 @@ function mergeDurableCopies(
       secondary.announcements || [],
       primary.announcements || []
     ),
+    coachingBookings: mergeById<CoachingBooking>(
+      secondary.coachingBookings || [],
+      primary.coachingBookings || []
+    ),
+    coachingPackages: mergeById<CoachingPackage>(
+      secondary.coachingPackages || [],
+      primary.coachingPackages || []
+    ),
+    memberships: mergeById<Membership>(
+      secondary.memberships || [],
+      primary.memberships || []
+    ),
+    expenses: mergeById<Expense>(
+      secondary.expenses || [],
+      primary.expenses || []
+    ),
+    customerNotes: mergeById<CustomerNote>(
+      secondary.customerNotes || [],
+      primary.customerNotes || []
+    ),
+    activityLog: mergeById<ActivityLogEntry>(
+      secondary.activityLog || [],
+      primary.activityLog || []
+    ),
+    stockAdjustments: mergeById<StockAdjustment>(
+      secondary.stockAdjustments || [],
+      primary.stockAdjustments || []
+    ),
+    backupAttempts: mergeById<BackupAttempt>(
+      secondary.backupAttempts || [],
+      primary.backupAttempts || []
+    ),
+    refunds: mergeById<RefundRecord>(
+      secondary.refunds || [],
+      primary.refunds || []
+    ),
+    googleSheetsConfig: (() => {
+      const a = primary.googleSheetsConfig;
+      const b = secondary.googleSheetsConfig;
+      if (!a && !b) return undefined;
+      if (!a) return b;
+      if (!b) return a;
+      return (a.updatedAt || "") >= (b.updatedAt || "") ? a : b;
+    })(),
     shopifyConfig: mergeShopifyConfig(
       secondary.shopifyConfig,
       primary.shopifyConfig

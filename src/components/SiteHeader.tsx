@@ -22,6 +22,8 @@ export function SiteHeader() {
   const { user, canEdit, can, editMode, setEditMode } = useEditMode();
   const [open, setOpen] = useState(false);
   const shopMode = pathname.startsWith("/shop") || pathname.startsWith("/cart");
+  // Operations Center has its own shell — hide the storefront chrome.
+  if (pathname.startsWith("/ops")) return null;
   const showAdmin =
     can("manage_inventory") ||
     can("manage_roles") ||
